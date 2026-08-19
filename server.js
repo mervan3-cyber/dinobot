@@ -27,11 +27,21 @@ KESIN KURALLAR:
 
 Cikti Formati: {"tahmin": "1.5 UST", "guven_puani": 75, "oran": 1.45, "baski_endeksi": "%88", "gerekce": "..."}`;
 
-// SISTEM DEGISKENLERI (Panelden degisecek)
-let botInterval = null;
+// SISTEM DEGISKENLERI
 let isRunning = false;
+let isScanning = false; // Spam tiklamayi onlemek icin kilit
 let globalMinOran = 1.40;
 let globalMinGuven = 70;
+
+// ZAMANLAYICI DEGISKENLERI (COKLU LISTE)
+let scheduleEnabled = false;
+let schedules = []; 
+let nextRunTime = 0;
+let masterInterval = null;
+
+function getCurrentTimeTR() {
+    return new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
+}
 
 async function canliMaclariHazirla() {
     try {
@@ -65,7 +75,6 @@ async function canliMaclariHazirla() {
         }
         return macVerileri;
     } catch (error) {
-        console.error("API Hatasi:", error.message);
         return [];
     }
 }
@@ -74,65 +83,154 @@ async function telegramaGonder(mac, analiz) {
     const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥\n------------------------------------------------\n⚽️ *Maç:* ${mac.mac}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Tahmin:* ${analiz.tahmin}\n📈 *Değer (Oran):* ${analiz.oran}\n⚡️ *Güven Puanı:* %${analiz.guven_puani}\n📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}\n\n🦖 *Yapay Zeka Analizi:*\n_${analiz.gerekce}_\n------------------------------------------------`;
     try {
         await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
-    } catch (error) {
-        console.error("Telegram hatasi:", error.message);
-    }
+    } catch (error) {}
 }
 
 async function botuCalistir() {
-    if(!isRunning) return;
-    console.log("Tarama basladi...");
-    const macListesi = await canliMaclariHazirla();
-    if (macListesi.length === 0) return;
+    if (isScanning) {
+        console.log(`[${getCurrentTimeTR()}] Tarama zaten devam ediyor, bu istek atlandi.`);
+        return;
+    }
+    isScanning = true;
+    try {
+        console.log(`[${getCurrentTimeTR()}] Tarama basladi...`);
+        const macListesi = await canliMaclariHazirla();
+        if (macListesi.length === 0) {
+            isScanning = false;
+            return;
+        }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" }); 
-    let onaylanan = 0, istek = 0;
+        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" }); 
+        let onaylanan = 0, istek = 0;
 
-    for (const mac of macListesi) {
-        if (onaylanan >= 3 || istek >= 5) break;
-        istek++;
-        try {
-            const prompt = SYSTEM_INSTRUCTION + "\n\nAnaliz Edilecek Mac Verisi:\n" + JSON.stringify(mac);
-            const result = await model.generateContent(prompt);
-            let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
-            const analiz = JSON.parse(aiYaniti);
+        for (const mac of macListesi) {
+            if (onaylanan >= 3 || istek >= 5) break;
+            istek++;
+            try {
+                const prompt = SYSTEM_INSTRUCTION + "\n\nAnaliz Edilecek Mac Verisi:\n" + JSON.stringify(mac);
+                const result = await model.generateContent(prompt);
+                let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
+                const analiz = JSON.parse(aiYaniti);
 
-            if (parseFloat(analiz.oran) >= globalMinOran && analiz.guven_puani >= globalMinGuven) {
-                await telegramaGonder(mac, analiz);
-                onaylanan++;
-            }
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (err) { }
+                if (parseFloat(analiz.oran) >= globalMinOran && analiz.guven_puani >= globalMinGuven) {
+                    await telegramaGonder(mac, analiz);
+                    onaylanan++;
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } catch (err) { }
+        }
+    } finally {
+        isScanning = false;
+        console.log(`[${getCurrentTimeTR()}] Tarama bitti.`);
     }
 }
 
-// API ENDPOINT'LERI (Netlify'dan gelen komutlari dinler)
+// ANA KONTROL SAATI (Coklu Liste Destekli)
+function masterClock() {
+    if (!isRunning) return;
+
+    const nowTime = getCurrentTimeTR();
+    let activeSchedule = null;
+
+    if (scheduleEnabled && schedules.length > 0) {
+        for (let s of schedules) {
+            let inWindow = false;
+            if (s.start <= s.end) {
+                inWindow = (nowTime >= s.start && nowTime <= s.end);
+            } else { // Gece yarisini gecen saatler
+                inWindow = (nowTime >= s.start || nowTime <= s.end);
+            }
+
+            if (inWindow) {
+                activeSchedule = s;
+            } else {
+                s.hasRanSingle = false; 
+            }
+        }
+    } else if (!scheduleEnabled) {
+        activeSchedule = { mode: 'loop' };
+    }
+
+    if (activeSchedule) {
+        if (scheduleEnabled && activeSchedule.mode === 'single') {
+            if (!activeSchedule.hasRanSingle) {
+                botuCalistir();
+                activeSchedule.hasRanSingle = true; 
+            }
+        } else {
+            const nowMs = Date.now();
+            if (nowMs >= nextRunTime) {
+                botuCalistir();
+                nextRunTime = nowMs + (15 * 60 * 1000); 
+            }
+        }
+    }
+}
+
+
+// --- API ENDPOINT'LERI ---
+
 app.post('/api/start', (req, res) => {
     if (!isRunning) {
         isRunning = true;
-        botuCalistir(); // Ilk taramayi hemen yap
-        botInterval = setInterval(botuCalistir, 15 * 60 * 1000); // Sonra 15 dakikada bir (900.000 ms)
-        res.json({ success: true, message: "Bot başlatıldı." });
+        nextRunTime = 0; 
+        masterInterval = setInterval(masterClock, 60000); 
+        masterClock(); 
+        res.json({ success: true, message: "Sistem Ana Şalteri AÇILDI." });
     } else {
-        res.json({ success: false, message: "Bot zaten çalışıyor." });
+        res.json({ success: false, message: "Sistem zaten çalışıyor." });
     }
 });
 
 app.post('/api/stop', (req, res) => {
     isRunning = false;
-    if (botInterval) clearInterval(botInterval);
-    res.json({ success: true, message: "Bot durduruldu." });
+    if (masterInterval) clearInterval(masterInterval);
+    res.json({ success: true, message: "Sistem Ana Şalteri KAPATILDI." });
+});
+
+app.post('/api/force-scan', (req, res) => {
+    if (!isRunning) {
+        return res.json({ success: false, message: "HATA: Önce Sistem Şalterini AÇMALISIN!" });
+    }
+    if (isScanning) {
+        return res.json({ success: false, message: "Şu an zaten bir tarama yapılıyor. Lütfen bekle." });
+    }
+    
+    // Asenkron olarak tetikle, cevap bekleme
+    botuCalistir().catch(console.error);
+    res.json({ success: true, message: "⚡ Manuel Hızlı Tarama tetiklendi! Arka planda maçlar aranıyor..." });
 });
 
 app.post('/api/settings', (req, res) => {
     globalMinOran = parseFloat(req.body.oran) || globalMinOran;
     globalMinGuven = parseInt(req.body.guven) || globalMinGuven;
-    res.json({ success: true, message: `Ayarlar: Oran ${globalMinOran}, Guven ${globalMinGuven}` });
+    res.json({ success: true, message: `Filtreler güncellendi: Min Oran ${globalMinOran}` });
+});
+
+app.post('/api/schedule', (req, res) => {
+    scheduleEnabled = !!req.body.enabled;
+    const incomingSchedules = req.body.schedules || [];
+    
+    schedules = incomingSchedules.map(inc => {
+        const existing = schedules.find(s => s.id === inc.id);
+        return {
+            ...inc,
+            hasRanSingle: existing ? existing.hasRanSingle : false
+        };
+    });
+    
+    res.json({ success: true, message: `Zamanlayıcı Programı Kaydedildi. (${schedules.length} Görev)` });
 });
 
 app.get('/api/status', (req, res) => {
-    res.json({ isRunning, globalMinOran, globalMinGuven });
+    res.json({ 
+        isRunning, 
+        globalMinOran, 
+        globalMinGuven,
+        scheduleEnabled,
+        schedules
+    });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Dino Backend ${PORT} portunda calisiyor.`));
+app.listen(PORT, () => console.log(`Dino Backend V4 ${PORT} portunda calisiyor.`));
