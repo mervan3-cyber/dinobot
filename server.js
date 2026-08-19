@@ -4,10 +4,15 @@ const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// HTML PANELINI YAYINLAMAK ICIN EKLENDI
+app.use(express.static(path.join(__dirname, 'public')));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const apiFootballKey = process.env.API_FOOTBALL_KEY;
@@ -27,17 +32,38 @@ KESIN KURALLAR:
 
 Cikti Formati: {"tahmin": "1.5 UST", "guven_puani": 75, "oran": 1.45, "baski_endeksi": "%88", "gerekce": "..."}`;
 
-// SISTEM DEGISKENLERI
-let isRunning = false;
-let isScanning = false; // Spam tiklamayi onlemek icin kilit
-let globalMinOran = 1.40;
-let globalMinGuven = 70;
+const DATA_FILE = path.join(__dirname, 'dino_data.json');
 
-// ZAMANLAYICI DEGISKENLERI (COKLU LISTE)
-let scheduleEnabled = false;
-let schedules = []; 
+let state = {
+    isRunning: false,
+    globalMinOran: 1.40,
+    globalMinGuven: 70,
+    scheduleEnabled: false,
+    schedules: [] 
+};
+
+let isScanning = false;
 let nextRunTime = 0;
 let masterInterval = null;
+
+function loadData() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const rawData = fs.readFileSync(DATA_FILE);
+            const savedState = JSON.parse(rawData);
+            state = { ...state, ...savedState };
+            console.log("Kalıcı Hafıza yüklendi.");
+        } else {
+            saveData();
+        }
+    } catch (err) {}
+}
+
+function saveData() {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
+    } catch (err) {}
+}
 
 function getCurrentTimeTR() {
     return new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
@@ -87,10 +113,7 @@ async function telegramaGonder(mac, analiz) {
 }
 
 async function botuCalistir() {
-    if (isScanning) {
-        console.log(`[${getCurrentTimeTR()}] Tarama zaten devam ediyor, bu istek atlandi.`);
-        return;
-    }
+    if (isScanning) return;
     isScanning = true;
     try {
         console.log(`[${getCurrentTimeTR()}] Tarama basladi...`);
@@ -112,7 +135,7 @@ async function botuCalistir() {
                 let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
                 const analiz = JSON.parse(aiYaniti);
 
-                if (parseFloat(analiz.oran) >= globalMinOran && analiz.guven_puani >= globalMinGuven) {
+                if (parseFloat(analiz.oran) >= state.globalMinOran && analiz.guven_puani >= state.globalMinGuven) {
                     await telegramaGonder(mac, analiz);
                     onaylanan++;
                 }
@@ -125,37 +148,38 @@ async function botuCalistir() {
     }
 }
 
-// ANA KONTROL SAATI (Coklu Liste Destekli)
 function masterClock() {
-    if (!isRunning) return;
-
+    if (!state.isRunning) return;
     const nowTime = getCurrentTimeTR();
     let activeSchedule = null;
 
-    if (scheduleEnabled && schedules.length > 0) {
-        for (let s of schedules) {
+    if (state.scheduleEnabled && state.schedules.length > 0) {
+        for (let s of state.schedules) {
             let inWindow = false;
             if (s.start <= s.end) {
                 inWindow = (nowTime >= s.start && nowTime <= s.end);
-            } else { // Gece yarisini gecen saatler
+            } else { 
                 inWindow = (nowTime >= s.start || nowTime <= s.end);
             }
-
             if (inWindow) {
                 activeSchedule = s;
             } else {
-                s.hasRanSingle = false; 
+                if (s.hasRanSingle) {
+                   s.hasRanSingle = false; 
+                   saveData(); 
+                }
             }
         }
-    } else if (!scheduleEnabled) {
+    } else if (!state.scheduleEnabled) {
         activeSchedule = { mode: 'loop' };
     }
 
     if (activeSchedule) {
-        if (scheduleEnabled && activeSchedule.mode === 'single') {
+        if (state.scheduleEnabled && activeSchedule.mode === 'single') {
             if (!activeSchedule.hasRanSingle) {
                 botuCalistir();
                 activeSchedule.hasRanSingle = true; 
+                saveData(); 
             }
         } else {
             const nowMs = Date.now();
@@ -167,70 +191,65 @@ function masterClock() {
     }
 }
 
-
-// --- API ENDPOINT'LERI ---
-
 app.post('/api/start', (req, res) => {
-    if (!isRunning) {
-        isRunning = true;
+    if (!state.isRunning) {
+        state.isRunning = true;
+        saveData(); 
         nextRunTime = 0; 
         masterInterval = setInterval(masterClock, 60000); 
         masterClock(); 
-        res.json({ success: true, message: "Sistem Ana Şalteri AÇILDI." });
+        res.json({ success: true, message: "Sistem Ana Şalteri AÇILDI ve hafızaya kaydedildi." });
     } else {
         res.json({ success: false, message: "Sistem zaten çalışıyor." });
     }
 });
 
 app.post('/api/stop', (req, res) => {
-    isRunning = false;
+    state.isRunning = false;
+    saveData(); 
     if (masterInterval) clearInterval(masterInterval);
-    res.json({ success: true, message: "Sistem Ana Şalteri KAPATILDI." });
+    res.json({ success: true, message: "Sistem Ana Şalteri KAPATILDI ve hafızaya kaydedildi." });
 });
 
 app.post('/api/force-scan', (req, res) => {
-    if (!isRunning) {
+    if (!state.isRunning) {
         return res.json({ success: false, message: "HATA: Önce Sistem Şalterini AÇMALISIN!" });
     }
     if (isScanning) {
         return res.json({ success: false, message: "Şu an zaten bir tarama yapılıyor. Lütfen bekle." });
     }
-    
-    // Asenkron olarak tetikle, cevap bekleme
     botuCalistir().catch(console.error);
     res.json({ success: true, message: "⚡ Manuel Hızlı Tarama tetiklendi! Arka planda maçlar aranıyor..." });
 });
 
 app.post('/api/settings', (req, res) => {
-    globalMinOran = parseFloat(req.body.oran) || globalMinOran;
-    globalMinGuven = parseInt(req.body.guven) || globalMinGuven;
-    res.json({ success: true, message: `Filtreler güncellendi: Min Oran ${globalMinOran}` });
+    state.globalMinOran = parseFloat(req.body.oran) || state.globalMinOran;
+    state.globalMinGuven = parseInt(req.body.guven) || state.globalMinGuven;
+    saveData(); 
+    res.json({ success: true, message: `Filtreler güncellendi ve hafızaya kaydedildi: Min Oran ${state.globalMinOran}` });
 });
 
 app.post('/api/schedule', (req, res) => {
-    scheduleEnabled = !!req.body.enabled;
+    state.scheduleEnabled = !!req.body.enabled;
     const incomingSchedules = req.body.schedules || [];
-    
-    schedules = incomingSchedules.map(inc => {
-        const existing = schedules.find(s => s.id === inc.id);
-        return {
-            ...inc,
-            hasRanSingle: existing ? existing.hasRanSingle : false
-        };
+    state.schedules = incomingSchedules.map(inc => {
+        const existing = state.schedules.find(s => s.id === inc.id);
+        return { ...inc, hasRanSingle: existing ? existing.hasRanSingle : false };
     });
-    
-    res.json({ success: true, message: `Zamanlayıcı Programı Kaydedildi. (${schedules.length} Görev)` });
+    saveData(); 
+    res.json({ success: true, message: `Zamanlayıcı Programı Kaydedildi. (${state.schedules.length} Görev)` });
 });
 
 app.get('/api/status', (req, res) => {
-    res.json({ 
-        isRunning, 
-        globalMinOran, 
-        globalMinGuven,
-        scheduleEnabled,
-        schedules
-    });
+    res.json(state);
 });
 
+loadData();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Dino Backend V4 ${PORT} portunda calisiyor.`));
+app.listen(PORT, () => {
+    console.log(`Dino Backend V6 ${PORT} portunda calisiyor.`);
+    if (state.isRunning) {
+        masterInterval = setInterval(masterClock, 60000);
+        masterClock();
+    }
+});
