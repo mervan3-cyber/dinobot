@@ -1,15 +1,15 @@
 require('dotenv').config();
-const dns = require('dns');
-// Node 17+ ve Ubuntu sunucularda yasanan IPv6 DNS TimeOut hatasini cozmek icin IPv4 zorlamasi:
-dns.setDefaultResultOrder('ipv4first');
-
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
+const https = require('https');
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
+
+// NODEJS KESIN IPV4 ZORLAMASI (Ajan)
+const ipv4Agent = new https.Agent({ family: 4 });
 
 const app = express();
 app.use(cors());
@@ -94,9 +94,9 @@ async function canliMaclariHazirla() {
             return [];
         }
 
-        // 10 saniyelik timeout eklendi ki sunucu takili kalmasin
         const response = await axios.get('https://v3.football.api-sports.io/fixtures?live=all', { 
             headers: { 'x-apisports-key': apiFootballKey },
+            httpsAgent: ipv4Agent, // KESIN IPV4
             timeout: 10000 
         });
         const maclar = response.data.response;
@@ -113,6 +113,7 @@ async function canliMaclariHazirla() {
             try {
                 const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
+                    httpsAgent: ipv4Agent,
                     timeout: 8000
                 });
                 let canliOranlar = oddsResponse.data.response?.[0]?.odds;
@@ -121,6 +122,7 @@ async function canliMaclariHazirla() {
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
+                    httpsAgent: ipv4Agent,
                     timeout: 8000
                 });
                 
@@ -133,7 +135,6 @@ async function canliMaclariHazirla() {
                     canli_oranlar: canliOranlar
                 });
             } catch (innerErr) {
-                // Sadece bu mac icin hata ver, digerlerine gec
                 continue;
             }
         }
@@ -142,6 +143,8 @@ async function canliMaclariHazirla() {
         let hataMesaji = error.message;
         if (error.response && error.response.status === 401) {
             hataMesaji = "API Anahtarı geçersiz veya limitsiz (401 Unauthorized)";
+        } else if (error.response && error.response.status === 403) {
+            hataMesaji = "Missing application key (403 Forbidden) - .env dosyan okunmuyor olabilir!";
         } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
             hataMesaji = "API-Sports sunucusuna bağlanılamadı (Zaman Aşımı)";
         }
@@ -151,7 +154,20 @@ async function canliMaclariHazirla() {
 }
 
 async function telegramaGonder(mac, analiz) {
-    const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥\n------------------------------------------------\n⚽️ *Maç:* ${mac.mac}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Tahmin:* ${analiz.tahmin}\n📈 *Değer (Oran):* ${analiz.oran}\n⚡️ *Güven Puanı:* %${analiz.guven_puani}\n📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}\n\n🦖 *Yapay Zeka Analizi:*\n_${analiz.gerekce}_\n------------------------------------------------`;
+    const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥
+------------------------------------------------
+⚽️ *Maç:* ${mac.mac}
+🏆 *Lig:* ${mac.lig}
+⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}
+
+🎯 *Tahmin:* ${analiz.tahmin}
+📈 *Değer (Oran):* ${analiz.oran}
+⚡️ *Güven Puanı:* %${analiz.guven_puani}
+📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}
+
+🦖 *Yapay Zeka Analizi:*
+_${analiz.gerekce}_
+------------------------------------------------`;
     try {
         await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
     } catch (error) {
@@ -180,7 +196,10 @@ async function botuCalistir() {
             if (onaylanan >= 3 || istek >= 5) break;
             istek++;
             try {
-                const prompt = SYSTEM_INSTRUCTION + "\n\nAnaliz Edilecek Mac Verisi:\n" + JSON.stringify(mac);
+                const prompt = SYSTEM_INSTRUCTION + "
+
+Analiz Edilecek Mac Verisi:
+" + JSON.stringify(mac);
                 const result = await model.generateContent(prompt);
                 let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
                 const analiz = JSON.parse(aiYaniti);
@@ -307,7 +326,7 @@ app.get('/api/status', (req, res) => {
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🌐 Dino Backend V8 Başlatıldı. Port: ${PORT}`);
+    addSystemLog(`> 🌐 Dino Backend V9 Başlatıldı. Port: ${PORT}`);
     if (state.isRunning) {
         masterInterval = setInterval(masterClock, 60000);
         masterClock();
