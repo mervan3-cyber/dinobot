@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino İddaa | Admin Kontrol Merkezi</title>
+    <style>
+        :root { --primary: #ff9800; --bg: #121212; --surface: #1e1e1e; --text: #ffffff; --text-secondary: #aaaaaa; --success: #4caf50; --danger: #f44336; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 15px; }
+        .container { width: 100%; max-width: 500px; background: var(--surface); border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { text-align: center; margin-bottom: 20px; color: var(--primary); }
+        .hidden { display: none !important; }
+        input[type="password"], input[type="number"], input[type="time"], select { width: 100%; padding: 10px; margin: 8px 0; border: none; border-radius: 6px; background: #2c2c2c; color: #fff; outline: none; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        button { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 6px; background: var(--primary); color: #fff; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+        .card { background: #2c2c2c; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+        .bg-danger { background: var(--danger); }
+        .bg-success { background: var(--success); }
+        .logs { background: #000; color: #0f0; font-family: monospace; padding: 10px; border-radius: 6px; height: 150px; overflow-y: auto; font-size: 0.85em; line-height: 1.5; border: 1px solid #333; }
+        .schedule-item { display: flex; justify-content: space-between; background: #1a1a1a; padding: 10px; margin-bottom: 8px; border-radius: 6px; align-items: center; }
+    </style>
+</head>
+<body>
+    <div class="container" id="login-screen">
+        <h2>🦖 Dino Admin Paneli</h2>
+        <input type="password" id="admin-pass" placeholder="Admin Şifresini Girin">
+        <button onclick="login()">Giriş Yap</button>
+        <p id="login-error" style="color: var(--danger); text-align: center; margin-top: 10px; display: none;">Hatalı şifre!</p>
+    </div>
+
+    <div class="container hidden" id="dashboard">
+        <h2>⚙️ Sistem Kontrolü</h2>
+        <div class="card flex-between">
+            <div>
+                <h3 style="margin-bottom: 5px;">Sistem Şalteri</h3>
+                <span class="status-badge bg-danger" id="bot-status-badge">KAPALI</span>
+            </div>
+            <button id="toggle-btn" style="width: auto; padding: 10px 20px;" onclick="toggleBot()">BAŞLAT</button>
+        </div>
+        <div class="card flex-between" style="background: #1a1a1a; border: 1px solid var(--primary);">
+            <div>
+                <h3 style="margin-bottom: 5px; color: var(--primary);">⚡ Hızlı Tarama</h3>
+                <p style="font-size: 0.75em; color: var(--text-secondary); margin-top: 2px;">Saati beklemeden hemen 1 kez tara.</p>
+            </div>
+            <button style="width: auto; padding: 10px 15px; margin: 0; background: var(--primary);" onclick="forceScan()">ŞİMDİ TARA</button>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom: 10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
+            <div class="flex-between" style="margin-bottom: 15px;">
+                <label style="font-size: 0.9em; color: var(--text-secondary);">Zamanlayıcıyı Aktifleştir:</label>
+                <input type="checkbox" id="schedule-enabled">
+            </div>
+            <div id="schedule-list" style="margin-bottom: 15px;"></div>
+            <div style="background: #1e1e1e; padding: 12px; border-radius: 6px; border: 1px dashed #555; margin-bottom: 10px;">
+                <h4 style="margin-bottom: 8px; color: var(--primary); font-size: 0.9em;">➕ Yeni Aralık Ekle</h4>
+                <div class="flex-between" style="margin-bottom: 8px;">
+                    <div style="width: 48%;"><label style="font-size: 0.75em; color: var(--text-secondary);">Başlangıç</label><input type="time" id="new-start" value="13:00"></div>
+                    <div style="width: 48%;"><label style="font-size: 0.75em; color: var(--text-secondary);">Bitiş</label><input type="time" id="new-end" value="14:00"></div>
+                </div>
+                <label style="font-size: 0.75em; color: var(--text-secondary); display: block; margin-top: 5px;">Çalışma Modu:</label>
+                <select id="new-mode"><option value="loop">15 Dakikada Bir Tara</option><option value="single">Saati Gelince Tek Sefer Tara</option></select>
+                <button style="background: #2196f3; padding: 8px; margin-top: 10px;" onclick="addSchedule()">Listeye Ekle</button>
+            </div>
+            <button style="background: var(--success);" onclick="saveSchedule()">Tüm Programı Sunucuya İlet</button>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom: 10px;">📊 Filtre Ayarları</h3>
+            <div class="flex-between">
+                <div style="width: 48%;"><label style="font-size: 0.8em; color: var(--text-secondary);">Min Oran:</label><input type="number" step="0.01" id="min-oran" value="1.40"></div>
+                <div style="width: 48%;"><label style="font-size: 0.8em; color: var(--text-secondary);">Min Güven:</label><input type="number" id="min-guven" value="70"></div>
+            </div>
+            <button style="background: #2196f3;" onclick="saveSettings()">Filtreyi Güncelle</button>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom: 5px;">📡 Canlı Sistem Radarı</h3>
+            <p style="font-size: 0.75em; color: var(--text-secondary); margin-bottom: 8px;">Arka plandaki tüm tarama işlemleri anlık olarak buraya düşer.</p>
+            <div class="logs" id="log-box">> Panel sunucuya bağlandı. Kayıtlar bekleniyor...<br></div>
+        </div>
+    </div>
+
+    <script>
+        const CORRECT_PASS = "enessro"; 
+        const BACKEND_URL = "http://91.198.66.192:3000"; 
+        
+        let isBotRunning = false; let schedules = [];
+        let autoScroll = true;
+
+        const logBox = document.getElementById("log-box");
+        logBox.addEventListener("scroll", () => {
+            // Kullanıcı yukarı kaydırırsa auto-scroll'u durdur
+            autoScroll = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 10;
+        });
+
+        function login() {
+            if(document.getElementById("admin-pass").value === CORRECT_PASS) {
+                document.getElementById("login-screen").classList.add("hidden");
+                document.getElementById("dashboard").classList.remove("hidden");
+                checkStatus();
+                setInterval(fetchLogs, 2500); // 2.5 saniyede bir logları çek
+            } else { document.getElementById("login-error").style.display = "block"; }
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch(BACKEND_URL + '/api/logs');
+                const logs = await res.json();
+                if (logs.length > 0) {
+                    logBox.innerHTML = logs.join('<br>');
+                    if(autoScroll) {
+                        logBox.scrollTop = logBox.scrollHeight;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(BACKEND_URL + '/api/status'); const data = await res.json();
+                isBotRunning = !data.isRunning; toggleBot(true); 
+                document.getElementById("min-oran").value = data.globalMinOran; document.getElementById("min-guven").value = data.globalMinGuven;
+                document.getElementById("schedule-enabled").checked = data.scheduleEnabled; schedules = data.schedules || []; renderSchedules();
+            } catch(e) { }
+        }
+
+        function renderSchedules() {
+            const list = document.getElementById("schedule-list"); list.innerHTML = "";
+            if (schedules.length === 0) { list.innerHTML = "<div style='color: #888; font-size: 0.8em; text-align: center; padding: 10px;'>Henüz program eklenmedi.</div>"; return; }
+            schedules.forEach((s) => {
+                const modeText = s.mode === 'loop' ? '15 Dk Döngü' : 'Tek Sefer';
+                list.innerHTML += `<div class="schedule-item"><div><span style="font-weight: bold; color: var(--primary); font-size: 0.9em;">${s.start} - ${s.end}</span><br><span style="font-size: 0.75em; color: var(--text-secondary);">${modeText}</span></div><button style="width: auto; margin: 0; padding: 6px 12px; background: var(--danger); font-size: 0.8em;" onclick="removeSchedule('${s.id}')">Sil</button></div>`;
+            });
+        }
+        function addSchedule() {
+            const start = document.getElementById("new-start").value; const end = document.getElementById("new-end").value; const mode = document.getElementById("new-mode").value;
+            schedules.push({ id: Date.now().toString(), start, end, mode }); renderSchedules();
+        }
+        function removeSchedule(idToRemove) { schedules = schedules.filter(s => s.id !== idToRemove); renderSchedules(); }
+
+        async function toggleBot(onlyUI = false) {
+            isBotRunning = !isBotRunning; const badge = document.getElementById("bot-status-badge"); const btn = document.getElementById("toggle-btn");
+            if(isBotRunning) {
+                badge.textContent = "SİSTEM AÇIK"; badge.classList.replace("bg-danger", "bg-success"); btn.textContent = "SİSTEMİ DURDUR"; btn.style.background = "var(--danger)";
+                if(!onlyUI) { try { await fetch(BACKEND_URL + '/api/start', { method: 'POST' }); fetchLogs(); } catch(e) {} }
+            } else {
+                badge.textContent = "SİSTEM KAPALI"; badge.classList.replace("bg-success", "bg-danger"); btn.textContent = "SİSTEMİ BAŞLAT"; btn.style.background = "var(--primary)";
+                if(!onlyUI) { try { await fetch(BACKEND_URL + '/api/stop', { method: 'POST' }); fetchLogs(); } catch(e) {} }
+            }
+        }
+        async function forceScan() {
+            if(!isBotRunning) { alert("HATA: Önce Sistem Şalterini AÇMALISIN!"); return; }
+            try { await fetch(BACKEND_URL + '/api/force-scan', { method: 'POST' }); fetchLogs(); } catch(e) { }
+        }
+        async function saveSettings() {
+            const oran = document.getElementById("min-oran").value; const guven = document.getElementById("min-guven").value;
+            try { await fetch(BACKEND_URL + '/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oran, guven }) }); fetchLogs(); } catch(e) {}
+        }
+        async function saveSchedule() {
+            const enabled = document.getElementById("schedule-enabled").checked;
+            try { await fetch(BACKEND_URL + '/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled, schedules }) }); fetchLogs(); } catch(e) { }
+        }
+    </script>
+</body>
+</html>
