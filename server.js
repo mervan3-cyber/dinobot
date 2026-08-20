@@ -10,8 +10,6 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// HTML PANELINI YAYINLAMAK ICIN EKLENDI
 app.use(express.static(path.join(__dirname, 'public')));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -46,13 +44,34 @@ let isScanning = false;
 let nextRunTime = 0;
 let masterInterval = null;
 
+// --- CANLI RADAR (LOG) SISTEMI ---
+let systemLogs = [];
+
+function addSystemLog(msg) {
+    const time = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul' });
+    const logMsg = `[${time}] ${msg}`;
+    console.log(logMsg); // Siyah ekrana yazdır (pm2 logs için)
+    
+    // Panele gidecek olan diziye ekle (en fazla 40 satır tut)
+    systemLogs.push(logMsg);
+    if (systemLogs.length > 40) {
+        systemLogs.shift();
+    }
+}
+
+// Yeni API Endpoint: Panel buraya istek atıp logları alacak
+app.get('/api/logs', (req, res) => {
+    res.json(systemLogs);
+});
+
+
 function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
             const rawData = fs.readFileSync(DATA_FILE);
             const savedState = JSON.parse(rawData);
             state = { ...state, ...savedState };
-            console.log("Kalıcı Hafıza yüklendi.");
+            addSystemLog("> Kalıcı Hafıza başarıyla yüklendi.");
         } else {
             saveData();
         }
@@ -116,13 +135,16 @@ async function botuCalistir() {
     if (isScanning) return;
     isScanning = true;
     try {
-        console.log(`[${getCurrentTimeTR()}] Tarama basladi...`);
+        addSystemLog(`> 🔍 Otomatik tarama başlatıldı...`);
         const macListesi = await canliMaclariHazirla();
+        
         if (macListesi.length === 0) {
+            addSystemLog("> ℹ️ Kriterlere uygun (VIP Lig, 25-80. dk) aktif maç bulunamadı.");
             isScanning = false;
             return;
         }
 
+        addSystemLog(`> 📊 Toplam ${macListesi.length} uygun maç bulundu. Analiz ediliyor...`);
         const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" }); 
         let onaylanan = 0, istek = 0;
 
@@ -137,14 +159,17 @@ async function botuCalistir() {
 
                 if (parseFloat(analiz.oran) >= state.globalMinOran && analiz.guven_puani >= state.globalMinGuven) {
                     await telegramaGonder(mac, analiz);
+                    addSystemLog(`> ✅ ${mac.mac} için sinyal gönderildi (Oran: ${analiz.oran}, Güven: ${analiz.guven_puani})`);
                     onaylanan++;
+                } else {
+                    addSystemLog(`> ❌ ${mac.mac} pas geçildi (Oran: ${analiz.oran}, Güven: ${analiz.guven_puani})`);
                 }
                 await new Promise(resolve => setTimeout(resolve, 2000));
             } catch (err) { }
         }
+        addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} maç Telegram'a iletildi.`);
     } finally {
         isScanning = false;
-        console.log(`[${getCurrentTimeTR()}] Tarama bitti.`);
     }
 }
 
@@ -196,9 +221,10 @@ app.post('/api/start', (req, res) => {
         state.isRunning = true;
         saveData(); 
         nextRunTime = 0; 
+        addSystemLog("> ⚡ Sistem Ana Şalteri AÇILDI.");
         masterInterval = setInterval(masterClock, 60000); 
         masterClock(); 
-        res.json({ success: true, message: "Sistem Ana Şalteri AÇILDI ve hafızaya kaydedildi." });
+        res.json({ success: true, message: "Sistem açıldı." });
     } else {
         res.json({ success: false, message: "Sistem zaten çalışıyor." });
     }
@@ -207,26 +233,29 @@ app.post('/api/start', (req, res) => {
 app.post('/api/stop', (req, res) => {
     state.isRunning = false;
     saveData(); 
+    addSystemLog("> 🛑 Sistem Ana Şalteri KAPATILDI.");
     if (masterInterval) clearInterval(masterInterval);
-    res.json({ success: true, message: "Sistem Ana Şalteri KAPATILDI ve hafızaya kaydedildi." });
+    res.json({ success: true, message: "Sistem durduruldu." });
 });
 
 app.post('/api/force-scan', (req, res) => {
     if (!state.isRunning) {
-        return res.json({ success: false, message: "HATA: Önce Sistem Şalterini AÇMALISIN!" });
+        return res.json({ success: false, message: "HATA" });
     }
     if (isScanning) {
-        return res.json({ success: false, message: "Şu an zaten bir tarama yapılıyor. Lütfen bekle." });
+        return res.json({ success: false, message: "Tarama yapiliyor" });
     }
+    addSystemLog("> 🚀 Manuel Hızlı Tarama tetiklendi!");
     botuCalistir().catch(console.error);
-    res.json({ success: true, message: "⚡ Manuel Hızlı Tarama tetiklendi! Arka planda maçlar aranıyor..." });
+    res.json({ success: true, message: "Basladi" });
 });
 
 app.post('/api/settings', (req, res) => {
     state.globalMinOran = parseFloat(req.body.oran) || state.globalMinOran;
     state.globalMinGuven = parseInt(req.body.guven) || state.globalMinGuven;
     saveData(); 
-    res.json({ success: true, message: `Filtreler güncellendi ve hafızaya kaydedildi: Min Oran ${state.globalMinOran}` });
+    addSystemLog(`> ⚙️ Filtreler güncellendi: Min Oran ${state.globalMinOran}, Min Güven ${state.globalMinGuven}`);
+    res.json({ success: true, message: "Kaydedildi" });
 });
 
 app.post('/api/schedule', (req, res) => {
@@ -237,7 +266,8 @@ app.post('/api/schedule', (req, res) => {
         return { ...inc, hasRanSingle: existing ? existing.hasRanSingle : false };
     });
     saveData(); 
-    res.json({ success: true, message: `Zamanlayıcı Programı Kaydedildi. (${state.schedules.length} Görev)` });
+    addSystemLog(`> ⏰ Zamanlayıcı Programı kaydedildi (${state.schedules.length} görev). Aktif: ${state.scheduleEnabled}`);
+    res.json({ success: true, message: "Kaydedildi" });
 });
 
 app.get('/api/status', (req, res) => {
@@ -247,7 +277,7 @@ app.get('/api/status', (req, res) => {
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Dino Backend V6 ${PORT} portunda calisiyor.`);
+    addSystemLog(`> 🌐 Dino Backend V7 Başlatıldı. Port: ${PORT}`);
     if (state.isRunning) {
         masterInterval = setInterval(masterClock, 60000);
         masterClock();
