@@ -1,4 +1,8 @@
 require('dotenv').config();
+const dns = require('dns');
+// Node 17+ ve Ubuntu sunucularda yasanan IPv6 DNS TimeOut hatasini cozmek icin IPv4 zorlamasi:
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -96,7 +100,7 @@ async function canliMaclariHazirla() {
 
         const response = await axios.get('https://v3.football.api-sports.io/fixtures?live=all', { 
             headers: { 'x-apisports-key': apiFootballKey },
-            httpsAgent: ipv4Agent, // KESIN IPV4
+            httpsAgent: ipv4Agent, 
             timeout: 10000 
         });
         const maclar = response.data.response;
@@ -154,20 +158,7 @@ async function canliMaclariHazirla() {
 }
 
 async function telegramaGonder(mac, analiz) {
-    const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥
-------------------------------------------------
-⚽️ *Maç:* ${mac.mac}
-🏆 *Lig:* ${mac.lig}
-⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}
-
-🎯 *Tahmin:* ${analiz.tahmin}
-📈 *Değer (Oran):* ${analiz.oran}
-⚡️ *Güven Puanı:* %${analiz.guven_puani}
-📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}
-
-🦖 *Yapay Zeka Analizi:*
-_${analiz.gerekce}_
-------------------------------------------------`;
+    const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥\n------------------------------------------------\n⚽️ *Maç:* ${mac.mac}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Tahmin:* ${analiz.tahmin}\n📈 *Değer (Oran):* ${analiz.oran}\n⚡️ *Güven Puanı:* %${analiz.guven_puani}\n📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}\n\n🦖 *Yapay Zeka Analizi:*\n_${analiz.gerekce}_\n------------------------------------------------`;
     try {
         await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
     } catch (error) {
@@ -196,10 +187,8 @@ async function botuCalistir() {
             if (onaylanan >= 3 || istek >= 5) break;
             istek++;
             try {
-                const prompt = SYSTEM_INSTRUCTION + "
-
-Analiz Edilecek Mac Verisi:
-" + JSON.stringify(mac);
+                // BUG FIX: Escaped the newlines here correctly for a literal string in JS
+                const prompt = SYSTEM_INSTRUCTION + "\n\nAnaliz Edilecek Mac Verisi:\n" + JSON.stringify(mac);
                 const result = await model.generateContent(prompt);
                 let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
                 const analiz = JSON.parse(aiYaniti);
@@ -326,7 +315,7 @@ app.get('/api/status', (req, res) => {
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🌐 Dino Backend V9 Başlatıldı. Port: ${PORT}`);
+    addSystemLog(`> 🌐 Dino Backend V10 Başlatıldı. Port: ${PORT}`);
     if (state.isRunning) {
         masterInterval = setInterval(masterClock, 60000);
         masterClock();

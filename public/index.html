@@ -91,7 +91,6 @@
 
         const logBox = document.getElementById("log-box");
         logBox.addEventListener("scroll", () => {
-            // Kullanıcı yukarı kaydırırsa auto-scroll'u durdur
             autoScroll = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 10;
         });
 
@@ -100,7 +99,7 @@
                 document.getElementById("login-screen").classList.add("hidden");
                 document.getElementById("dashboard").classList.remove("hidden");
                 checkStatus();
-                setInterval(fetchLogs, 2500); // 2.5 saniyede bir logları çek
+                setInterval(fetchLogs, 2500); 
             } else { document.getElementById("login-error").style.display = "block"; }
         }
 
