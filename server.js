@@ -1,4 +1,8 @@
 require('dotenv').config();
+const dns = require('dns');
+// Node 17+ ve Ubuntu sunucularda yasanan IPv6 DNS TimeOut hatasini cozmek icin IPv4 zorlamasi:
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -44,26 +48,21 @@ let isScanning = false;
 let nextRunTime = 0;
 let masterInterval = null;
 
-// --- CANLI RADAR (LOG) SISTEMI ---
 let systemLogs = [];
 
 function addSystemLog(msg) {
     const time = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul' });
     const logMsg = `[${time}] ${msg}`;
-    console.log(logMsg); // Siyah ekrana yazdır (pm2 logs için)
-    
-    // Panele gidecek olan diziye ekle (en fazla 40 satır tut)
+    console.log(logMsg); 
     systemLogs.push(logMsg);
     if (systemLogs.length > 40) {
         systemLogs.shift();
     }
 }
 
-// Yeni API Endpoint: Panel buraya istek atıp logları alacak
 app.get('/api/logs', (req, res) => {
     res.json(systemLogs);
 });
-
 
 function loadData() {
     try {
@@ -90,7 +89,16 @@ function getCurrentTimeTR() {
 
 async function canliMaclariHazirla() {
     try {
-        const response = await axios.get('https://v3.football.api-sports.io/fixtures?live=all', { headers: { 'x-apisports-key': apiFootballKey } });
+        if(!apiFootballKey || apiFootballKey.trim() === '') {
+            addSystemLog("> ⚠️ HATA: .env dosyasındaki API_FOOTBALL_KEY boş veya okunamıyor!");
+            return [];
+        }
+
+        // 10 saniyelik timeout eklendi ki sunucu takili kalmasin
+        const response = await axios.get('https://v3.football.api-sports.io/fixtures?live=all', { 
+            headers: { 'x-apisports-key': apiFootballKey },
+            timeout: 10000 
+        });
         const maclar = response.data.response;
         if (!maclar || maclar.length === 0) return [];
 
@@ -102,24 +110,42 @@ async function canliMaclariHazirla() {
 
         for (const mac of onEleme) {
             await new Promise(resolve => setTimeout(resolve, 2000));
-            const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { headers: { 'x-apisports-key': apiFootballKey } });
-            let canliOranlar = oddsResponse.data.response?.[0]?.odds;
-            if (!canliOranlar) continue; 
+            try {
+                const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { 
+                    headers: { 'x-apisports-key': apiFootballKey },
+                    timeout: 8000
+                });
+                let canliOranlar = oddsResponse.data.response?.[0]?.odds;
+                if (!canliOranlar) continue; 
 
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { headers: { 'x-apisports-key': apiFootballKey } });
-            
-            macVerileri.push({
-                mac: `${mac.teams.home.name} - ${mac.teams.away.name}`,
-                lig: mac.league.name,
-                dakika: mac.fixture.status.elapsed,
-                skor: `${mac.goals.home}-${mac.goals.away}`,
-                istatistikler: statsResponse.data.response,
-                canli_oranlar: canliOranlar
-            });
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
+                    headers: { 'x-apisports-key': apiFootballKey },
+                    timeout: 8000
+                });
+                
+                macVerileri.push({
+                    mac: `${mac.teams.home.name} - ${mac.teams.away.name}`,
+                    lig: mac.league.name,
+                    dakika: mac.fixture.status.elapsed,
+                    skor: `${mac.goals.home}-${mac.goals.away}`,
+                    istatistikler: statsResponse.data.response,
+                    canli_oranlar: canliOranlar
+                });
+            } catch (innerErr) {
+                // Sadece bu mac icin hata ver, digerlerine gec
+                continue;
+            }
         }
         return macVerileri;
     } catch (error) {
+        let hataMesaji = error.message;
+        if (error.response && error.response.status === 401) {
+            hataMesaji = "API Anahtarı geçersiz veya limitsiz (401 Unauthorized)";
+        } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            hataMesaji = "API-Sports sunucusuna bağlanılamadı (Zaman Aşımı)";
+        }
+        addSystemLog(`> ⚠️ API HATASI: ${hataMesaji}`);
         return [];
     }
 }
@@ -128,7 +154,9 @@ async function telegramaGonder(mac, analiz) {
     const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥\n------------------------------------------------\n⚽️ *Maç:* ${mac.mac}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Tahmin:* ${analiz.tahmin}\n📈 *Değer (Oran):* ${analiz.oran}\n⚡️ *Güven Puanı:* %${analiz.guven_puani}\n📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}\n\n🦖 *Yapay Zeka Analizi:*\n_${analiz.gerekce}_\n------------------------------------------------`;
     try {
         await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
-    } catch (error) {}
+    } catch (error) {
+        addSystemLog(`> ⚠️ TELEGRAM HATASI: ${error.message}`);
+    }
 }
 
 async function botuCalistir() {
@@ -139,12 +167,12 @@ async function botuCalistir() {
         const macListesi = await canliMaclariHazirla();
         
         if (macListesi.length === 0) {
-            addSystemLog("> ℹ️ Kriterlere uygun (VIP Lig, 25-80. dk) aktif maç bulunamadı.");
+            addSystemLog("> ℹ️ Kriterlere uygun aktif maç bulunamadı veya ağa ulaşılamadı.");
             isScanning = false;
             return;
         }
 
-        addSystemLog(`> 📊 Toplam ${macListesi.length} uygun maç bulundu. Analiz ediliyor...`);
+        addSystemLog(`> 📊 Toplam ${macListesi.length} uygun maç bulundu. Yapay Zeka analiz ediyor...`);
         const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" }); 
         let onaylanan = 0, istek = 0;
 
@@ -165,7 +193,9 @@ async function botuCalistir() {
                     addSystemLog(`> ❌ ${mac.mac} pas geçildi (Oran: ${analiz.oran}, Güven: ${analiz.guven_puani})`);
                 }
                 await new Promise(resolve => setTimeout(resolve, 2000));
-            } catch (err) { }
+            } catch (err) { 
+                addSystemLog(`> ⚠️ YAPAY ZEKA HATASI: ${err.message}`);
+            }
         }
         addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} maç Telegram'a iletildi.`);
     } finally {
@@ -277,7 +307,7 @@ app.get('/api/status', (req, res) => {
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🌐 Dino Backend V7 Başlatıldı. Port: ${PORT}`);
+    addSystemLog(`> 🌐 Dino Backend V8 Başlatıldı. Port: ${PORT}`);
     if (state.isRunning) {
         masterInterval = setInterval(masterClock, 60000);
         masterClock();
