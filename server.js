@@ -95,10 +95,10 @@ async function canliMaclariHazirla() {
         uygunMaclar.sort((a, b) => (VIP_LIGLER.includes(b.league.name) ? 1 : 0) - (VIP_LIGLER.includes(a.league.name) ? 1 : 0));
 
         let macVerileri = [];
-        const onEleme = uygunMaclar.slice(0, 4); // Test icin ilk 4 mac
+        const onEleme = uygunMaclar; // TÜM MAÇLARI TARA
 
         for (const mac of onEleme) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 4000));
             try {
                 const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
@@ -125,7 +125,7 @@ async function canliMaclariHazirla() {
                     }
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 4000));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
                     httpsAgent: ipv4Agent, timeout: 8000
@@ -180,6 +180,9 @@ function yapayZekaAnaliziYap(mac) {
             try {
                 const dinoOlasiliklari = JSON.parse(stdout);
                 if (dinoOlasiliklari.hata) { resolve(null); return; }
+                
+                // RÖNTGEN SATIRIMIZ BURADA
+                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Piyasa Oranları: ${JSON.stringify(p.canli_oranlar)} | Dino Çıktısı: ${JSON.stringify(dinoOlasiliklari)}`);
 
                 let enIyiFirsat = null;
                 let enYuksekEdge = 0; 
