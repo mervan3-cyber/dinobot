@@ -10,7 +10,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // Gemini geri geldi!
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const ipv4Agent = new https.Agent({ family: 4 });
 
@@ -31,7 +31,7 @@ const DATA_FILE = path.join(__dirname, 'dino_data.json');
 
 let state = {
     isRunning: false,
-    globalMinEdge: 15,  // EDGE (Value) filtresi
+    globalMinEdge: 15,  
     scheduleEnabled: false,
     schedules: [] 
 };
@@ -43,7 +43,7 @@ let systemLogs = [];
 
 function addSystemLog(msg) {
     const time = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul' });
-    const logMsg = `[${time}]${msg}`;
+    const logMsg = `[${time}] ${msg}`;
     console.log(logMsg); 
     systemLogs.push(logMsg);
     if (systemLogs.length > 40) systemLogs.shift();
@@ -143,7 +143,7 @@ async function canliMaclariHazirla() {
                 };
 
                 macVerileri.push({
-                    mac_isim: `${mac.teams.home.name} -${mac.teams.away.name}`,
+                    mac_isim: `${mac.teams.home.name} - ${mac.teams.away.name}`,
                     lig: mac.league.name,
                     dakika: mac.fixture.status.elapsed,
                     skor: `${mac.goals.home}-${mac.goals.away}`,
@@ -170,11 +170,11 @@ async function canliMaclariHazirla() {
 function yapayZekaAnaliziYap(mac) {
     return new Promise((resolve, reject) => {
         const p = mac;
-        const pythonKomutu = `python3 tahmin_yap.py ${p.dakika} ${p.home_shot}${p.away_shot} ${p.home_sot}${p.away_sot} ${p.home_corner}${p.away_corner}`;
+        const pythonKomutu = `python3 tahmin_yap.py ${p.dakika} ${p.home_shot} ${p.away_shot} ${p.home_sot} ${p.away_sot} ${p.home_corner} ${p.away_corner}`;
 
         exec(pythonKomutu, (hata, stdout, stderr) => {
             if (hata) {
-                addSystemLog(`> ⚠️ PYTHON HATASI (${p.mac_isim}):${hata.message}`);
+                addSystemLog(`> ⚠️ PYTHON HATASI (${p.mac_isim}): ${hata.message}`);
                 resolve(null); return;
             }
             try {
@@ -231,31 +231,28 @@ async function botuCalistir() {
         addSystemLog(`> 📊 Toplam ${macListesi.length} maç bulundu. Python DINO Motoru calisiyor...`);
         let onaylanan = 0;
         
-        // Model ismini 1.5-flash olarak guncelledim, en stabil ve hizli surum budur.
         const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" }); 
 
         for (const mac of macListesi) {
-            // Önce Python'a sor (Matematik onayı)
             const firsat = await yapayZekaAnaliziYap(mac);
             
             if (firsat) {
                 addSystemLog(`> 🧠 Edge Bulundu (${mac.mac_isim}). Gemini yorumu yazıyor...`);
                 let aiYorumu = "Yapay zeka sistemimiz istatistiksel bir avantaj yakaladı. Baskının sonuca dönüşmesi bekleniyor."; 
                 
-                // Python onay verdiyse, istatistikleri Gemini'ye atip yorum yazdir
                 try {
-                    const prompt = `${GEMINI_INSTRUCTION}\n\nMaç:${mac.mac_isim}\nDakika: ${mac.dakika}\nSkor:${mac.skor}\nİstatistikler: ${mac.home_shot} Şut (${mac.home_sot} İsabet), ${mac.home_corner} Korner vs${mac.away_shot} Şut (${mac.away_sot} İsabet),${mac.away_corner} Korner.\nSeçilen Bahis: ${firsat.market}\nAvantaj (Edge): +${firsat.edge}%\n\nSadece analiz metnini yaz:`;
+                    const prompt = `${GEMINI_INSTRUCTION}\n\nMaç: ${mac.mac_isim}\nDakika: ${mac.dakika}\nSkor: ${mac.skor}\nİstatistikler: ${mac.home_shot} Şut (${mac.home_sot} İsabet), ${mac.home_corner} Korner vs ${mac.away_shot} Şut (${mac.away_sot} İsabet), ${mac.away_corner} Korner.\nSeçilen Bahis: ${firsat.market}\nAvantaj (Edge): +${firsat.edge}%\n\nSadece analiz metnini yaz:`;
                     const result = await model.generateContent(prompt);
                     aiYorumu = result.response.text().trim().replace(/```/g, "");
                 } catch (geminiErr) {
                     addSystemLog(`> ⚠️ GEMINI HATASI: ${geminiErr.message}`);
                 }
 
-                const mesaj = `🔥 *DİNO VALUE ALARM* 🔥\n--------------------------------------\n⚽️ *Maç:* ${mac.mac_isim}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:*${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Value Market:*${firsat.market}\n📈 *EDGE (Avantaj):* +${firsat.edge}\%\n💵 *Canlı Oran:* ${firsat.oran}\n🦖 *Dino İhtimali:* %${firsat.dino_yuzde}\n\n📝 *Dino Analiz:*\n_${aiYorumu}_\n--------------------------------------`;
+                const mesaj = `🔥 *DİNO VALUE ALARM* 🔥\n--------------------------------------\n⚽️ *Maç:* ${mac.mac_isim}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Value Market:* ${firsat.market}\n📈 *EDGE (Avantaj):* +${firsat.edge}%\n💵 *Canlı Oran:* ${firsat.oran}\n🦖 *Dino İhtimali:* %${firsat.dino_yuzde}\n\n📝 *Dino Analiz:*\n_${aiYorumu}_\n--------------------------------------`;
                 
                 try {
                     await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
-                    addSystemLog(`> ✅ SİNYAL GÖNDERİLDİ: ${mac.mac_isim} \vert{} Edge: +${firsat.edge}`);
+                    addSystemLog(`> ✅ SİNYAL GÖNDERİLDİ: ${mac.mac_isim} | Edge: +${firsat.edge}`);
                     onaylanan++;
                 } catch (e) { addSystemLog(`> ⚠️ TELEGRAM HATASI: ${e.message}`); }
             } else {
@@ -269,7 +266,7 @@ async function botuCalistir() {
     }
 }
 
-// --------- ZAMANLAYICI VE API ENDPOINTLERI (AYNI) ---------
+// --------- ZAMANLAYICI VE API ENDPOINTLERI ---------
 function masterClock() {
     if (!state.isRunning) return;
     const nowTime = getCurrentTimeTR();
@@ -324,4 +321,27 @@ app.post('/api/force-scan', (req, res) => {
 app.post('/api/settings', (req, res) => {
     state.globalMinEdge = parseFloat(req.body.oran) || state.globalMinEdge;
     saveData(); 
-    addSystemLog(`> ⚙️ EDGE Filtresi
+    addSystemLog(`> ⚙️ EDGE Filtresi güncellendi: Min EDGE %${state.globalMinEdge}`);
+    res.json({ success: true, message: "Kaydedildi" });
+});
+
+app.post('/api/schedule', (req, res) => {
+    state.scheduleEnabled = !!req.body.enabled;
+    const incomingSchedules = req.body.schedules || [];
+    state.schedules = incomingSchedules.map(inc => {
+        const existing = state.schedules.find(s => s.id === inc.id);
+        return { ...inc, hasRanSingle: existing ? existing.hasRanSingle : false };
+    });
+    saveData(); 
+    addSystemLog(`> ⏰ Zamanlayıcı Programı kaydedildi (${state.schedules.length} görev).`);
+    res.json({ success: true, message: "Kaydedildi" });
+});
+
+app.get('/api/status', (req, res) => res.json(state));
+
+loadData();
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    addSystemLog(`> 🌐 DINO VALUE ENGINE V11 (Python + Gemini Hibrit) Başlatıldı! Port: ${PORT}`);
+    if (state.isRunning) { masterInterval = setInterval(masterClock, 60000); masterClock(); }
+});
