@@ -109,20 +109,30 @@ async function canliMaclariHazirla() {
                 if (!canliOranlar) continue; 
                 
                 let oranObjesi = {};
+                
+                // 🔍 GİZLİ DEDEKTİF: API'den gelen ham oran verisini ekrana basalım
+                const rawOranStr = JSON.stringify(canliOranlar);
+                addSystemLog(`> 🔍 RAW ORAN (${mac.mac_isim}): ${rawOranStr.length > 150 ? rawOranStr.substring(0, 150) + '...' : rawOranStr}`);
+
                 canliOranlar.forEach(market => {
-                    if (market.id === 1) { 
-                        let home = market.values.find(v => v.value === 'Home');
-                        let draw = market.values.find(v => v.value === 'Draw');
-                        let away = market.values.find(v => v.value === 'Away');
-                        if (home) oranObjesi['MS1'] = parseFloat(home.odd);
-                        if (draw) oranObjesi['X'] = parseFloat(draw.odd);
-                        if (away) oranObjesi['MS2'] = parseFloat(away.odd);
+                    // === yerine == kullanarak id'nin string veya number olma durumunu tolere ediyoruz
+                    if (market.id == 1) { 
+                        let home = market.values.find(v => v.value === 'Home' || v.value === '1');
+                        let draw = market.values.find(v => v.value === 'Draw' || v.value === 'X');
+                        let away = market.values.find(v => v.value === 'Away' || v.value === '2');
+                        
+                        if (home && home.odd) oranObjesi['MS1'] = parseFloat(home.odd);
+                        if (draw && draw.odd) oranObjesi['X'] = parseFloat(draw.odd);
+                        if (away && away.odd) oranObjesi['MS2'] = parseFloat(away.odd);
                     }
-                    if (market.id === 5) { 
+                    if (market.id == 5) { 
                         market.values.forEach(v => {
                             if (v.value.includes('Over')) {
-                                let barem = v.value.split(' ')[1].replace('.5', '_5') + '_UST';
-                                oranObjesi[barem] = parseFloat(v.odd);
+                                let parcalar = v.value.split(' ');
+                                if(parcalar.length > 1) {
+                                    let barem = parcalar[1].replace('.5', '_5') + '_UST';
+                                    oranObjesi[barem] = parseFloat(v.odd);
+                                }
                             }
                         });
                     }
