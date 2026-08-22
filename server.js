@@ -31,7 +31,7 @@ const DATA_FILE = path.join(__dirname, 'dino_data.json');
 
 let state = {
     isRunning: false,
-    globalMinEdge: 15,  
+    globalMinEdge: 5,  // Senin tavsiyene göre 5'e çektik
     scheduleEnabled: false,
     schedules: [] 
 };
@@ -91,7 +91,6 @@ async function canliMaclariHazirla() {
         const maclar = response.data.response;
         if (!maclar || maclar.length === 0) return [];
 
-        // 🚀 HIZ VE PERFORMANS: Sadece 25-80 dk arası ve KESİN OLARAK VIP Ligler
         let uygunMaclar = maclar.filter(m => 
             m.fixture.status.elapsed >= 25 && 
             m.fixture.status.elapsed <= 80 &&
@@ -99,10 +98,9 @@ async function canliMaclariHazirla() {
         );
 
         let macVerileri = [];
-        const onEleme = uygunMaclar;
+        const onEleme = uygunMaclar; // Slice kaldırıldı, tüm VIP'ler taranıyor
 
         for (const mac of onEleme) {
-            // ⚡ HIZ AYARI: 2 saniye yerine 0.3 saniye (300ms) bekle
             await new Promise(resolve => setTimeout(resolve, 300));
             const macIsim = `${mac.teams.home.name} - ${mac.teams.away.name}`;
             
@@ -118,23 +116,22 @@ async function canliMaclariHazirla() {
                 if (canliOranlar && canliOranlar.length > 0) {
                     addSystemLog(`> 🔍 RAW ORAN (${macIsim}): Market Sayısı: ${canliOranlar.length}`);
 
-                    // 🛠️ KÖKTEN ÇÖZÜM: Filtre yok. Gelen her oranı "MARKET_SECENEK" formatında çek.
                     canliOranlar.forEach(market => {
                         if (market.values && market.values.length > 0) {
                             market.values.forEach(v => {
-                                let anahtar = `${market.name}_${v.value}`.replace(/\s+/g, '_').toUpperCase();
-                                oranObjesi[anahtar] = parseFloat(v.odd);
-                                
-                                // Python'un okuyabilmesi için eski isimlere (MS1, 2.5_UST) manuel bir köprü (yedek) kuralım
-                                // Çünkü Python modeli MS1, 2.5_UST vs arıyor.
+                                // Sadece ihtiyacımız olan MS ve UST marketlerini
+                                // Python'un ÇIKARDIĞI isim formatıyla BİREBİR aynı olacak şekilde ekliyoruz.
                                 if (market.id == 1 && (v.value === 'Home' || v.value === '1')) oranObjesi['MS1'] = parseFloat(v.odd);
                                 if (market.id == 1 && (v.value === 'Draw' || v.value === 'X')) oranObjesi['X'] = parseFloat(v.odd);
                                 if (market.id == 1 && (v.value === 'Away' || v.value === '2')) oranObjesi['MS2'] = parseFloat(v.odd);
+                                
                                 if (market.id == 5 && v.value.includes('Over')) {
-                                    let parcalar = v.value.split(' ');
-                                    if(parcalar.length > 1) {
-                                        let barem = parcalar[1].replace('.5', '_5') + '_UST';
-                                        oranObjesi[barem] = parseFloat(v.odd);
+                                    // Örnek: v.value = "Over 2.5"
+                                    let baremSayi = v.value.split(' ')[1]; // "2.5"
+                                    if(baremSayi) {
+                                        // "2.5_UST" yapalım ki tahmin_yap.py deki 2.5_UST ile BİREBİR uyuşsun
+                                        let baremAnahtar = baremSayi + '_UST'; 
+                                        oranObjesi[baremAnahtar] = parseFloat(v.odd);
                                     }
                                 }
                             });
@@ -144,7 +141,6 @@ async function canliMaclariHazirla() {
                      addSystemLog(`> ⚠️ ${macIsim} oranları (bahis şirketlerince) KAPALI.`);
                 }
 
-                // ⚡ HIZ AYARI: İstatistikleri çekmeden önce yine 0.3 saniye bekle
                 await new Promise(resolve => setTimeout(resolve, 300));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
@@ -201,27 +197,37 @@ function yapayZekaAnaliziYap(mac) {
                 const dinoOlasiliklari = JSON.parse(stdout);
                 if (dinoOlasiliklari.hata) { resolve(null); return; }
                 
-                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Oranlar (Toplam: ${Object.keys(p.canli_oranlar).length}) | Dino: ${JSON.stringify(dinoOlasiliklari)}`);
+                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Oranlar: ${JSON.stringify(p.canli_oranlar)}`);
 
                 let enIyiFirsat = null;
                 let enYuksekEdge = 0; 
 
+                // HİÇBİR İSİM DEĞİŞİKLİĞİ YAPMADAN DİREKT EŞLEŞTİRME
                 for (const [market, piyasaOrani] of Object.entries(p.canli_oranlar)) {
-                    let pyMarket = market.replace('_', '.'); 
-                    if (dinoOlasiliklari[pyMarket]) {
-                        const dinoYuzde = dinoOlasiliklari[pyMarket];
-                        const piyasaYuzde = (1 / piyasaOrani) * 100;
-                        const edge = dinoYuzde - piyasaYuzde;
+                    // Python'dan da MS1 veya 2.5_UST diye geliyor, bizde de öyle kayıtlı.
+                    const pyMarket = market.toUpperCase(); 
+                    const dinoYuzde = dinoOlasiliklari[pyMarket];
 
-                        if (edge > enYuksekEdge && edge >= state.globalMinEdge) {
-                            enYuksekEdge = edge;
-                            enIyiFirsat = {
-                                market: pyMarket,
-                                edge: edge.toFixed(1),
-                                dino_yuzde: dinoYuzde,
-                                oran: piyasaOrani
-                            };
-                        }
+                    // Eşleşme yoksa atla
+                    if (dinoYuzde === undefined || isNaN(piyasaOrani) || piyasaOrani <= 1) {
+                        continue;
+                    }
+
+                    const piyasaYuzde = (1 / piyasaOrani) * 100;
+                    const edge = dinoYuzde - piyasaYuzde;
+
+                    // SENİN İSTEDİĞİN O EFSANE DEBUG LOGU:
+                    addSystemLog(`> [VALUE TEST] ${p.mac_isim} | ${pyMarket} | Dino: ${dinoYuzde} | Oran: ${piyasaOrani} | Piyasa: ${piyasaYuzde.toFixed(1)} | EDGE: ${edge.toFixed(1)}`);
+
+                    if (edge > enYuksekEdge && edge >= state.globalMinEdge) {
+                        enYuksekEdge = edge;
+                        enIyiFirsat = {
+                            market: pyMarket,
+                            edge: edge.toFixed(1),
+                            dino_yuzde: dinoYuzde,
+                            oran: piyasaOrani,
+                            piyasa_yuzde: piyasaYuzde.toFixed(1)
+                        };
                     }
                 }
                 resolve(enIyiFirsat);
@@ -280,7 +286,6 @@ async function botuCalistir() {
             } else {
                 addSystemLog(`> ❌ ${mac.mac_isim} pas geçildi (Yeterli Value Bulunamadı)`);
             }
-            // Hızlı işlem: Burada ekstra beklemeye gerek yok
         }
         addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} efsane maç yakalandı.`);
     } finally {
@@ -364,6 +369,6 @@ app.get('/api/status', (req, res) => res.json(state));
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🌐 DINO VALUE ENGINE V11 (HIZLI & FİLTRESİZ) Başlatıldı! Port: ${PORT}`);
+    addSystemLog(`> 🌐 DINO VALUE ENGINE V12 (LABORATUVAR) Başlatıldı! Port: ${PORT}`);
     if (state.isRunning) { masterInterval = setInterval(masterClock, 60000); masterClock(); }
 });
