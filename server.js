@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-important-leagues-v2-2026-08-23';
+const BUILD_VERSION = 'ml-all-live-ubuntu-v3-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -49,7 +49,12 @@ const geminiKey =
     process.env.GEMINI_API_KEY;
 
 const pythonBinary =
-    process.env.PYTHON_BIN || 'python';
+    process.env.PYTHON_BIN ||
+    (
+        process.platform === 'win32'
+            ? 'python'
+            : 'python3'
+    );
 
 
 // =========================================================
@@ -857,8 +862,7 @@ async function canliMaclariHazirla() {
                     return (
                         dakika >= 25 &&
                         dakika <= 80 &&
-                        !closedStatuses.has(status) &&
-                        VIP_LIGLER.includes(match.league?.name)
+                        !closedStatuses.has(status)
                     );
 
                 }
@@ -891,17 +895,8 @@ async function canliMaclariHazirla() {
         );
 
 
-        if (
-            uygunMaclar.length === 0
-        ) {
-
-            return [];
-
-        }
-
-
         addSystemLog(
-            `> ⏱️ 25-80 dakika aralığında ${uygunMaclar.length} maç bulundu.`
+            `> ⏱️ /fixtures kaynağında 25-80 dakika aralığında ${uygunMaclar.length} maç bulundu.`
         );
 
 
@@ -924,6 +919,53 @@ async function canliMaclariHazirla() {
             parseLiveOdds(
                 oddsResponse
             );
+
+
+        // /fixtures?live=all ile /odds/live kapsamları anlık olarak farklı
+        // olabiliyor. Odds cevabındaki canlı fixture'ları da aday havuzuna ekle.
+        const oddsLiveFixtures = Array.isArray(oddsResponse.data?.response)
+            ? oddsResponse.data.response
+            : [];
+        const mergedFixtures = new Map();
+
+        for (const match of uygunMaclar) {
+            mergedFixtures.set(Number(match.fixture?.id), match);
+        }
+
+        for (const match of oddsLiveFixtures) {
+            const dakika = Number(match.fixture?.status?.elapsed);
+            const status = normalizeText(
+                match.fixture?.status?.short ?? match.fixture?.status?.long
+            );
+            const closedStatuses = new Set([
+                'ft', 'aet', 'pen', 'p', 'canc', 'abd', 'awd', 'wo',
+                'match finished', 'finished', 'cancelled', 'abandoned',
+                'suspended', 'postponed', 'interrupted'
+            ]);
+
+            if (
+                Number.isFinite(dakika) &&
+                dakika >= 25 &&
+                dakika <= 80 &&
+                !closedStatuses.has(status)
+            ) {
+                const fixtureID = Number(match.fixture?.id);
+                if (fixtureID && !mergedFixtures.has(fixtureID)) {
+                    mergedFixtures.set(fixtureID, match);
+                }
+            }
+        }
+
+        uygunMaclar = Array.from(mergedFixtures.values());
+        uygunMaclar.sort((a, b) => {
+            const vipA = VIP_LIGLER.includes(a.league?.name) ? 1 : 0;
+            const vipB = VIP_LIGLER.includes(b.league?.name) ? 1 : 0;
+            return vipB - vipA;
+        });
+
+        addSystemLog(
+            `> 🌐 Birleştirilmiş 25-80 dakika aday havuzu: ${uygunMaclar.length} maç.`
+        );
 
 
         addSystemLog(
@@ -1042,10 +1084,34 @@ async function canliMaclariHazirla() {
                 );
 
 
-            const fixture =
+            let fixture =
                 fixtureMap.get(
                     fixtureID
                 ) || match;
+
+
+            if (
+                fixture.goals?.home === null ||
+                fixture.goals?.home === undefined ||
+                fixture.goals?.away === null ||
+                fixture.goals?.away === undefined
+            ) {
+                const detailResponse = await apiGet(
+                    `/fixtures?id=${fixtureID}`
+                );
+                const detailedFixture = Array.isArray(detailResponse.data?.response)
+                    ? detailResponse.data.response[0]
+                    : null;
+
+                if (!detailedFixture) {
+                    addSystemLog(
+                        `> ⚠️ Fixture ${fixtureID}: güncel skor detayı alınamadı, modelden çıkarıldı.`
+                    );
+                    continue;
+                }
+
+                fixture = detailedFixture;
+            }
 
 
             let enriched =
