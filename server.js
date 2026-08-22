@@ -13,32 +13,18 @@ const { spawn } = require('child_process');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // =========================================================
-// EXPRESS
+// EXPRESS & ENV
 // =========================================================
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// =========================================================
-// ENV
-// =========================================================
 const apiFootballKey = process.env.API_FOOTBALL_KEY;
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
 const kanalID = process.env.TELEGRAM_CHANNEL_ID;
 const geminiKey = process.env.GEMINI_API_KEY;
-const pythonBinary = process.env.PYTHON_BIN || 'python';
-
-// =========================================================
-// API CLIENT
-// =========================================================
-const ipv4Agent = new https.Agent({ family: 4 });
-const apiClient = axios.create({
-    baseURL: 'https://v3.football.api-sports.io',
-    headers: { 'x-apisports-key': apiFootballKey },
-    httpsAgent: ipv4Agent,
-    timeout: 15000
-});
+const pythonBinary = process.env.PYTHON_BIN || 'python3'; // Python3 garantisi
 
 // =========================================================
 // TELEGRAM & GEMINI
@@ -48,13 +34,12 @@ const genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 // =========================================================
-// AYARLAR
+// AYARLAR & HAFIZA
 // =========================================================
 const VIP_LIGLER = [
     "Süper Lig", "Premier League", "La Liga", "Serie A", "Bundesliga", 
     "Ligue 1", "UEFA Champions League", "UEFA Europa League", "Major League Soccer"
 ];
-
 const DATA_FILE = path.join(__dirname, 'dino_data.json');
 
 let state = {
@@ -68,38 +53,7 @@ let isScanning = false;
 let nextRunTime = 0;
 let masterInterval = null;
 let systemLogs = [];
-let apiQueue = Promise.resolve();
 let lastApiRequestTime = 0;
-let quotaRemaining = null;
-
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-async function apiGet(url, config = {}) {
-    let result;
-    apiQueue = apiQueue.then(async () => {
-        const now = Date.now();
-        const elapsed = now - lastApiRequestTime;
-        const minimumDelay = 250; // 4 request / sec
-        
-        if (elapsed < minimumDelay) await sleep(minimumDelay - elapsed);
-        
-        lastApiRequestTime = Date.now();
-        try {
-            result = await apiClient.get(url, config);
-            const remaining = result.headers['x-ratelimit-requests-remaining'];
-            if (remaining !== undefined) quotaRemaining = Number(remaining);
-        } catch (error) {
-            if (error.response && error.response.status === 429) {
-                addSystemLog("> ⚠️ API 429! 15 saniye bekleniyor...");
-                await sleep(15000);
-                lastApiRequestTime = Date.now();
-                result = await apiClient.get(url, config);
-            } else { throw error; }
-        }
-    });
-    await apiQueue;
-    return result;
-}
 
 function addSystemLog(msg) {
     const time = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul' });
@@ -108,7 +62,7 @@ function addSystemLog(msg) {
     systemLogs.push(logMsg);
     if (systemLogs.length > 80) systemLogs.shift();
 }
-app.get('/api/logs', (req, res) => { res.json(systemLogs); });
+app.get('/api/logs', (req, res) => res.json(systemLogs));
 
 function loadData() {
     try {
@@ -119,22 +73,54 @@ function loadData() {
         } else { saveData(); }
     } catch (err) { addSystemLog("> ⚠️ Hafıza yüklenemedi."); }
 }
-
 function saveData() {
     try { fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2)); } 
-    catch (err) { addSystemLog("> ⚠️ Hafıza kaydedilemedi."); }
-}
-function getCurrentTimeTR() {
-    return new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
+    catch (err) {}
 }
 
 // =========================================================
-// MARKET İSİMLERİNİ STANDARDİZE ET (Python ile BİREBİR)
+// API CLIENT (TAKAILMAYI ÇÖZEN YENİ SİSTEM)
+// =========================================================
+const ipv4Agent = new https.Agent({ family: 4 });
+
+async function apiGet(url) {
+    const now = Date.now();
+    const elapsed = now - lastApiRequestTime;
+    
+    // API-Sports saniyede maksimum 10 isteğe izin verir (PRO). Biz güvenli tarafta kalıp 300ms bekliyoruz.
+    if (elapsed < 300) {
+        await new Promise(resolve => setTimeout(resolve, 300 - elapsed));
+    }
+    lastApiRequestTime = Date.now();
+
+    try {
+        const response = await axios.get(`https://v3.football.api-sports.io${url}`, {
+            headers: { 'x-apisports-key': apiFootballKey },
+            httpsAgent: ipv4Agent,
+            timeout: 15000
+        });
+        return response;
+    } catch (error) {
+        if (error.response && error.response.status === 429) {
+            addSystemLog("> ⚠️ API Rate Limit (429)! 10 Saniye bekleniyor...");
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            lastApiRequestTime = Date.now();
+            return await axios.get(`https://v3.football.api-sports.io${url}`, {
+                headers: { 'x-apisports-key': apiFootballKey },
+                httpsAgent: ipv4Agent,
+                timeout: 15000
+            });
+        }
+        throw error;
+    }
+}
+
+// =========================================================
+// MARKET İSİMLERİNİ STANDARDİZE ET (PYTHON İLE %100 UYUMLU)
 // =========================================================
 function normalizeMarketName(value) {
     if (value === null || value === undefined) return null;
     const text = String(value).trim();
-    
     if (/^home$/i.test(text) || text === "1") return 'MS1';
     if (/^draw$/i.test(text) || text === "X") return 'X';
     if (/^away$/i.test(text) || text === "2") return 'MS2';
@@ -149,7 +135,7 @@ function normalizeMarketName(value) {
 }
 
 // =========================================================
-// LIVE ODDS PARSE (101 ve 29 gibi çöp oranları filtrele)
+// GÜVENLİ ORAN AYIKLAMA (101 ve 29 gibi oranları siler)
 // =========================================================
 function parseLiveOdds(response) {
     const oddsMap = new Map();
@@ -171,7 +157,7 @@ function parseLiveOdds(response) {
             for (const bet of bets) {
                 if (bet.stopped === true || bet.blocked === true) continue;
                 
-                // SADECE ID 1 (MS) VE ID 5 (ALT/UST) İÇİN ÇALIŞ
+                // Sadece MS (1) ve Alt/Üst (5) marketlerini al. Handikapları vb. engelle!
                 if (bet.id !== 1 && bet.id !== 5) continue;
 
                 const values = Array.isArray(bet.values) ? bet.values : [];
@@ -181,12 +167,17 @@ function parseLiveOdds(response) {
                     const market = normalizeMarketName(value.value);
                     if (!market) continue;
                     
-                    // Oran temizleme: Virgül vb varsa düzelt, stringi floata çevir
-                    let rawOdd = String(value.odd).replace(',', '.');
-                    const odd = parseFloat(rawOdd);
+                    // Kesirli (10/1) veya virgüllü (2,50) oranları düzelt
+                    let rawOddStr = String(value.odd).trim().replace(',', '.');
+                    let odd = 0;
+                    if (rawOddStr.includes('/')) {
+                        let parts = rawOddStr.split('/');
+                        if (parts.length === 2) odd = (parseFloat(parts[0]) / parseFloat(parts[1])) + 1;
+                    } else {
+                        odd = parseFloat(rawOddStr);
+                    }
 
-                    // KRİTİK FİLTRE: Maç sonu ve Alt/Üst oranları 1.01'den küçük, 25'ten büyük OLAMAZ.
-                    // Eğer 29, 101, 41 geliyorsa bu API'nin o markette hata yaptığını gösterir, çöpe at.
+                    // 101, 29, 41 gibi absürt ve imkansız hatalı oranları ÇÖPE AT!
                     if (!Number.isFinite(odd) || odd <= 1.01 || odd > 25.0) continue;
 
                     if (!marketMap[market] || odd > marketMap[market].oran) {
@@ -200,7 +191,7 @@ function parseLiveOdds(response) {
 }
 
 // =========================================================
-// FIXTURE STATISTICS
+// İSTATİSTİKLERİ ÇEK
 // =========================================================
 function getStat(teamStats, statName) {
     if (!Array.isArray(teamStats)) return 0;
@@ -217,7 +208,6 @@ function enrichFixturesWithStats(fixtures) {
         
         const homeID = fixture.teams.home.id;
         const awayID = fixture.teams.away.id;
-        
         const homeStatsObj = statistics.find(x => x.team?.id === homeID);
         const awayStatsObj = statistics.find(x => x.team?.id === awayID);
         if (!homeStatsObj || !awayStatsObj) return null;
@@ -239,11 +229,10 @@ function enrichFixturesWithStats(fixtures) {
 }
 
 // =========================================================
-// CANLI MAÇ HAZIRLA
+// ANA HAZIRLIK EVRESİ
 // =========================================================
 async function canliMaclariHazirla() {
-    if (!apiFootballKey || !apiFootballKey.trim()) { addSystemLog("> ❌ API_FOOTBALL_KEY bulunamadı."); return []; }
-    
+    if (!apiFootballKey || !apiFootballKey.trim()) { addSystemLog("> ❌ API_FOOTBALL_KEY boş!"); return []; }
     try {
         const liveResponse = await apiGet('/fixtures?live=all');
         const allLiveFixtures = liveResponse.data?.response || [];
@@ -253,7 +242,6 @@ async function canliMaclariHazirla() {
             return (dakika >= 25 && dakika <= 80);
         });
         
-        // VIP ligleri öne al ama diğerlerini silme (senin isteğine göre, istersen sadece VIP yapabilirsin)
         uygunMaclar.sort((a, b) => {
             const vipA = VIP_LIGLER.includes(a.league.name) ? 1 : 0;
             const vipB = VIP_LIGLER.includes(b.league.name) ? 1 : 0;
@@ -275,9 +263,7 @@ async function canliMaclariHazirla() {
             const ids = chunk.map(m => m.fixture.id).join('-');
             const statsResponse = await apiGet(`/fixtures?ids=${ids}`);
             const returned = statsResponse.data?.response || [];
-            for (const fixture of returned) {
-                fixtureMap.set(Number(fixture.fixture.id), fixture);
-            }
+            for (const fixture of returned) { fixtureMap.set(Number(fixture.fixture.id), fixture); }
         }
 
         const macVerileri = [];
@@ -288,6 +274,11 @@ async function canliMaclariHazirla() {
             
             const enriched = enrichFixturesWithStats([fixture])[0];
             if (!enriched) continue;
+
+            // ⛔ 0 İSTATİSTİK FİLTRESİ: Eğer maçta hiç şut/korner verisi yoksa, yapay zekayı kör etmemek için maçı çöpe at!
+            if (enriched.home_shot === 0 && enriched.away_shot === 0 && enriched.home_corner === 0 && enriched.away_corner === 0) {
+                continue; 
+            }
             
             const liveOdds = oddsMap.get(fixtureID);
             if (!liveOdds || Object.keys(liveOdds).length === 0) continue;
@@ -303,7 +294,7 @@ async function canliMaclariHazirla() {
 }
 
 // =========================================================
-// PYTHON
+// PYTHON BAĞLANTISI (SENİN KODUN İLE %100 UYUMLU)
 // =========================================================
 function yapayZekaAnaliziYap(maclar) {
     return new Promise((resolve) => {
@@ -313,10 +304,10 @@ function yapayZekaAnaliziYap(maclar) {
         let stdout = ''; let stderr = '';
         python.stdout.on('data', data => { stdout += data.toString(); });
         python.stderr.on('data', data => { stderr += data.toString(); });
-        python.on('error', error => { resolve([]); });
+        python.on('error', error => { addSystemLog(`> ❌ PYTHON ÇÖKTÜ: ${error.message}`); resolve([]); });
         
         python.on('close', code => {
-            if (code !== 0) { resolve([]); return; }
+            if (code !== 0) { addSystemLog(`> ❌ PYTHON HATA KODU: ${code}`); resolve([]); return; }
             try {
                 const sonuc = JSON.parse(stdout);
                 if (sonuc.hata) { resolve([]); return; }
@@ -337,7 +328,6 @@ function valueAnaliziYap(mac, dino) {
         const piyasaOrani = typeof oddsData === 'object' ? Number(oddsData.oran) : Number(oddsData);
         if (!Number.isFinite(piyasaOrani) || piyasaOrani <= 1) continue;
         
-        // Node'daki MS1 ile Python'daki MS1 artık tamamen aynı
         const pyMarket = market.toUpperCase();
         const dinoYuzde = Number(dino[pyMarket]);
         if (!Number.isFinite(dinoYuzde)) continue;
@@ -364,19 +354,19 @@ function valueAnaliziYap(mac, dino) {
 // GEMINI & TELEGRAM
 // =========================================================
 async function geminiYorumuYaz(mac, firsat) {
-    if (!genAI) return "İstatistiksel model pozitif value tespit etti.";
+    if (!genAI) return "İstatistiksel model canlı verilerde pozitif value tespit etti.";
     try {
         const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-        const prompt = `Futbol veri analistisin. Python modelimiz Value buldu.
+        const prompt = `Sen veri analistisin. Python modelimiz value buldu.
 Maç: ${mac.mac_isim}, Dakika: ${mac.dakika}, Skor: ${mac.skor}
-Ev Sahibi: ${mac.home_shot} Şut, ${mac.home_sot} İsabet, ${mac.home_corner} Korner
+Ev: ${mac.home_shot} Şut, ${mac.home_sot} İsabet, ${mac.home_corner} Korner
 Deplasman: ${mac.away_shot} Şut, ${mac.away_sot} İsabet, ${mac.away_corner} Korner
-Seçilen Bahis: ${firsat.market}, Avantaj: +${firsat.edge}%
-Bu value'nun istatistiksel nedenini şut/korner verilerini kullanarak 2 cümlede profesyonelce açıkla. Başlık/Tahmin yazma.`;
+Bahis: ${firsat.market}, Avantaj (Edge): +${firsat.edge}%
+Bu value'nun istatistiksel nedenini şut/korner baskısına göre 2-3 cümlede açıkla.`;
         
         const result = await model.generateContent(prompt);
         return result.response.text().trim().replace(/```/g, '');
-    } catch (error) { return "İstatistiksel model pozitif value tespit etti."; }
+    } catch (error) { return "İstatistiksel model canlı verilerde pozitif value tespit etti."; }
 }
 
 async function telegramSinyaliGonder(mac, firsat, yorum) {
@@ -387,33 +377,39 @@ async function telegramSinyaliGonder(mac, firsat, yorum) {
 }
 
 // =========================================================
-// ANA DÖNGÜ
+// TARAMA DÖNGÜSÜ
 // =========================================================
 async function botuCalistir() {
     if (isScanning) return;
     isScanning = true;
     try {
+        addSystemLog("> 🔍 Otomatik tarama başlatıldı...");
         const macListesi = await canliMaclariHazirla();
-        if (macListesi.length === 0) return;
+        if (macListesi.length === 0) {
+            addSystemLog("> ℹ️ Kriterlere uygun maç bulunamadı.");
+            return;
+        }
         
+        addSystemLog(`> 📊 Python'a ${macListesi.length} maç gönderiliyor...`);
         const dinoSonuclari = await yapayZekaAnaliziYap(macListesi);
         if (!Array.isArray(dinoSonuclari)) return;
 
+        let onaylanan = 0;
         for (let i = 0; i < macListesi.length; i++) {
             const mac = macListesi[i];
             const dino = dinoSonuclari[i];
             if (!dino || Object.keys(dino).length === 0) continue;
             
-            // Eğer istatistikler sıfırsa (0 Şut 0 Korner), bu maçı GÜVENLİK için tamamen pas geç!
-            if (mac.home_shot === 0 && mac.away_shot === 0 && mac.home_corner === 0 && mac.away_corner === 0) continue;
-
             const firsat = valueAnaliziYap(mac, dino);
             if (!firsat) continue;
 
+            addSystemLog(`> 🚨 VALUE BULUNDU: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}%`);
             const yorum = await geminiYorumuYaz(mac, firsat);
-            await telegramSinyaliGonder(mac, firsat, yorum);
+            const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
+            if (gonderildi) onaylanan++;
         }
-    } catch (error) {} 
+        addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} efsane maç yakalandı.`);
+    } catch (error) { addSystemLog(`> ❌ ANA TARAMA HATASI: ${error.message}`); } 
     finally { isScanning = false; }
 }
 
@@ -427,30 +423,32 @@ function masterClock() {
 app.post('/api/start', (req, res) => {
     if (state.isRunning) return res.json({ success: false });
     state.isRunning = true; saveData(); nextRunTime = 0; 
+    addSystemLog("> ⚡ Sistem Ana Şalteri AÇILDI.");
     masterInterval = setInterval(masterClock, 60000); masterClock(); 
     res.json({ success: true });
 });
 app.post('/api/stop', (req, res) => {
     state.isRunning = false; saveData(); 
     if (masterInterval) clearInterval(masterInterval);
+    addSystemLog("> 🛑 Sistem KAPATILDI.");
     res.json({ success: true });
 });
 app.post('/api/force-scan', (req, res) => {
     if (!state.isRunning || isScanning) return res.json({ success: false });
     botuCalistir().catch(console.error); res.json({ success: true });
 });
-app.get('/api/settings', (req, res) => { res.json(state); });
+app.get('/api/settings', (req, res) => res.json(state));
 app.post('/api/settings', (req, res) => {
     if (req.body.oran !== undefined) state.globalMinEdge = parseFloat(req.body.oran);
     saveData(); res.json({ success: true, state: state });
 });
 app.get('/api/status', (req, res) => {
-    res.json({ isRunning: state.isRunning, isScanning: isScanning, minEdge: state.globalMinEdge, nextRunTime: nextRunTime, quotaRemaining: quotaRemaining });
+    res.json({ isRunning: state.isRunning, isScanning: isScanning, minEdge: state.globalMinEdge, nextRunTime: nextRunTime });
 });
 
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🚀 DINO PRO (Filtreli & Stabil) Başlatıldı! Port: ${PORT}`);
+    addSystemLog(`> 🚀 DINO PRO (Python Uyumlu & Anti-Deadlock) Başlatıldı! Port: ${PORT}`);
     if (state.isRunning) { masterInterval = setInterval(masterClock, 60000); masterClock(); }
 });
