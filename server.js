@@ -20,6 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
+const BUILD_VERSION = 'batch-ai-v3-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -114,7 +115,13 @@ const AI_MIN_CONFIDENCE = Number.isFinite(
     Number(process.env.AI_MIN_CONFIDENCE)
 )
     ? Number(process.env.AI_MIN_CONFIDENCE)
-    : 65;
+    : 55;
+
+const AI_MAX_SIGNALS_PER_SCAN = Number.isFinite(
+    Number(process.env.AI_MAX_SIGNALS_PER_SCAN)
+)
+    ? Math.max(1, Math.floor(Number(process.env.AI_MAX_SIGNALS_PER_SCAN)))
+    : 3;
 
 
 // =========================================================
@@ -1568,86 +1575,122 @@ Sadece analiz metnini yaz.
 }
 
 
-async function geminiFirsatiSec(mac) {
-    if (!genAI) {
-        addSystemLog(
-            `> ⚠️ ${mac.mac_isim}: GEMINI_API_KEY yok; AI fallback çalıştırılamadı.`
-        );
-        return null;
+
+async function geminiFirsatlariTopluSec(maclar) {
+    if (!genAI || !Array.isArray(maclar) || maclar.length === 0) {
+        return [];
     }
 
-    const marketler = Object.entries(mac.canli_oranlar || {}).map(
-        ([market, data]) => ({
-            market,
-            oran: Number(data?.oran ?? data),
-            kaynak: data?.bookmaker || 'API-Football Live Odds'
-        })
-    ).filter(item => Number.isFinite(item.oran) && item.oran > 1);
+    const adaylar = maclar.map(mac => ({
+        fixture_id: mac.fixture_id,
+        mac: mac.mac_isim,
+        lig: mac.lig,
+        dakika: mac.dakika,
+        skor: mac.skor,
+        istatistik: {
+            ev_sut: mac.home_shot,
+            ev_isabet: mac.home_sot,
+            ev_korner: mac.home_corner,
+            dep_sut: mac.away_shot,
+            dep_isabet: mac.away_sot,
+            dep_korner: mac.away_corner
+        },
+        marketler: Object.entries(mac.canli_oranlar || {}).map(
+            ([market, data]) => ({
+                market,
+                oran: Number(data?.oran ?? data)
+            })
+        ).filter(item => Number.isFinite(item.oran) && item.oran > 1)
+    })).filter(aday => aday.marketler.length > 0);
 
-    if (marketler.length === 0) return null;
-
-    const veri = value =>
-        value === null || value === undefined ? 'VERI_YOK' : value;
+    if (adaylar.length === 0) return [];
 
     try {
         const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         const prompt = `
-Sen temkinli bir canlı futbol veri analistisin. Aşağıdaki maç için sadece verilen
-marketlerden birini seçebilir veya PASS diyebilirsin. Oran, market, kaynak ya da
-istatistik uydurma. Eksik istatistiği sıfır kabul etme. Skor ve dakika ile çelişen,
-aşırı riskli veya yeterli dayanağı olmayan durumda PASS seç.
+Sen canlı futbol maçlarını birbirleriyle karşılaştıran temkinli bir analiz
+motorusun. Aşağıdaki adayların tümünü birlikte değerlendir ve göreli olarak en
+güçlü en fazla ${AI_MAX_SIGNALS_PER_SCAN} seçimi sırala.
 
-Maç: ${mac.mac_isim}
-Lig: ${mac.lig}
-Dakika: ${veri(mac.dakika)}
-Skor: ${mac.skor}
-Ev şut/isabet/korner: ${veri(mac.home_shot)} / ${veri(mac.home_sot)} / ${veri(mac.home_corner)}
-Dep şut/isabet/korner: ${veri(mac.away_shot)} / ${veri(mac.away_sot)} / ${veri(mac.away_corner)}
-Kullanılabilir canlı marketler: ${JSON.stringify(marketler)}
+Kurallar:
+- Yalnızca verilen fixture_id ve o fixture içindeki market adını kullan.
+- Oran üretme veya değiştirme; oranı cevaba hiç yazma.
+- null istatistiği sıfır kabul etme. Veri eksikse skor, dakika ve piyasanın
+  sunduğu marketleri kullanarak diğer adaylarla göreli karşılaştırma yap.
+- İlk yarı, korner veya takım toplamı gibi listede olmayan market önerme.
+- Aday listesi boş olmadığı için PASS döndürme. Zayıf adayları ele ve en güçlü
+  1-${AI_MAX_SIGNALS_PER_SCAN} adayı seç.
+- confidence kesin kazanma ihtimali değil, adaylar arasındaki göreli analiz
+  güvenidir.
 
-Yalnızca geçerli JSON döndür:
-{"market":"MS1 veya listedeki birebir market ya da PASS","confidence":0-100,"yorum":"En fazla 3 kısa cümle"}
+Adaylar:
+${JSON.stringify(adaylar)}
+
+Yalnızca bu biçimde geçerli JSON döndür:
+{"secimler":[{"fixture_id":123,"market":"MS1","confidence":0-100,"yorum":"En fazla 3 kısa cümle"}]}
 `;
 
         const result = await model.generateContent(prompt);
         const raw = result.response.text().trim().replace(/```(?:json)?/gi, '');
         const jsonStart = raw.indexOf('{');
         const jsonEnd = raw.lastIndexOf('}');
-        if (jsonStart < 0 || jsonEnd < jsonStart) return null;
+        if (jsonStart < 0 || jsonEnd < jsonStart) return [];
 
-        const secim = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-        const market = String(secim.market || '').trim();
-        const confidence = Number(secim.confidence);
+        const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+        const secimler = Array.isArray(parsed.secimler)
+            ? parsed.secimler
+            : (Array.isArray(parsed.seçimler) ? parsed.seçimler : []);
+        const macMap = new Map(
+            maclar.map(mac => [Number(mac.fixture_id), mac])
+        );
+        const kullanilanFixtureler = new Set();
+        const dogrulanan = [];
 
-        if (
-            normalizeText(market) === 'pass' ||
-            !Object.prototype.hasOwnProperty.call(mac.canli_oranlar, market) ||
-            !Number.isFinite(confidence) ||
-            confidence < AI_MIN_CONFIDENCE
-        ) {
-            addSystemLog(
-                `> ⏭️ ${mac.mac_isim}: Gemini PASS / düşük güven (${Number.isFinite(confidence) ? confidence : 0}%).`
+        for (const secim of secimler) {
+            if (dogrulanan.length >= AI_MAX_SIGNALS_PER_SCAN) break;
+
+            const fixtureID = Number(secim.fixture_id);
+            const mac = macMap.get(fixtureID);
+            if (!mac || kullanilanFixtureler.has(fixtureID)) continue;
+
+            const istenenMarket = String(secim.market || '').trim();
+            const market = Object.keys(mac.canli_oranlar || {}).find(
+                key => key.toUpperCase() === istenenMarket.toUpperCase()
             );
-            return null;
+            const confidence = Number(secim.confidence);
+
+            if (
+                !market ||
+                !Number.isFinite(confidence) ||
+                confidence < AI_MIN_CONFIDENCE
+            ) {
+                continue;
+            }
+
+            const oddsData = mac.canli_oranlar[market];
+            const oran = Number(oddsData?.oran ?? oddsData);
+            if (!Number.isFinite(oran) || oran <= 1) continue;
+
+            kullanilanFixtureler.add(fixtureID);
+            dogrulanan.push({
+                mac,
+                firsat: {
+                    market,
+                    oran,
+                    bookmaker: oddsData?.bookmaker || 'API-Football Live Odds',
+                    confidence: Math.max(0, Math.min(100, confidence)),
+                    yorum: String(
+                        secim.yorum || 'Canlı skor, dakika ve kullanılabilir piyasa birlikte değerlendirildi.'
+                    ).trim()
+                }
+            });
         }
 
-        const oddsData = mac.canli_oranlar[market];
-        const oran = Number(oddsData?.oran ?? oddsData);
-        if (!Number.isFinite(oran) || oran <= 1) return null;
-
-        return {
-            market,
-            oran,
-            bookmaker: oddsData?.bookmaker || 'API-Football Live Odds',
-            confidence: Math.max(0, Math.min(100, confidence)),
-            yorum: String(secim.yorum || 'Canlı maç akışı ve mevcut piyasa birlikte değerlendirildi.').trim()
-        };
+        return dogrulanan;
 
     } catch (error) {
-        addSystemLog(
-            `> ⚠️ ${mac.mac_isim}: GEMINI FALLBACK HATASI: ${error.message}`
-        );
-        return null;
+        addSystemLog(`> ⚠️ GEMINI TOPLU ANALİZ HATASI: ${error.message}`);
+        return [];
     }
 }
 
@@ -1872,12 +1915,18 @@ async function botuCalistir() {
 
         if (aiMaclari.length > 0) {
             addSystemLog(
-                `> 🤖 Gemini ${aiMaclari.length} maçı eksik verileri sıfır saymadan değerlendirecek...`
+                `> 🤖 Gemini ${aiMaclari.length} maçı topluca karşılaştırıp en iyi ${AI_MAX_SIGNALS_PER_SCAN} adayı seçecek...`
             );
 
-            for (const mac of aiMaclari) {
-                const firsat = await geminiFirsatiSec(mac);
-                if (!firsat) continue;
+            const aiSecimleri = await geminiFirsatlariTopluSec(aiMaclari);
+
+            if (aiSecimleri.length === 0) {
+                addSystemLog(
+                    `> ⏭️ Gemini geçerli/eşik üstü bir toplu seçim üretmedi (minimum güven %${AI_MIN_CONFIDENCE}).`
+                );
+            }
+
+            for (const { mac, firsat } of aiSecimleri) {
 
                 addSystemLog(
                     `> 🚨 AI SEÇİMİ: ${mac.mac_isim} | ${firsat.market} | Güven %${firsat.confidence} | Oran ${firsat.oran}`
@@ -2339,6 +2388,9 @@ app.get(
 
         res.json({
 
+            buildVersion:
+                BUILD_VERSION,
+
             isRunning:
                 state.isRunning,
 
@@ -2378,6 +2430,11 @@ app.listen(
 
         addSystemLog(
             `> 🦖 DINO SERVER çalışıyor. Port: ${PORT}`
+        );
+
+
+        addSystemLog(
+            `> 🧩 Sürüm: ${BUILD_VERSION}`
         );
 
 
