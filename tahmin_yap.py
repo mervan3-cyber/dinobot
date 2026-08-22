@@ -85,6 +85,53 @@ def temel_ozellikler(mac):
     }
 
 
+def skor_ozellikleri(mac):
+    minute = sayi(mac.get("dakika", mac.get("minute")), "dakika")
+    home_score, away_score = skoru_oku(mac)
+    phase = minute / 90.0
+    goal_diff = home_score - away_score
+    total_goals = home_score + away_score
+    home_lead = 1.0 if goal_diff > 0 else 0.0
+    draw_state = 1.0 if goal_diff == 0 else 0.0
+    away_lead = 1.0 if goal_diff < 0 else 0.0
+
+    return {
+        "minute": minute,
+        "remaining_minutes": max(0.0, 95.0 - minute),
+        "phase_squared": phase * phase,
+        "home_score": home_score,
+        "away_score": away_score,
+        "goal_diff": goal_diff,
+        "total_goals": total_goals,
+        "home_lead": home_lead,
+        "draw_state": draw_state,
+        "away_lead": away_lead,
+        "home_lead_late": home_lead * phase,
+        "draw_late": draw_state * phase,
+        "away_lead_late": away_lead * phase,
+        "goal_diff_late": goal_diff * phase,
+        "goal_diff_late_squared": goal_diff * phase * phase,
+        "total_goals_late": total_goals * phase,
+    }
+
+
+def istatistikler_tam(mac):
+    required = [
+        "home_shot", "away_shot", "home_sot",
+        "away_sot", "home_corner", "away_corner"
+    ]
+    for key in required:
+        value = mac.get(key)
+        if value is None or value == "":
+            return False
+        try:
+            if not math.isfinite(float(value)):
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def prematch_ekle(mac, features):
     keys = ["prematch_p_home", "prematch_p_draw", "prematch_p_away"]
     if all(mac.get(key) is not None for key in keys):
@@ -143,9 +190,13 @@ def model_tahmini(model, features):
 
 
 def mac_tahmini(mac, models):
-    features = temel_ozellikler(mac)
-    prematch_var = prematch_ekle(mac, features)
-    variant = "live_plus_prematch" if prematch_var else "live_only"
+    if istatistikler_tam(mac):
+        features = temel_ozellikler(mac)
+        prematch_var = prematch_ekle(mac, features)
+        variant = "live_plus_prematch" if prematch_var else "live_only"
+    else:
+        features = skor_ozellikleri(mac)
+        variant = "score_only"
     selected = models[variant]
 
     result_probs = model_tahmini(selected["result"], features)

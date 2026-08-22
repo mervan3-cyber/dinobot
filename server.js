@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-all-live-ubuntu-v3-2026-08-23';
+const BUILD_VERSION = 'ml-score-fallback-ubuntu-v4-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -1123,7 +1123,7 @@ async function canliMaclariHazirla() {
             if (!temelStatsTam(enriched)) {
 
                 addSystemLog(
-                    `> 🔄 ${match.teams.home.name} - ${match.teams.away.name}: embedded stats eksik, /fixtures/statistics deneniyor.`
+                    `> 🔄 ${enriched.mac_isim}: embedded stats eksik, /fixtures/statistics deneniyor.`
                 );
 
                 const fallbackStats = await direktFixtureStatsGetir(fixture);
@@ -1144,9 +1144,8 @@ async function canliMaclariHazirla() {
 
             if (!temelStatsTam(enriched)) {
                 addSystemLog(
-                    `> ⛔ ${match.teams.home.name} - ${match.teams.away.name}: ML istatistiği eksik; modelden çıkarıldı.`
+                    `> 🧩 ${enriched.mac_isim}: temel istatistik eksik; dakika + skor fallback modeli kullanılacak.`
                 );
-                continue;
             }
 
 
@@ -1546,6 +1545,14 @@ async function geminiYorumuYaz(
                     GEMINI_MODEL
             });
 
+        const statsAvailable = temelStatsTam(mac);
+        const statsDescription = statsAvailable
+            ? `Ev sahibi: ${mac.home_shot} toplam şut, ${mac.home_sot} isabetli şut, ${mac.home_corner} korner.\nDeplasman: ${mac.away_shot} toplam şut, ${mac.away_sot} isabetli şut, ${mac.away_corner} korner.`
+            : 'Şut, isabetli şut ve korner verileri API tarafından sağlanmadı. Bu değerleri tahmin etme veya sıfır kabul etme.';
+        const analysisRule = statsAvailable
+            ? 'Şut, isabetli şut, korner, skor ve dakikayı kullan.'
+            : 'Yalnızca skor, dakika, seçilmiş market ve model olasılığını kullan; bulunmayan canlı istatistikleri uydurma.';
+
 
         const prompt = `
 Sen uzman bir canlı futbol veri analistisin.
@@ -1564,15 +1571,8 @@ ${mac.dakika}
 Skor:
 ${mac.skor}
 
-Ev sahibi:
-${mac.home_shot} toplam şut,
-${mac.home_sot} isabetli şut,
-${mac.home_corner} korner.
-
-Deplasman:
-${mac.away_shot} toplam şut,
-${mac.away_sot} isabetli şut,
-${mac.away_corner} korner.
+Canlı veri:
+${statsDescription}
 
 Seçilen market:
 ${firsat.market}
@@ -1592,7 +1592,7 @@ EDGE:
 Görevin:
 Bu value'nun istatistiksel olarak neden oluştuğunu 3 kısa cümlede profesyonel biçimde açıkla.
 
-Şut, isabetli şut ve korner verilerini kullan.
+${analysisRule}
 
 Tahmin dışında yeni bir bahis önermeye çalışma.
 
@@ -1635,6 +1635,20 @@ Sadece analiz metnini yaz.
 // TELEGRAM
 // =========================================================
 
+function telegramHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+
+function statGoster(value) {
+    return value === null || value === undefined
+        ? 'Veri yok'
+        : value;
+}
+
 async function telegramSinyaliGonder(
     mac,
     firsat,
@@ -1657,25 +1671,26 @@ async function telegramSinyaliGonder(
 
     const mesaj =
 
-`🔥 *DİNO VALUE ALARM* 🔥
+`🔥 <b>DİNO VALUE ALARM</b> 🔥
 --------------------------------------
-⚽️ *Maç:* ${mac.mac_isim}
-🏆 *Lig:* ${mac.lig}
-⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}
+⚽️ <b>Maç:</b> ${telegramHtml(mac.mac_isim)}
+🏆 <b>Lig:</b> ${telegramHtml(mac.lig)}
+⏱ <b>Dakika:</b> ${telegramHtml(mac.dakika)} | <b>Skor:</b> ${telegramHtml(mac.skor)}
 
-🎯 *Value Market:* ${firsat.market}
-📈 *EDGE:* +${firsat.edge}%
-💵 *Canlı Oran:* ${firsat.oran}
-🏦 *Kaynak:* ${firsat.bookmaker}
-🦖 *Dino İhtimali:* %${firsat.dino_yuzde}
-📊 *Piyasa İhtimali:* %${firsat.piyasa_yuzde}
+🎯 <b>Value Market:</b> ${telegramHtml(firsat.market)}
+📈 <b>EDGE:</b> +${telegramHtml(firsat.edge)}%
+💵 <b>Canlı Oran:</b> ${telegramHtml(firsat.oran)}
+🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
+🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
+📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
+🧠 <b>Model:</b> ${temelStatsTam(mac) ? 'Canlı istatistik modeli' : 'Dakika + skor fallback modeli'}
 
-📌 *Canlı İstatistikler*
-🏠 ${mac.home_shot} Şut | ${mac.home_sot} İsabet | ${mac.home_corner} Korner
-✈️ ${mac.away_shot} Şut | ${mac.away_sot} İsabet | ${mac.away_corner} Korner
+📌 <b>Canlı İstatistikler</b>
+🏠 ${telegramHtml(statGoster(mac.home_shot))} Şut | ${telegramHtml(statGoster(mac.home_sot))} İsabet | ${telegramHtml(statGoster(mac.home_corner))} Korner
+✈️ ${telegramHtml(statGoster(mac.away_shot))} Şut | ${telegramHtml(statGoster(mac.away_sot))} İsabet | ${telegramHtml(statGoster(mac.away_corner))} Korner
 
-📝 *Dino Analiz:*
-_${yorum}_
+📝 <b>Dino Analiz:</b>
+<i>${telegramHtml(yorum)}</i>
 
 --------------------------------------`;
 
@@ -1687,7 +1702,7 @@ _${yorum}_
             mesaj,
             {
                 parse_mode:
-                    'Markdown'
+                    'HTML'
             }
         );
 
@@ -1722,12 +1737,12 @@ async function botuCalistir() {
 
         const macListesi = await canliMaclariHazirla();
         if (macListesi.length === 0) {
-            addSystemLog('> ℹ️ Model kapsamına uygun, oranlı ve eksiksiz canlı maç bulunamadı.');
+            addSystemLog('> ℹ️ Model kapsamına uygun ve oranlı canlı maç bulunamadı.');
             return;
         }
 
         addSystemLog(
-            `> 📊 Yeni modele ${macListesi.length} eksiksiz maç gönderiliyor...`
+            `> 📊 Yeni modele ${macListesi.length} maç gönderiliyor (tam stats + skor fallback)...`
         );
 
         const dinoSonuclari = await yapayZekaAnaliziYap(macListesi);
