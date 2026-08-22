@@ -1,18 +1,17 @@
 require('dotenv').config();
 const dns = require('dns');
-// Node 17+ ve Ubuntu sunucularda yasanan IPv6 DNS TimeOut hatasini cozmek icin IPv4 zorlamasi:
 dns.setDefaultResultOrder('ipv4first');
 
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 const https = require('https');
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // Gemini geri geldi!
 
-// NODEJS KESIN IPV4 ZORLAMASI (Ajan)
 const ipv4Agent = new https.Agent({ family: 4 });
 
 const app = express();
@@ -20,30 +19,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// API ve KEY AYARLARI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const apiFootballKey = process.env.API_FOOTBALL_KEY;
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
-const kanalID = process.env.TELEGRAM_CHANNEL_ID;
+const kanalID = process.env.TELEGRAM_CHANNEL_ID; 
 
 const VIP_LIGLER = ["Süper Lig", "Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "UEFA Champions League", "UEFA Europa League", "Major League Soccer"];
-
-const SYSTEM_INSTRUCTION = `Sen uzman bir spor veri bilimcisi ve acimasiz bir 'Value Bet' analistisin. 
-Sana iletilen mac istatistiklerini ve gercek Bet365 canli oranlarini analiz et.
-
-KESIN KURALLAR:
-1. HER DURUMDA ANALIZ YAP: Mac ne kadar kisir veya oran ne kadar dusuk olursa olsun PAS gecmek veya analizi reddetmek YASAKTIR.
-2. ISTATISTIK SARTI: 'gerekce' icinde karari destekleyen sahadaki RAKAMSAL verileri belirtmek zorundasin.
-3. BAREM SARTI: Asya handikap KULLANMAK YASAKTIR. Net iddaa baremleri kullan.
-4. DINO BASKI ENDEKSI: Hucum baskisini gosteren ozel bir yuzdelik skor uret.
-
-Cikti Formati: {"tahmin": "1.5 UST", "guven_puani": 75, "oran": 1.45, "baski_endeksi": "%88", "gerekce": "..."}`;
 
 const DATA_FILE = path.join(__dirname, 'dino_data.json');
 
 let state = {
     isRunning: false,
-    globalMinOran: 1.40,
-    globalMinGuven: 70,
+    globalMinEdge: 15,  // EDGE (Value) filtresi
     scheduleEnabled: false,
     schedules: [] 
 };
@@ -51,28 +39,22 @@ let state = {
 let isScanning = false;
 let nextRunTime = 0;
 let masterInterval = null;
-
 let systemLogs = [];
 
 function addSystemLog(msg) {
     const time = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul' });
-    const logMsg = `[${time}] ${msg}`;
+    const logMsg = `[${time}]${msg}`;
     console.log(logMsg); 
     systemLogs.push(logMsg);
-    if (systemLogs.length > 40) {
-        systemLogs.shift();
-    }
+    if (systemLogs.length > 40) systemLogs.shift();
 }
 
-app.get('/api/logs', (req, res) => {
-    res.json(systemLogs);
-});
+app.get('/api/logs', (req, res) => res.json(systemLogs));
 
 function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
-            const rawData = fs.readFileSync(DATA_FILE);
-            const savedState = JSON.parse(rawData);
+            const savedState = JSON.parse(fs.readFileSync(DATA_FILE));
             state = { ...state, ...savedState };
             addSystemLog("> Kalıcı Hafıza başarıyla yüklendi.");
         } else {
@@ -91,18 +73,21 @@ function getCurrentTimeTR() {
     return new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
 }
 
+// -----------------------------------------------------------------------------------
+// 1. API-FOOTBALL VERI CEKME
+// -----------------------------------------------------------------------------------
 async function canliMaclariHazirla() {
     try {
         if(!apiFootballKey || apiFootballKey.trim() === '') {
-            addSystemLog("> ⚠️ HATA: .env dosyasındaki API_FOOTBALL_KEY boş veya okunamıyor!");
+            addSystemLog("> ⚠️ HATA: .env dosyasındaki API_FOOTBALL_KEY boş!");
             return [];
         }
 
         const response = await axios.get('https://v3.football.api-sports.io/fixtures?live=all', { 
             headers: { 'x-apisports-key': apiFootballKey },
-            httpsAgent: ipv4Agent, 
-            timeout: 10000 
+            httpsAgent: ipv4Agent, timeout: 10000 
         });
+        
         const maclar = response.data.response;
         if (!maclar || maclar.length === 0) return [];
 
@@ -110,61 +95,126 @@ async function canliMaclariHazirla() {
         uygunMaclar.sort((a, b) => (VIP_LIGLER.includes(b.league.name) ? 1 : 0) - (VIP_LIGLER.includes(a.league.name) ? 1 : 0));
 
         let macVerileri = [];
-        const onEleme = uygunMaclar.slice(0, 4);
+        const onEleme = uygunMaclar.slice(0, 4); // Test icin ilk 4 mac
 
         for (const mac of onEleme) {
             await new Promise(resolve => setTimeout(resolve, 2000));
             try {
                 const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
-                    httpsAgent: ipv4Agent,
-                    timeout: 8000
+                    httpsAgent: ipv4Agent, timeout: 8000
                 });
+                
                 let canliOranlar = oddsResponse.data.response?.[0]?.odds;
                 if (!canliOranlar) continue; 
+                
+                let oranObjesi = {};
+                canliOranlar.forEach(market => {
+                    if (market.id === 1) { 
+                        oranObjesi['MS1'] = parseFloat(market.values.find(v => v.value === 'Home').odd);
+                        oranObjesi['X'] = parseFloat(market.values.find(v => v.value === 'Draw').odd);
+                        oranObjesi['MS2'] = parseFloat(market.values.find(v => v.value === 'Away').odd);
+                    }
+                    if (market.id === 5) { 
+                        market.values.forEach(v => {
+                            if (v.value.includes('Over')) {
+                                let barem = v.value.split(' ')[1].replace('.5', '_5') + '_UST';
+                                oranObjesi[barem] = parseFloat(v.odd);
+                            }
+                        });
+                    }
+                });
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
-                    httpsAgent: ipv4Agent,
-                    timeout: 8000
+                    httpsAgent: ipv4Agent, timeout: 8000
                 });
                 
+                let stats = statsResponse.data.response;
+                if(!stats || stats.length < 2) continue;
+                
+                let home_stats = stats[0].statistics;
+                let away_stats = stats[1].statistics;
+                
+                const getStat = (teamStats, statName) => {
+                    let s = teamStats.find(x => x.type === statName);
+                    return s && s.value ? parseInt(s.value) : 0;
+                };
+
                 macVerileri.push({
-                    mac: `${mac.teams.home.name} - ${mac.teams.away.name}`,
+                    mac_isim: `${mac.teams.home.name} -${mac.teams.away.name}`,
                     lig: mac.league.name,
                     dakika: mac.fixture.status.elapsed,
                     skor: `${mac.goals.home}-${mac.goals.away}`,
-                    istatistikler: statsResponse.data.response,
-                    canli_oranlar: canliOranlar
+                    home_shot: getStat(home_stats, 'Total Shots'),
+                    away_shot: getStat(away_stats, 'Total Shots'),
+                    home_sot: getStat(home_stats, 'Shots on Goal'),
+                    away_sot: getStat(away_stats, 'Shots on Goal'),
+                    home_corner: getStat(home_stats, 'Corner Kicks'),
+                    away_corner: getStat(away_stats, 'Corner Kicks'),
+                    canli_oranlar: oranObjesi
                 });
-            } catch (innerErr) {
-                continue;
-            }
+            } catch (innerErr) { continue; }
         }
         return macVerileri;
     } catch (error) {
-        let hataMesaji = error.message;
-        if (error.response && error.response.status === 401) {
-            hataMesaji = "API Anahtarı geçersiz veya limitsiz (401 Unauthorized)";
-        } else if (error.response && error.response.status === 403) {
-            hataMesaji = "Missing application key (403 Forbidden) - .env dosyan okunmuyor olabilir!";
-        } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-            hataMesaji = "API-Sports sunucusuna bağlanılamadı (Zaman Aşımı)";
-        }
-        addSystemLog(`> ⚠️ API HATASI: ${hataMesaji}`);
+        addSystemLog(`> ⚠️ API HATASI: ${error.message}`);
         return [];
     }
 }
 
-async function telegramaGonder(mac, analiz) {
-    const mesaj = `🔥 *DİNO İDDAA CANLI FIRSAT* 🔥\n------------------------------------------------\n⚽️ *Maç:* ${mac.mac}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:* ${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Tahmin:* ${analiz.tahmin}\n📈 *Değer (Oran):* ${analiz.oran}\n⚡️ *Güven Puanı:* %${analiz.guven_puani}\n📊 *Dino Baskı Endeksi:* ${analiz.baski_endeksi}\n\n🦖 *Yapay Zeka Analizi:*\n_${analiz.gerekce}_\n------------------------------------------------`;
-    try {
-        await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
-    } catch (error) {
-        addSystemLog(`> ⚠️ TELEGRAM HATASI: ${error.message}`);
-    }
+// -----------------------------------------------------------------------------------
+// 2. PYTHON (MATEMATİK / VALUE ENGINE) KISMI
+// -----------------------------------------------------------------------------------
+function yapayZekaAnaliziYap(mac) {
+    return new Promise((resolve, reject) => {
+        const p = mac;
+        const pythonKomutu = `python3 tahmin_yap.py ${p.dakika} ${p.home_shot}${p.away_shot} ${p.home_sot}${p.away_sot} ${p.home_corner}${p.away_corner}`;
+
+        exec(pythonKomutu, (hata, stdout, stderr) => {
+            if (hata) {
+                addSystemLog(`> ⚠️ PYTHON HATASI (${p.mac_isim}):${hata.message}`);
+                resolve(null); return;
+            }
+            try {
+                const dinoOlasiliklari = JSON.parse(stdout);
+                if (dinoOlasiliklari.hata) { resolve(null); return; }
+
+                let enIyiFirsat = null;
+                let enYuksekEdge = 0; 
+
+                for (const [market, piyasaOrani] of Object.entries(p.canli_oranlar)) {
+                    let pyMarket = market.replace('_', '.'); 
+                    if (dinoOlasiliklari[pyMarket]) {
+                        const dinoYuzde = dinoOlasiliklari[pyMarket];
+                        const piyasaYuzde = (1 / piyasaOrani) * 100;
+                        const edge = dinoYuzde - piyasaYuzde;
+
+                        if (edge > enYuksekEdge && edge >= state.globalMinEdge) {
+                            enYuksekEdge = edge;
+                            enIyiFirsat = {
+                                market: pyMarket,
+                                edge: edge.toFixed(1),
+                                dino_yuzde: dinoYuzde,
+                                oran: piyasaOrani
+                            };
+                        }
+                    }
+                }
+                resolve(enIyiFirsat);
+            } catch (err) { resolve(null); }
+        });
+    });
 }
+
+// -----------------------------------------------------------------------------------
+// 3. GEMINI (ANALİST / YORUMCU) KISMI VE ANA DÖNGÜ
+// -----------------------------------------------------------------------------------
+const GEMINI_INSTRUCTION = `Sen uzman bir spor veri analisti ve iddaa yorumcususun. 
+Arka planda çalışan Python Yapay Zeka modelimiz bir maçta 'Value (Değer)' buldu ve bahis kararı verdi.
+Görevin, bu maçın canlı istatistiklerine bakarak kullanıcılara bu bahsin NEDEN mantıklı olduğunu açıklayan, 3-4 cümlelik kısa, ikna edici ve profesyonel bir analiz metni yazmaktır.
+Sadece analizi yaz, başlık veya tahmin kısımlarını yazma. İstatistikleri (şut, korner, baskı) kesinlikle kullanarak yorumla.`;
 
 async function botuCalistir() {
     if (isScanning) return;
@@ -174,43 +224,52 @@ async function botuCalistir() {
         const macListesi = await canliMaclariHazirla();
         
         if (macListesi.length === 0) {
-            addSystemLog("> ℹ️ Kriterlere uygun aktif maç bulunamadı veya ağa ulaşılamadı.");
-            isScanning = false;
-            return;
+            addSystemLog("> ℹ️ Kriterlere uygun aktif maç bulunamadı.");
+            isScanning = false; return;
         }
 
-        addSystemLog(`> 📊 Toplam ${macListesi.length} uygun maç bulundu. Yapay Zeka analiz ediyor...`);
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" }); 
-        let onaylanan = 0, istek = 0;
+        addSystemLog(`> 📊 Toplam ${macListesi.length} maç bulundu. Python DINO Motoru calisiyor...`);
+        let onaylanan = 0;
+        
+        // Model ismini 1.5-flash olarak guncelledim, en stabil ve hizli surum budur.
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" }); 
 
         for (const mac of macListesi) {
-            if (onaylanan >= 3 || istek >= 5) break;
-            istek++;
-            try {
-                // BUG FIX: Escaped the newlines here correctly for a literal string in JS
-                const prompt = SYSTEM_INSTRUCTION + "\n\nAnaliz Edilecek Mac Verisi:\n" + JSON.stringify(mac);
-                const result = await model.generateContent(prompt);
-                let aiYaniti = result.response.text().trim().replace(/```json/g, "").replace(/```/g, "");
-                const analiz = JSON.parse(aiYaniti);
-
-                if (parseFloat(analiz.oran) >= state.globalMinOran && analiz.guven_puani >= state.globalMinGuven) {
-                    await telegramaGonder(mac, analiz);
-                    addSystemLog(`> ✅ ${mac.mac} için sinyal gönderildi (Oran: ${analiz.oran}, Güven: ${analiz.guven_puani})`);
-                    onaylanan++;
-                } else {
-                    addSystemLog(`> ❌ ${mac.mac} pas geçildi (Oran: ${analiz.oran}, Güven: ${analiz.guven_puani})`);
+            // Önce Python'a sor (Matematik onayı)
+            const firsat = await yapayZekaAnaliziYap(mac);
+            
+            if (firsat) {
+                addSystemLog(`> 🧠 Edge Bulundu (${mac.mac_isim}). Gemini yorumu yazıyor...`);
+                let aiYorumu = "Yapay zeka sistemimiz istatistiksel bir avantaj yakaladı. Baskının sonuca dönüşmesi bekleniyor."; 
+                
+                // Python onay verdiyse, istatistikleri Gemini'ye atip yorum yazdir
+                try {
+                    const prompt = `${GEMINI_INSTRUCTION}\n\nMaç:${mac.mac_isim}\nDakika: ${mac.dakika}\nSkor:${mac.skor}\nİstatistikler: ${mac.home_shot} Şut (${mac.home_sot} İsabet), ${mac.home_corner} Korner vs${mac.away_shot} Şut (${mac.away_sot} İsabet),${mac.away_corner} Korner.\nSeçilen Bahis: ${firsat.market}\nAvantaj (Edge): +${firsat.edge}%\n\nSadece analiz metnini yaz:`;
+                    const result = await model.generateContent(prompt);
+                    aiYorumu = result.response.text().trim().replace(/```/g, "");
+                } catch (geminiErr) {
+                    addSystemLog(`> ⚠️ GEMINI HATASI: ${geminiErr.message}`);
                 }
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            } catch (err) { 
-                addSystemLog(`> ⚠️ YAPAY ZEKA HATASI: ${err.message}`);
+
+                const mesaj = `🔥 *DİNO VALUE ALARM* 🔥\n--------------------------------------\n⚽️ *Maç:* ${mac.mac_isim}\n🏆 *Lig:* ${mac.lig}\n⏱ *Dakika:*${mac.dakika} | *Skor:* ${mac.skor}\n\n🎯 *Value Market:*${firsat.market}\n📈 *EDGE (Avantaj):* +${firsat.edge}\%\n💵 *Canlı Oran:* ${firsat.oran}\n🦖 *Dino İhtimali:* %${firsat.dino_yuzde}\n\n📝 *Dino Analiz:*\n_${aiYorumu}_\n--------------------------------------`;
+                
+                try {
+                    await bot.sendMessage(kanalID, mesaj, { parse_mode: "Markdown" });
+                    addSystemLog(`> ✅ SİNYAL GÖNDERİLDİ: ${mac.mac_isim} \vert{} Edge: +${firsat.edge}`);
+                    onaylanan++;
+                } catch (e) { addSystemLog(`> ⚠️ TELEGRAM HATASI: ${e.message}`); }
+            } else {
+                addSystemLog(`> ❌ ${mac.mac_isim} pas geçildi (Yeterli Value Bulunamadı)`);
             }
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
-        addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} maç Telegram'a iletildi.`);
+        addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} efsane maç yakalandı.`);
     } finally {
         isScanning = false;
     }
 }
 
+// --------- ZAMANLAYICI VE API ENDPOINTLERI (AYNI) ---------
 function masterClock() {
     if (!state.isRunning) return;
     const nowTime = getCurrentTimeTR();
@@ -218,20 +277,9 @@ function masterClock() {
 
     if (state.scheduleEnabled && state.schedules.length > 0) {
         for (let s of state.schedules) {
-            let inWindow = false;
-            if (s.start <= s.end) {
-                inWindow = (nowTime >= s.start && nowTime <= s.end);
-            } else { 
-                inWindow = (nowTime >= s.start || nowTime <= s.end);
-            }
-            if (inWindow) {
-                activeSchedule = s;
-            } else {
-                if (s.hasRanSingle) {
-                   s.hasRanSingle = false; 
-                   saveData(); 
-                }
-            }
+            let inWindow = (s.start <= s.end) ? (nowTime >= s.start && nowTime <= s.end) : (nowTime >= s.start || nowTime <= s.end);
+            if (inWindow) activeSchedule = s;
+            else if (s.hasRanSingle) { s.hasRanSingle = false; saveData(); }
         }
     } else if (!state.scheduleEnabled) {
         activeSchedule = { mode: 'loop' };
@@ -239,85 +287,41 @@ function masterClock() {
 
     if (activeSchedule) {
         if (state.scheduleEnabled && activeSchedule.mode === 'single') {
-            if (!activeSchedule.hasRanSingle) {
-                botuCalistir();
-                activeSchedule.hasRanSingle = true; 
-                saveData(); 
-            }
+            if (!activeSchedule.hasRanSingle) { botuCalistir(); activeSchedule.hasRanSingle = true; saveData(); }
         } else {
             const nowMs = Date.now();
-            if (nowMs >= nextRunTime) {
-                botuCalistir();
-                nextRunTime = nowMs + (15 * 60 * 1000); 
-            }
+            let beklemeSuresi = 15 * 60 * 1000;
+            if (activeSchedule.mode === '5 Dakikada Bir Tara') beklemeSuresi = 5 * 60 * 1000;
+            if (nowMs >= nextRunTime) { botuCalistir(); nextRunTime = nowMs + beklemeSuresi; }
         }
     }
 }
 
 app.post('/api/start', (req, res) => {
     if (!state.isRunning) {
-        state.isRunning = true;
-        saveData(); 
-        nextRunTime = 0; 
+        state.isRunning = true; saveData(); nextRunTime = 0; 
         addSystemLog("> ⚡ Sistem Ana Şalteri AÇILDI.");
-        masterInterval = setInterval(masterClock, 60000); 
-        masterClock(); 
+        masterInterval = setInterval(masterClock, 60000); masterClock(); 
         res.json({ success: true, message: "Sistem açıldı." });
-    } else {
-        res.json({ success: false, message: "Sistem zaten çalışıyor." });
-    }
+    } else { res.json({ success: false, message: "Sistem zaten çalışıyor." }); }
 });
 
 app.post('/api/stop', (req, res) => {
-    state.isRunning = false;
-    saveData(); 
+    state.isRunning = false; saveData(); 
     addSystemLog("> 🛑 Sistem Ana Şalteri KAPATILDI.");
     if (masterInterval) clearInterval(masterInterval);
     res.json({ success: true, message: "Sistem durduruldu." });
 });
 
 app.post('/api/force-scan', (req, res) => {
-    if (!state.isRunning) {
-        return res.json({ success: false, message: "HATA" });
-    }
-    if (isScanning) {
-        return res.json({ success: false, message: "Tarama yapiliyor" });
-    }
+    if (!state.isRunning) return res.json({ success: false, message: "HATA" });
+    if (isScanning) return res.json({ success: false, message: "Tarama yapiliyor" });
     addSystemLog("> 🚀 Manuel Hızlı Tarama tetiklendi!");
     botuCalistir().catch(console.error);
     res.json({ success: true, message: "Basladi" });
 });
 
 app.post('/api/settings', (req, res) => {
-    state.globalMinOran = parseFloat(req.body.oran) || state.globalMinOran;
-    state.globalMinGuven = parseInt(req.body.guven) || state.globalMinGuven;
+    state.globalMinEdge = parseFloat(req.body.oran) || state.globalMinEdge;
     saveData(); 
-    addSystemLog(`> ⚙️ Filtreler güncellendi: Min Oran ${state.globalMinOran}, Min Güven ${state.globalMinGuven}`);
-    res.json({ success: true, message: "Kaydedildi" });
-});
-
-app.post('/api/schedule', (req, res) => {
-    state.scheduleEnabled = !!req.body.enabled;
-    const incomingSchedules = req.body.schedules || [];
-    state.schedules = incomingSchedules.map(inc => {
-        const existing = state.schedules.find(s => s.id === inc.id);
-        return { ...inc, hasRanSingle: existing ? existing.hasRanSingle : false };
-    });
-    saveData(); 
-    addSystemLog(`> ⏰ Zamanlayıcı Programı kaydedildi (${state.schedules.length} görev). Aktif: ${state.scheduleEnabled}`);
-    res.json({ success: true, message: "Kaydedildi" });
-});
-
-app.get('/api/status', (req, res) => {
-    res.json(state);
-});
-
-loadData();
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    addSystemLog(`> 🌐 Dino Backend V10 Başlatıldı. Port: ${PORT}`);
-    if (state.isRunning) {
-        masterInterval = setInterval(masterClock, 60000);
-        masterClock();
-    }
-});
+    addSystemLog(`> ⚙️ EDGE Filtresi
