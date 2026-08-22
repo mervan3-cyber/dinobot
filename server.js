@@ -726,30 +726,24 @@ function getTargetLiveMarket(
         );
 
 
-    const looksLikeWinner =
-        (
-            betName === 'match winner' ||
+    const FULL_TIME_WINNER_MARKETS =
+    new Set([
 
-            betName === '1x2' ||
+        'match winner',
+        '1x2',
+        '1 x 2',
+        'full time result',
+        'fulltime result',
+        'full time winner',
+        'fulltime winner'
 
-            betName === '1 x 2' ||
+    ]);
 
-            betName === 'full time result' ||
 
-            betName === 'fulltime result' ||
-
-            betName === 'full time winner' ||
-
-            betName === 'fulltime winner' ||
-
-            betName.includes(
-                'match winner'
-            ) ||
-
-            betName.includes(
-                '1x2'
-            )
-        );
+const looksLikeWinner =
+    FULL_TIME_WINNER_MARKETS.has(
+        betName
+    );
 
 
     if (
@@ -1668,21 +1662,16 @@ function getStat(
 ) {
 
     if (
-        !Array.isArray(
-            teamStats
-        )
+        !Array.isArray(teamStats)
     ) {
-
-        return 0;
-
+        return null;
     }
 
 
     const item =
         teamStats.find(
             x =>
-                x.type ===
-                statName
+                x.type === statName
         );
 
 
@@ -1691,34 +1680,28 @@ function getStat(
         item.value === null ||
         item.value === undefined
     ) {
-
-        return 0;
-
+        return null;
     }
 
 
     const value =
-        String(
-            item.value
-        )
-        .replace(
-            '%',
-            ''
-        );
+        String(item.value)
+            .replace('%', '')
+            .trim();
+
+
+    if (!value) {
+        return null;
+    }
 
 
     const parsed =
-        parseFloat(
-            value
-        );
+        parseFloat(value);
 
 
-    return Number.isFinite(
-        parsed
-    )
+    return Number.isFinite(parsed)
         ? parsed
-        : 0;
-
+        : null;
 }
 
 
@@ -1846,6 +1829,191 @@ function enrichFixturesWithStats(
 
 }
 
+function temelStatsTam(mac) {
+
+    const values = [
+
+        mac?.home_shot,
+        mac?.away_shot,
+
+        mac?.home_sot,
+        mac?.away_sot,
+
+        mac?.home_corner,
+        mac?.away_corner
+
+    ];
+
+
+    return values.every(
+        value =>
+            Number.isFinite(
+                Number(value)
+            )
+    );
+}
+
+
+// =========================================================
+// DEDICATED FIXTURE STATISTICS
+// =========================================================
+
+async function direktFixtureStatsGetir(
+    fixture
+) {
+
+    try {
+
+        const fixtureID =
+            Number(
+                fixture?.fixture?.id
+            );
+
+
+        if (!fixtureID) {
+            return null;
+        }
+
+
+        const response =
+            await apiGet(
+                `/fixtures/statistics?fixture=${fixtureID}`
+            );
+
+
+        const statistics =
+            Array.isArray(
+                response.data?.response
+            )
+                ? response.data.response
+                : [];
+
+
+        if (
+            statistics.length < 2
+        ) {
+
+            addSystemLog(
+                `> ⚠️ Fixture ${fixtureID}: dedicated statistics bulunamadı.`
+            );
+
+            return null;
+        }
+
+
+        const homeID =
+            fixture.teams.home.id;
+
+        const awayID =
+            fixture.teams.away.id;
+
+
+        const homeStatsObj =
+            statistics.find(
+                x =>
+                    Number(x.team?.id) ===
+                    Number(homeID)
+            );
+
+
+        const awayStatsObj =
+            statistics.find(
+                x =>
+                    Number(x.team?.id) ===
+                    Number(awayID)
+            );
+
+
+        if (
+            !homeStatsObj ||
+            !awayStatsObj
+        ) {
+
+            return null;
+        }
+
+
+        const mac = {
+
+            fixture_id:
+                fixtureID,
+
+            mac_isim:
+                `${fixture.teams.home.name} - ${fixture.teams.away.name}`,
+
+            lig:
+                fixture.league.name,
+
+            dakika:
+                fixture.fixture.status.elapsed,
+
+            skor:
+                `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
+
+            home_shot:
+                getStat(
+                    homeStatsObj.statistics,
+                    'Total Shots'
+                ),
+
+            away_shot:
+                getStat(
+                    awayStatsObj.statistics,
+                    'Total Shots'
+                ),
+
+            home_sot:
+                getStat(
+                    homeStatsObj.statistics,
+                    'Shots on Goal'
+                ),
+
+            away_sot:
+                getStat(
+                    awayStatsObj.statistics,
+                    'Shots on Goal'
+                ),
+
+            home_corner:
+                getStat(
+                    homeStatsObj.statistics,
+                    'Corner Kicks'
+                ),
+
+            away_corner:
+                getStat(
+                    awayStatsObj.statistics,
+                    'Corner Kicks'
+                )
+
+        };
+
+
+        if (
+            !temelStatsTam(mac)
+        ) {
+
+            addSystemLog(
+                `> ⚠️ ${mac.mac_isim}: temel canlı istatistiklerden biri API'de yok.`
+            );
+
+            return null;
+        }
+
+
+        return mac;
+
+
+    } catch (error) {
+
+        addSystemLog(
+            `> ⚠️ Fixture statistics hatası: ${error.message}`
+        );
+
+        return null;
+
+    }
+}
 
 // =========================================================
 // API FOOTBALL'DAN TÜM CANLI MAÇLARI HAZIRLA
@@ -2102,21 +2270,50 @@ async function canliMaclariHazirla() {
             }
 
 
-            const enriched =
-                enrichFixturesWithStats(
-                    [fixture]
-                )[0];
+            let enriched =
+    enrichFixturesWithStats(
+        [fixture]
+    )[0];
 
 
-            if (!enriched) {
+// =====================================================
+// EMBEDDED STATS EKSİKSE DEDICATED ENDPOINT'E GİT
+// =====================================================
 
-                addSystemLog(
-                    `> ⚠️ ${match.teams.home.name} - ${match.teams.away.name}: İstatistik bulunamadı.`
-                );
+if (
+    !enriched ||
+    !temelStatsTam(enriched)
+) {
 
-                continue;
+    addSystemLog(
+        `> 🔄 ${match.teams.home.name} - ${match.teams.away.name}: embedded stats eksik, dedicated statistics deneniyor...`
+    );
 
-            }
+
+    enriched =
+        await direktFixtureStatsGetir(
+            fixture
+        );
+
+}
+
+
+// =====================================================
+// HALA STATS YOKSA MODELE GÖNDERME
+// =====================================================
+
+if (
+    !enriched ||
+    !temelStatsTam(enriched)
+) {
+
+    addSystemLog(
+        `> ⛔ ${match.teams.home.name} - ${match.teams.away.name}: güvenilir canlı istatistik yok, modelden çıkarıldı.`
+    );
+
+    continue;
+
+}
 
 
             const liveOdds =
