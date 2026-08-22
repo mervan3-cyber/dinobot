@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-retrained-v1-2026-08-23';
+const BUILD_VERSION = 'ml-important-leagues-v2-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -135,16 +135,6 @@ const VIP_LIGLER = [
 
     "Major League Soccer"
 ];
-
-// Model yalnızca bu veri kapsamıyla eğitildi. Başka liglere genelleme yapma.
-const MODEL_LIGLER = new Set([
-    'Premier League',
-    'Ligue 1',
-    'Serie A',
-    'Bundesliga',
-    'La Liga'
-]);
-
 
 const DATA_FILE =
     path.join(
@@ -868,7 +858,7 @@ async function canliMaclariHazirla() {
                         dakika >= 25 &&
                         dakika <= 80 &&
                         !closedStatuses.has(status) &&
-                        MODEL_LIGLER.has(match.league?.name)
+                        VIP_LIGLER.includes(match.league?.name)
                     );
 
                 }
