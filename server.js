@@ -95,10 +95,10 @@ async function canliMaclariHazirla() {
         uygunMaclar.sort((a, b) => (VIP_LIGLER.includes(b.league.name) ? 1 : 0) - (VIP_LIGLER.includes(a.league.name) ? 1 : 0));
 
         let macVerileri = [];
-        const onEleme = uygunMaclar; // TÜM MAÇLARI TARA
+        const onEleme = uygunMaclar; // TÜM MAÇLARI TARA (PRO PAKET)
 
         for (const mac of onEleme) {
-            await new Promise(resolve => setTimeout(resolve, 4000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
             try {
                 const oddsResponse = await axios.get(`https://v3.football.api-sports.io/odds/live?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
@@ -111,9 +111,12 @@ async function canliMaclariHazirla() {
                 let oranObjesi = {};
                 canliOranlar.forEach(market => {
                     if (market.id === 1) { 
-                        oranObjesi['MS1'] = parseFloat(market.values.find(v => v.value === 'Home').odd);
-                        oranObjesi['X'] = parseFloat(market.values.find(v => v.value === 'Draw').odd);
-                        oranObjesi['MS2'] = parseFloat(market.values.find(v => v.value === 'Away').odd);
+                        let home = market.values.find(v => v.value === 'Home');
+                        let draw = market.values.find(v => v.value === 'Draw');
+                        let away = market.values.find(v => v.value === 'Away');
+                        if (home) oranObjesi['MS1'] = parseFloat(home.odd);
+                        if (draw) oranObjesi['X'] = parseFloat(draw.odd);
+                        if (away) oranObjesi['MS2'] = parseFloat(away.odd);
                     }
                     if (market.id === 5) { 
                         market.values.forEach(v => {
@@ -125,7 +128,7 @@ async function canliMaclariHazirla() {
                     }
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 4000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
                     httpsAgent: ipv4Agent, timeout: 8000
@@ -181,8 +184,7 @@ function yapayZekaAnaliziYap(mac) {
                 const dinoOlasiliklari = JSON.parse(stdout);
                 if (dinoOlasiliklari.hata) { resolve(null); return; }
                 
-                // RÖNTGEN SATIRIMIZ BURADA
-                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Piyasa Oranları: ${JSON.stringify(p.canli_oranlar)} | Dino Çıktısı: ${JSON.stringify(dinoOlasiliklari)}`);
+                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Oranlar: ${JSON.stringify(p.canli_oranlar)} | Dino: ${JSON.stringify(dinoOlasiliklari)}`);
 
                 let enIyiFirsat = null;
                 let enYuksekEdge = 0; 
