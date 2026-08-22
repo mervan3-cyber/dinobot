@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-score-fallback-ubuntu-v4-2026-08-23';
+const BUILD_VERSION = 'ml-live-guard-ubuntu-v5-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -486,6 +486,64 @@ function selectionIsUnavailable(value) {
 }
 
 
+const CLOSED_FIXTURE_STATUSES = new Set([
+    'ft', 'aet', 'pen', 'p', 'canc', 'abd', 'awd', 'wo',
+    'pst', 'susp', 'int',
+    'match finished', 'finished', 'after extra time', 'after penalties',
+    'cancelled', 'canceled', 'abandoned', 'suspended', 'postponed',
+    'interrupted', 'walkover', 'awarded'
+]);
+
+
+function fixtureAcikcaKapaliMi(match) {
+    const fixture = match?.fixture || {};
+    const status = fixture?.status || {};
+
+    if (
+        selectionIsUnavailable(match) ||
+        selectionIsUnavailable(fixture) ||
+        selectionIsUnavailable(status)
+    ) {
+        return true;
+    }
+
+    const statusValues = [status.short, status.long]
+        .map(normalizeText)
+        .filter(Boolean);
+
+    return statusValues.some(value => CLOSED_FIXTURE_STATUSES.has(value));
+}
+
+
+function canliFixtureUygunMu(match, minMinute = 25, maxMinute = 80) {
+    const dakika = Number(match?.fixture?.status?.elapsed);
+
+    return (
+        Number.isFinite(dakika) &&
+        dakika >= minMinute &&
+        dakika <= maxMinute &&
+        !fixtureAcikcaKapaliMi(match)
+    );
+}
+
+
+function hazirMacHalaUygunMu(mac) {
+    return canliFixtureUygunMu({
+        fixture: {
+            status: {
+                elapsed: mac?.dakika,
+                short: mac?.status_short,
+                long: mac?.status_long,
+                finished: mac?.status_finished,
+                stopped: mac?.status_stopped,
+                blocked: mac?.status_blocked,
+                suspended: mac?.status_suspended
+            }
+        }
+    });
+}
+
+
 function parseTargetMarket(bet, value) {
     const betName = normalizeText(bet?.name);
     const selection = normalizeText(
@@ -556,6 +614,8 @@ function parseLiveOdds(response) {
         : [];
 
     for (const fixtureOdds of fixtures) {
+        if (fixtureAcikcaKapaliMi(fixtureOdds)) continue;
+
         const fixtureID = Number(fixtureOdds.fixture?.id);
         if (!fixtureID) continue;
 
@@ -751,6 +811,12 @@ function enrichFixturesWithStats(fixtures) {
             mac_isim: `${fixture.teams?.home?.name || 'Ev Sahibi'} - ${fixture.teams?.away?.name || 'Deplasman'}`,
             lig: fixture.league?.name || 'Bilinmeyen Lig',
             dakika: fixture.fixture?.status?.elapsed ?? null,
+            status_short: fixture.fixture?.status?.short ?? null,
+            status_long: fixture.fixture?.status?.long ?? null,
+            status_finished: fixture.fixture?.status?.finished ?? fixture.fixture?.finished ?? null,
+            status_stopped: fixture.fixture?.status?.stopped ?? fixture.fixture?.stopped ?? null,
+            status_blocked: fixture.fixture?.status?.blocked ?? fixture.fixture?.blocked ?? null,
+            status_suspended: fixture.fixture?.status?.suspended ?? fixture.fixture?.suspended ?? null,
             skor: `${fixture.goals?.home ?? 0}-${fixture.goals?.away ?? 0}`,
             home_shot: getStat(homeStatsObj?.statistics, 'Total Shots'),
             away_shot: getStat(awayStatsObj?.statistics, 'Total Shots'),
@@ -840,32 +906,7 @@ async function canliMaclariHazirla() {
 
         let uygunMaclar =
             allLiveFixtures.filter(
-                match => {
-
-                    const dakika =
-                        Number(
-                            match.fixture?.status?.elapsed
-                        );
-
-                    const status = normalizeText(
-                        match.fixture?.status?.short ??
-                        match.fixture?.status?.long
-                    );
-
-                    const closedStatuses = new Set([
-                        'ft', 'aet', 'pen', 'p', 'canc', 'abd', 'awd', 'wo',
-                        'match finished', 'finished', 'cancelled', 'abandoned',
-                        'suspended', 'postponed', 'interrupted'
-                    ]);
-
-
-                    return (
-                        dakika >= 25 &&
-                        dakika <= 80 &&
-                        !closedStatuses.has(status)
-                    );
-
-                }
+                match => canliFixtureUygunMu(match)
             );
 
 
@@ -933,22 +974,7 @@ async function canliMaclariHazirla() {
         }
 
         for (const match of oddsLiveFixtures) {
-            const dakika = Number(match.fixture?.status?.elapsed);
-            const status = normalizeText(
-                match.fixture?.status?.short ?? match.fixture?.status?.long
-            );
-            const closedStatuses = new Set([
-                'ft', 'aet', 'pen', 'p', 'canc', 'abd', 'awd', 'wo',
-                'match finished', 'finished', 'cancelled', 'abandoned',
-                'suspended', 'postponed', 'interrupted'
-            ]);
-
-            if (
-                Number.isFinite(dakika) &&
-                dakika >= 25 &&
-                dakika <= 80 &&
-                !closedStatuses.has(status)
-            ) {
+            if (canliFixtureUygunMu(match)) {
                 const fixtureID = Number(match.fixture?.id);
                 if (fixtureID && !mergedFixtures.has(fixtureID)) {
                     mergedFixtures.set(fixtureID, match);
@@ -1111,6 +1137,31 @@ async function canliMaclariHazirla() {
                 }
 
                 fixture = detailedFixture;
+            }
+
+
+            // /fixtures?ids cevabı, ilk canlı listeye göre daha günceldir.
+            // Maç bu sırada 80'i geçtiyse veya bittiyse modele kesinlikle girmez.
+            if (!canliFixtureUygunMu(fixture)) {
+                const dakika = fixture.fixture?.status?.elapsed ?? '?';
+                const status = fixture.fixture?.status?.short ?? fixture.fixture?.status?.long ?? '?';
+                addSystemLog(
+                    `> ⛔ Fixture ${fixtureID}: güncel durum ${dakika}' / ${status}; modelden çıkarıldı.`
+                );
+                continue;
+            }
+
+
+            if (
+                fixture.goals?.home === null ||
+                fixture.goals?.home === undefined ||
+                fixture.goals?.away === null ||
+                fixture.goals?.away === undefined
+            ) {
+                addSystemLog(
+                    `> ⚠️ Fixture ${fixtureID}: güncel skor eksik, modelden çıkarıldı.`
+                );
+                continue;
             }
 
 
@@ -1649,11 +1700,74 @@ function statGoster(value) {
         : value;
 }
 
+
+async function sinyalOncesiCanlilikDogrula(mac) {
+    try {
+        const response = await apiGet(
+            `/fixtures?id=${Number(mac.fixture_id)}`
+        );
+        const latest = Array.isArray(response.data?.response)
+            ? response.data.response[0]
+            : null;
+
+        if (!latest || !canliFixtureUygunMu(latest)) {
+            const dakika = latest?.fixture?.status?.elapsed ?? '?';
+            const status = latest?.fixture?.status?.short ?? latest?.fixture?.status?.long ?? 'veri yok';
+            addSystemLog(
+                `> ⛔ ${mac.mac_isim}: sinyal öncesi canlılık reddedildi (${dakika}' / ${status}).`
+            );
+            return false;
+        }
+
+        const latestHome = latest.goals?.home;
+        const latestAway = latest.goals?.away;
+
+        if (
+            latestHome === null || latestHome === undefined ||
+            latestAway === null || latestAway === undefined
+        ) {
+            addSystemLog(
+                `> ⛔ ${mac.mac_isim}: sinyal öncesi güncel skor alınamadı.`
+            );
+            return false;
+        }
+
+        const latestScore = `${latestHome}-${latestAway}`;
+        if (latestScore !== mac.skor) {
+            addSystemLog(
+                `> ⛔ ${mac.mac_isim}: skor ${mac.skor} → ${latestScore} değişti; eski model sonucu gönderilmedi.`
+            );
+            return false;
+        }
+
+        mac.dakika = latest.fixture.status.elapsed;
+        mac.status_short = latest.fixture.status.short ?? null;
+        mac.status_long = latest.fixture.status.long ?? null;
+
+        return true;
+
+    } catch (error) {
+        // Güncel durum doğrulanamıyorsa yanlışlıkla bitmiş maç göndermek yerine
+        // güvenli tarafta kalıp bu sinyali atlıyoruz.
+        addSystemLog(
+            `> ⛔ ${mac.mac_isim}: sinyal öncesi canlılık doğrulanamadı (${error.message}).`
+        );
+        return false;
+    }
+}
+
 async function telegramSinyaliGonder(
     mac,
     firsat,
     yorum
 ) {
+
+    if (!hazirMacHalaUygunMu(mac)) {
+        addSystemLog(
+            `> ⛔ ${mac.mac_isim}: Telegram güvenlik filtresi maçı reddetti (${mac.dakika}' / ${mac.status_short || mac.status_long || '?'}).`
+        );
+        return false;
+    }
 
     if (
         !bot ||
@@ -1735,7 +1849,15 @@ async function botuCalistir() {
     try {
         addSystemLog('> 🔍 ML taraması başlatıldı...');
 
-        const macListesi = await canliMaclariHazirla();
+        const hazirlananMaclar = await canliMaclariHazirla();
+        const macListesi = hazirlananMaclar.filter(hazirMacHalaUygunMu);
+
+        if (macListesi.length !== hazirlananMaclar.length) {
+            addSystemLog(
+                `> ⛔ Model öncesi canlılık filtresi ${hazirlananMaclar.length - macListesi.length} maçı çıkardı.`
+            );
+        }
+
         if (macListesi.length === 0) {
             addSystemLog('> ℹ️ Model kapsamına uygun ve oranlı canlı maç bulunamadı.');
             return;
@@ -1786,6 +1908,13 @@ async function botuCalistir() {
 
             // Gemini yalnızca ML sonucunu açıklar; market/oran seçmez.
             const yorum = await geminiYorumuYaz(mac, firsat);
+
+            // Telegram'dan hemen önce fixture'ı API'den yeniden doğrula.
+            // Skor değiştiyse model sonucu artık eski olduğu için bu tur gönderme.
+            if (!await sinyalOncesiCanlilikDogrula(mac)) {
+                continue;
+            }
+
             const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
 
             if (gonderildi) {
