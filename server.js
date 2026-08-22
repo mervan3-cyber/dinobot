@@ -91,14 +91,19 @@ async function canliMaclariHazirla() {
         const maclar = response.data.response;
         if (!maclar || maclar.length === 0) return [];
 
-        let uygunMaclar = maclar.filter(m => m.fixture.status.elapsed >= 25 && m.fixture.status.elapsed <= 80);
-        uygunMaclar.sort((a, b) => (VIP_LIGLER.includes(b.league.name) ? 1 : 0) - (VIP_LIGLER.includes(a.league.name) ? 1 : 0));
+        // 🚀 HIZ VE PERFORMANS: Sadece 25-80 dk arası ve KESİN OLARAK VIP Ligler
+        let uygunMaclar = maclar.filter(m => 
+            m.fixture.status.elapsed >= 25 && 
+            m.fixture.status.elapsed <= 80 &&
+            VIP_LIGLER.includes(m.league.name)
+        );
 
         let macVerileri = [];
-        const onEleme = uygunMaclar; 
+        const onEleme = uygunMaclar;
 
         for (const mac of onEleme) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // ⚡ HIZ AYARI: 2 saniye yerine 0.3 saniye (300ms) bekle
+            await new Promise(resolve => setTimeout(resolve, 300));
             const macIsim = `${mac.teams.home.name} - ${mac.teams.away.name}`;
             
             try {
@@ -113,19 +118,19 @@ async function canliMaclariHazirla() {
                 if (canliOranlar && canliOranlar.length > 0) {
                     addSystemLog(`> 🔍 RAW ORAN (${macIsim}): Market Sayısı: ${canliOranlar.length}`);
 
+                    // 🛠️ KÖKTEN ÇÖZÜM: Filtre yok. Gelen her oranı "MARKET_SECENEK" formatında çek.
                     canliOranlar.forEach(market => {
-                        if (market.id == 1) { 
-                            let home = market.values.find(v => v.value === 'Home' || v.value === '1');
-                            let draw = market.values.find(v => v.value === 'Draw' || v.value === 'X');
-                            let away = market.values.find(v => v.value === 'Away' || v.value === '2');
-                            
-                            if (home && home.odd) oranObjesi['MS1'] = parseFloat(home.odd);
-                            if (draw && draw.odd) oranObjesi['X'] = parseFloat(draw.odd);
-                            if (away && away.odd) oranObjesi['MS2'] = parseFloat(away.odd);
-                        }
-                        if (market.id == 5) { 
+                        if (market.values && market.values.length > 0) {
                             market.values.forEach(v => {
-                                if (v.value.includes('Over')) {
+                                let anahtar = `${market.name}_${v.value}`.replace(/\s+/g, '_').toUpperCase();
+                                oranObjesi[anahtar] = parseFloat(v.odd);
+                                
+                                // Python'un okuyabilmesi için eski isimlere (MS1, 2.5_UST) manuel bir köprü (yedek) kuralım
+                                // Çünkü Python modeli MS1, 2.5_UST vs arıyor.
+                                if (market.id == 1 && (v.value === 'Home' || v.value === '1')) oranObjesi['MS1'] = parseFloat(v.odd);
+                                if (market.id == 1 && (v.value === 'Draw' || v.value === 'X')) oranObjesi['X'] = parseFloat(v.odd);
+                                if (market.id == 1 && (v.value === 'Away' || v.value === '2')) oranObjesi['MS2'] = parseFloat(v.odd);
+                                if (market.id == 5 && v.value.includes('Over')) {
                                     let parcalar = v.value.split(' ');
                                     if(parcalar.length > 1) {
                                         let barem = parcalar[1].replace('.5', '_5') + '_UST';
@@ -136,10 +141,11 @@ async function canliMaclariHazirla() {
                         }
                     });
                 } else {
-                     addSystemLog(`> ⚠️ ${macIsim} için canlı oranlar şu an bahis şirketleri tarafından kapalı.`);
+                     addSystemLog(`> ⚠️ ${macIsim} oranları (bahis şirketlerince) KAPALI.`);
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // ⚡ HIZ AYARI: İstatistikleri çekmeden önce yine 0.3 saniye bekle
+                await new Promise(resolve => setTimeout(resolve, 300));
                 const statsResponse = await axios.get(`https://v3.football.api-sports.io/fixtures/statistics?fixture=${mac.fixture.id}`, { 
                     headers: { 'x-apisports-key': apiFootballKey },
                     httpsAgent: ipv4Agent, timeout: 8000
@@ -195,7 +201,7 @@ function yapayZekaAnaliziYap(mac) {
                 const dinoOlasiliklari = JSON.parse(stdout);
                 if (dinoOlasiliklari.hata) { resolve(null); return; }
                 
-                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Oranlar: ${JSON.stringify(p.canli_oranlar)} | Dino: ${JSON.stringify(dinoOlasiliklari)}`);
+                addSystemLog(`> 🩺 RÖNTGEN (${p.mac_isim}) -> Oranlar (Toplam: ${Object.keys(p.canli_oranlar).length}) | Dino: ${JSON.stringify(dinoOlasiliklari)}`);
 
                 let enIyiFirsat = null;
                 let enYuksekEdge = 0; 
@@ -244,7 +250,7 @@ async function botuCalistir() {
             isScanning = false; return;
         }
 
-        addSystemLog(`> 📊 Toplam ${macListesi.length} maç bulundu. Python DINO Motoru calisiyor...`);
+        addSystemLog(`> 📊 Toplam ${macListesi.length} VIP maç bulundu. Python Motoru ateşlendi...`);
         let onaylanan = 0;
         
         const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash-lite" }); 
@@ -274,7 +280,7 @@ async function botuCalistir() {
             } else {
                 addSystemLog(`> ❌ ${mac.mac_isim} pas geçildi (Yeterli Value Bulunamadı)`);
             }
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Hızlı işlem: Burada ekstra beklemeye gerek yok
         }
         addSystemLog(`> 🏁 Tarama bitti. ${onaylanan} efsane maç yakalandı.`);
     } finally {
@@ -358,6 +364,6 @@ app.get('/api/status', (req, res) => res.json(state));
 loadData();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    addSystemLog(`> 🌐 DINO VALUE ENGINE V11 (Python + Gemini Hibrit) Başlatıldı! Port: ${PORT}`);
+    addSystemLog(`> 🌐 DINO VALUE ENGINE V11 (HIZLI & FİLTRESİZ) Başlatıldı! Port: ${PORT}`);
     if (state.isRunning) { masterInterval = setInterval(masterClock, 60000); masterClock(); }
 });
