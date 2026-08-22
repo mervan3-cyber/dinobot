@@ -108,7 +108,13 @@ const genAI =
 // Gemini 3.5 Flash-Lite güncel ve stabil model.
 // Yüksek hacimli otomasyon için uygun.
 const GEMINI_MODEL =
-    'gemini-3.5-flash-lite';
+    process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+
+const AI_MIN_CONFIDENCE = Number.isFinite(
+    Number(process.env.AI_MIN_CONFIDENCE)
+)
+    ? Number(process.env.AI_MIN_CONFIDENCE)
+    : 65;
 
 
 // =========================================================
@@ -726,126 +732,37 @@ function temelStatsTam(mac) {
 // STATISTICS EKLE
 // =========================================================
 
-function enrichFixturesWithStats(
-    fixtures
-) {
+function enrichFixturesWithStats(fixtures) {
+    return fixtures.map(fixture => {
+        const statistics = Array.isArray(fixture.statistics)
+            ? fixture.statistics
+            : [];
+        const homeID = Number(fixture.teams?.home?.id);
+        const awayID = Number(fixture.teams?.away?.id);
+        const homeStatsObj = statistics.find(
+            item => Number(item.team?.id) === homeID
+        );
+        const awayStatsObj = statistics.find(
+            item => Number(item.team?.id) === awayID
+        );
 
-    return fixtures
-        .map(
-            fixture => {
-
-                const statistics =
-                    Array.isArray(
-                        fixture.statistics
-                    )
-                        ? fixture.statistics
-                        : [];
-
-
-                if (
-                    statistics.length <
-                    2
-                ) {
-
-                    return null;
-
-                }
-
-
-                const homeID =
-                    fixture.teams.home.id;
-
-                const awayID =
-                    fixture.teams.away.id;
-
-
-                const homeStatsObj =
-                    statistics.find(
-                        x =>
-                            x.team?.id ===
-                            homeID
-                    );
-
-
-                const awayStatsObj =
-                    statistics.find(
-                        x =>
-                            x.team?.id ===
-                            awayID
-                    );
-
-
-                if (
-                    !homeStatsObj ||
-                    !awayStatsObj
-                ) {
-
-                    return null;
-
-                }
-
-
-                return {
-
-                    fixture_id:
-                        fixture.fixture.id,
-
-                    mac_isim:
-                        `${fixture.teams.home.name} - ${fixture.teams.away.name}`,
-
-                    lig:
-                        fixture.league.name,
-
-                    dakika:
-                        fixture.fixture.status.elapsed,
-
-                    skor:
-                        `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
-
-                    home_shot:
-                        getStat(
-                            homeStatsObj.statistics,
-                            'Total Shots'
-                        ),
-
-                    away_shot:
-                        getStat(
-                            awayStatsObj.statistics,
-                            'Total Shots'
-                        ),
-
-                    home_sot:
-                        getStat(
-                            homeStatsObj.statistics,
-                            'Shots on Goal'
-                        ),
-
-                    away_sot:
-                        getStat(
-                            awayStatsObj.statistics,
-                            'Shots on Goal'
-                        ),
-
-                    home_corner:
-                        getStat(
-                            homeStatsObj.statistics,
-                            'Corner Kicks'
-                        ),
-
-                    away_corner:
-                        getStat(
-                            awayStatsObj.statistics,
-                            'Corner Kicks'
-                        )
-
-                };
-
-            }
-        )
-        .filter(Boolean);
-
+        // Maç bilgisini hiçbir zaman kaybetme. İstatistik yoksa null kalır;
+        // yalnızca ML filtresi bu maçı Python'dan ayırır.
+        return {
+            fixture_id: Number(fixture.fixture?.id),
+            mac_isim: `${fixture.teams?.home?.name || 'Ev Sahibi'} - ${fixture.teams?.away?.name || 'Deplasman'}`,
+            lig: fixture.league?.name || 'Bilinmeyen Lig',
+            dakika: fixture.fixture?.status?.elapsed ?? null,
+            skor: `${fixture.goals?.home ?? 0}-${fixture.goals?.away ?? 0}`,
+            home_shot: getStat(homeStatsObj?.statistics, 'Total Shots'),
+            away_shot: getStat(awayStatsObj?.statistics, 'Total Shots'),
+            home_sot: getStat(homeStatsObj?.statistics, 'Shots on Goal'),
+            away_sot: getStat(awayStatsObj?.statistics, 'Shots on Goal'),
+            home_corner: getStat(homeStatsObj?.statistics, 'Corner Kicks'),
+            away_corner: getStat(awayStatsObj?.statistics, 'Corner Kicks')
+        };
+    });
 }
-
 
 async function direktFixtureStatsGetir(fixture) {
     const fixtureID = Number(fixture?.fixture?.id);
@@ -866,8 +783,7 @@ async function direktFixtureStatsGetir(fixture) {
             statistics
         };
 
-        const enriched = enrichFixturesWithStats([fixtureWithStats])[0];
-        return temelStatsTam(enriched) ? enriched : null;
+        return enrichFixturesWithStats([fixtureWithStats])[0] || null;
 
     } catch (error) {
         addSystemLog(
@@ -1150,19 +1066,26 @@ async function canliMaclariHazirla() {
                     `> 🔄 ${match.teams.home.name} - ${match.teams.away.name}: embedded stats eksik, /fixtures/statistics deneniyor.`
                 );
 
-                enriched = await direktFixtureStatsGetir(fixture);
+                const fallbackStats = await direktFixtureStatsGetir(fixture);
+
+                if (fallbackStats) {
+                    for (const field of [
+                        'home_shot', 'away_shot', 'home_sot',
+                        'away_sot', 'home_corner', 'away_corner'
+                    ]) {
+                        if (fallbackStats[field] !== null) {
+                            enriched[field] = fallbackStats[field];
+                        }
+                    }
+                }
 
             }
 
 
             if (!temelStatsTam(enriched)) {
-
                 addSystemLog(
-                    `> ⛔ ${match.teams.home.name} - ${match.teams.away.name}: güvenilir canlı istatistik yok, modele gönderilmiyor.`
+                    `> 🤖 ${match.teams.home.name} - ${match.teams.away.name}: ML istatistiği eksik; maç Gemini değerlendirmesine ayrıldı.`
                 );
-
-                continue;
-
             }
 
 
@@ -1184,14 +1107,10 @@ async function canliMaclariHazirla() {
             }
 
 
-            // Python'a giden son listede eksik değer kalmasına izin verme.
-            if (!temelStatsTam(enriched)) {
-                continue;
-            }
-
-
             enriched.canli_oranlar =
                 liveOdds;
+
+            enriched.model_hazir = temelStatsTam(enriched);
 
 
             macVerileri.push(
@@ -1649,6 +1568,90 @@ Sadece analiz metnini yaz.
 }
 
 
+async function geminiFirsatiSec(mac) {
+    if (!genAI) {
+        addSystemLog(
+            `> ⚠️ ${mac.mac_isim}: GEMINI_API_KEY yok; AI fallback çalıştırılamadı.`
+        );
+        return null;
+    }
+
+    const marketler = Object.entries(mac.canli_oranlar || {}).map(
+        ([market, data]) => ({
+            market,
+            oran: Number(data?.oran ?? data),
+            kaynak: data?.bookmaker || 'API-Football Live Odds'
+        })
+    ).filter(item => Number.isFinite(item.oran) && item.oran > 1);
+
+    if (marketler.length === 0) return null;
+
+    const veri = value =>
+        value === null || value === undefined ? 'VERI_YOK' : value;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+        const prompt = `
+Sen temkinli bir canlı futbol veri analistisin. Aşağıdaki maç için sadece verilen
+marketlerden birini seçebilir veya PASS diyebilirsin. Oran, market, kaynak ya da
+istatistik uydurma. Eksik istatistiği sıfır kabul etme. Skor ve dakika ile çelişen,
+aşırı riskli veya yeterli dayanağı olmayan durumda PASS seç.
+
+Maç: ${mac.mac_isim}
+Lig: ${mac.lig}
+Dakika: ${veri(mac.dakika)}
+Skor: ${mac.skor}
+Ev şut/isabet/korner: ${veri(mac.home_shot)} / ${veri(mac.home_sot)} / ${veri(mac.home_corner)}
+Dep şut/isabet/korner: ${veri(mac.away_shot)} / ${veri(mac.away_sot)} / ${veri(mac.away_corner)}
+Kullanılabilir canlı marketler: ${JSON.stringify(marketler)}
+
+Yalnızca geçerli JSON döndür:
+{"market":"MS1 veya listedeki birebir market ya da PASS","confidence":0-100,"yorum":"En fazla 3 kısa cümle"}
+`;
+
+        const result = await model.generateContent(prompt);
+        const raw = result.response.text().trim().replace(/```(?:json)?/gi, '');
+        const jsonStart = raw.indexOf('{');
+        const jsonEnd = raw.lastIndexOf('}');
+        if (jsonStart < 0 || jsonEnd < jsonStart) return null;
+
+        const secim = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
+        const market = String(secim.market || '').trim();
+        const confidence = Number(secim.confidence);
+
+        if (
+            normalizeText(market) === 'pass' ||
+            !Object.prototype.hasOwnProperty.call(mac.canli_oranlar, market) ||
+            !Number.isFinite(confidence) ||
+            confidence < AI_MIN_CONFIDENCE
+        ) {
+            addSystemLog(
+                `> ⏭️ ${mac.mac_isim}: Gemini PASS / düşük güven (${Number.isFinite(confidence) ? confidence : 0}%).`
+            );
+            return null;
+        }
+
+        const oddsData = mac.canli_oranlar[market];
+        const oran = Number(oddsData?.oran ?? oddsData);
+        if (!Number.isFinite(oran) || oran <= 1) return null;
+
+        return {
+            market,
+            oran,
+            bookmaker: oddsData?.bookmaker || 'API-Football Live Odds',
+            confidence: Math.max(0, Math.min(100, confidence)),
+            yorum: String(secim.yorum || 'Canlı maç akışı ve mevcut piyasa birlikte değerlendirildi.').trim()
+        };
+
+    } catch (error) {
+        addSystemLog(
+            `> ⚠️ ${mac.mac_isim}: GEMINI FALLBACK HATASI: ${error.message}`
+        );
+        return null;
+    }
+}
+
+
 // =========================================================
 // TELEGRAM
 // =========================================================
@@ -1726,234 +1729,188 @@ _${yorum}_
 }
 
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+
+function statsText(value) {
+    return value === null || value === undefined ? 'Veri yok' : String(value);
+}
+
+
+async function telegramAiSinyaliGonder(mac, firsat) {
+    if (!bot || !kanalID) {
+        addSystemLog('> ⚠️ Telegram ayarları eksik.');
+        return false;
+    }
+
+    const mesaj =
+`🤖 <b>DİNO CANLI MAÇ ANALİZİ</b>
+--------------------------------------
+⚽️ <b>Maç:</b> ${escapeHtml(mac.mac_isim)}
+🏆 <b>Lig:</b> ${escapeHtml(mac.lig)}
+⏱ <b>Dakika:</b> ${escapeHtml(mac.dakika)} | <b>Skor:</b> ${escapeHtml(mac.skor)}
+
+🎯 <b>AI Seçimi:</b> ${escapeHtml(firsat.market)}
+💵 <b>Canlı Oran:</b> ${escapeHtml(firsat.oran)}
+🏦 <b>Kaynak:</b> ${escapeHtml(firsat.bookmaker)}
+🧠 <b>AI Güveni:</b> %${escapeHtml(firsat.confidence)}
+
+📌 <b>Canlı İstatistikler</b>
+🏠 ${escapeHtml(statsText(mac.home_shot))} Şut | ${escapeHtml(statsText(mac.home_sot))} İsabet | ${escapeHtml(statsText(mac.home_corner))} Korner
+✈️ ${escapeHtml(statsText(mac.away_shot))} Şut | ${escapeHtml(statsText(mac.away_sot))} İsabet | ${escapeHtml(statsText(mac.away_corner))} Korner
+
+📝 <b>AI Analizi:</b>
+<i>${escapeHtml(firsat.yorum)}</i>
+
+ℹ️ ML istatistikleri eksik olduğu için bu sinyal yalnızca AI değerlendirmesidir.
+--------------------------------------`;
+
+    try {
+        await bot.sendMessage(kanalID, mesaj, { parse_mode: 'HTML' });
+        return true;
+    } catch (error) {
+        addSystemLog(`> ⚠️ TELEGRAM AI HATASI: ${error.message}`);
+        return false;
+    }
+}
+
+
 // =========================================================
 // ANA TARAMA
 // =========================================================
 
 async function botuCalistir() {
-
-    if (
-        isScanning
-    ) {
-
-        return;
-
-    }
-
-
-    isScanning =
-        true;
-
+    if (isScanning) return;
+    isScanning = true;
 
     try {
+        addSystemLog('> 🔍 Otomatik tarama başlatıldı...');
 
-        addSystemLog(
-            "> 🔍 Otomatik tarama başlatıldı..."
-        );
-
-
-        // -------------------------------------------------
-        // API
-        // -------------------------------------------------
-
-        const macListesi =
-            await canliMaclariHazirla();
-
-
-        if (
-            macListesi.length === 0
-        ) {
-
-            addSystemLog(
-                "> ℹ️ Uygun canlı maç bulunamadı."
-            );
-
+        const macListesi = await canliMaclariHazirla();
+        if (macListesi.length === 0) {
+            addSystemLog('> ℹ️ Oranı bulunan uygun canlı maç bulunamadı.');
             return;
-
         }
 
+        const modelMaclari = macListesi.filter(temelStatsTam);
+        const aiMaclari = macListesi.filter(mac => !temelStatsTam(mac));
+        let onaylanan = 0;
 
         addSystemLog(
-            `> 📊 Python'a ${macListesi.length} maç gönderiliyor...`
+            `> 🧭 Hibrit dağılım: ML ${modelMaclari.length} maç | Gemini fallback ${aiMaclari.length} maç.`
         );
 
-
-        // -------------------------------------------------
-        // PYTHON
-        // -------------------------------------------------
-
-        const dinoSonuclari =
-            await yapayZekaAnaliziYap(
-                macListesi
-            );
-
-
-        if (
-            !Array.isArray(
-                dinoSonuclari
-            )
-        ) {
-
+        if (modelMaclari.length > 0) {
             addSystemLog(
-                "> ❌ Python sonuç üretmedi."
+                `> 📊 Python'a ${modelMaclari.length} eksiksiz maç gönderiliyor...`
             );
 
-            return;
-
-        }
-
-
-        if (dinoSonuclari.length !== macListesi.length) {
-
-            addSystemLog(
-                `> ❌ Python sonuç hizası bozuk: ${macListesi.length} maç gönderildi, ${dinoSonuclari.length} sonuç döndü. Yanlış maça sonuç bağlanmaması için tarama iptal edildi.`
-            );
-
-            return;
-
-        }
-
-
-        addSystemLog(
-            `> 🧠 Python ${dinoSonuclari.length} maç için tahmin üretti.`
-        );
-
-
-        let onaylanan =
-            0;
-
-
-        // -------------------------------------------------
-        // VALUE
-        // -------------------------------------------------
-
-        for (
-            let i = 0;
-            i < macListesi.length;
-            i++
-        ) {
-
-            const mac =
-                macListesi[i];
-
-
-            const dino =
-                dinoSonuclari[i];
-
+            const dinoSonuclari = await yapayZekaAnaliziYap(modelMaclari);
 
             if (
-                !dino ||
-                Object.keys(dino).length === 0
+                !Array.isArray(dinoSonuclari) ||
+                dinoSonuclari.length !== modelMaclari.length
             ) {
-
                 addSystemLog(
-                    `> ❌ ${mac.mac_isim}: Model sonucu yok.`
+                    `> ⚠️ Python sonuç hizası geçersiz: ${modelMaclari.length} maç / ${Array.isArray(dinoSonuclari) ? dinoSonuclari.length : 0} sonuç. Bu maçlar Gemini fallback'e aktarılıyor.`
                 );
-
-                continue;
-
-            }
-
-
-            addSystemLog(
-                `> 🩺 RÖNTGEN (${mac.mac_isim}) -> Oranlar (${Object.keys(mac.canli_oranlar).length}) | Dino: ${JSON.stringify(dino)}`
-            );
-
-
-            const firsat =
-                valueAnaliziYap(
-                    mac,
-                    dino
-                );
-
-
-            if (
-                !firsat
-            ) {
-
+                aiMaclari.push(...modelMaclari);
+            } else {
                 addSystemLog(
-                    `> ❌ ${mac.mac_isim} pas geçildi (EDGE ${state.globalMinEdge}% altında)`
+                    `> 🧠 Python ${dinoSonuclari.length} maç için tahmin üretti.`
                 );
 
-                continue;
+                for (let i = 0; i < modelMaclari.length; i++) {
+                    const mac = modelMaclari[i];
+                    const dino = dinoSonuclari[i];
 
+                    if (!dino || Object.keys(dino).length === 0) {
+                        addSystemLog(
+                            `> ⚠️ ${mac.mac_isim}: Model sonucu boş; Gemini fallback'e aktarıldı.`
+                        );
+                        aiMaclari.push(mac);
+                        continue;
+                    }
+
+                    addSystemLog(
+                        `> 🩺 RÖNTGEN (${mac.mac_isim}) -> Oranlar (${Object.keys(mac.canli_oranlar).length}) | Dino: ${JSON.stringify(dino)}`
+                    );
+
+                    const firsat = valueAnaliziYap(mac, dino);
+                    if (!firsat) {
+                        addSystemLog(
+                            `> ❌ ${mac.mac_isim} pas geçildi (EDGE ${state.globalMinEdge}% altında)`
+                        );
+                        continue;
+                    }
+
+                    addSystemLog(
+                        `> 🚨 ML VALUE BULUNDU: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}%`
+                    );
+
+                    const yorum = await geminiYorumuYaz(mac, firsat);
+                    const gonderildi = await telegramSinyaliGonder(
+                        mac,
+                        firsat,
+                        yorum
+                    );
+
+                    if (gonderildi) {
+                        onaylanan++;
+                        addSystemLog(
+                            `> ✅ ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
+                        );
+                    }
+                }
             }
-
-
-            addSystemLog(
-                `> 🚨 VALUE BULUNDU: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}%`
-            );
-
-
-            // -------------------------------------------------
-            // GEMINI
-            // -------------------------------------------------
-
-            const yorum =
-                await geminiYorumuYaz(
-                    mac,
-                    firsat
-                );
-
-
-            // -------------------------------------------------
-            // TELEGRAM
-            // -------------------------------------------------
-
-            const gonderildi =
-                await telegramSinyaliGonder(
-                    mac,
-                    firsat,
-                    yorum
-                );
-
-
-            if (
-                gonderildi
-            ) {
-
-                onaylanan++;
-
-                addSystemLog(
-                    `> ✅ SİNYAL GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}%`
-                );
-
-            }
-
         }
 
+        if (aiMaclari.length > 0) {
+            addSystemLog(
+                `> 🤖 Gemini ${aiMaclari.length} maçı eksik verileri sıfır saymadan değerlendirecek...`
+            );
+
+            for (const mac of aiMaclari) {
+                const firsat = await geminiFirsatiSec(mac);
+                if (!firsat) continue;
+
+                addSystemLog(
+                    `> 🚨 AI SEÇİMİ: ${mac.mac_isim} | ${firsat.market} | Güven %${firsat.confidence} | Oran ${firsat.oran}`
+                );
+
+                const gonderildi = await telegramAiSinyaliGonder(mac, firsat);
+                if (gonderildi) {
+                    onaylanan++;
+                    addSystemLog(
+                        `> ✅ AI SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
+                    );
+                }
+            }
+        }
 
         addSystemLog(
-            `> 🏁 Tarama bitti. ${onaylanan} efsane maç yakalandı.`
+            `> 🏁 Tarama bitti. ${onaylanan} maç gönderildi.`
         );
 
-
-        if (
-            quotaRemaining !== null
-        ) {
-
+        if (quotaRemaining !== null) {
             addSystemLog(
                 `> 📦 API kalan günlük istek: ${quotaRemaining}`
             );
-
         }
 
-
     } catch (error) {
-
         addSystemLog(
             `> ❌ ANA TARAMA HATASI: ${error.message}`
         );
-
     } finally {
-
-        isScanning =
-            false;
-
+        isScanning = false;
     }
-
 }
-
 
 // =========================================================
 // ZAMANLAYICI
