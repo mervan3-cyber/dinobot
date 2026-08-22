@@ -694,23 +694,29 @@ function parseLiveOdds(response) {
                     }
 
 
-                    const odd =
-                        parseFloat(
-                            String(
-                                value.odd
-                            )
-                        );
+                    // Gelen oranı temizle ve noktalı (decimal) formata zorla
+                    let rawOddStr = String(value.odd).trim();
+                    
+                    // Bazen oranlar kesirli (fractional) gelebilir (Örn: "10/1"). 
+                    // Kesirli oranları yakalayıp decimal formata çeviren ufak bir kontrol.
+                    let odd = 0;
+                    if (rawOddStr.includes('/')) {
+                        let parts = rawOddStr.split('/');
+                        if (parts.length === 2) {
+                            odd = (parseFloat(parts[0]) / parseFloat(parts[1])) + 1;
+                        }
+                    } else {
+                        odd = parseFloat(rawOddStr.replace(',', '.')); // Virgülle geldiyse noktaya çevir
+                    }
 
-
+                    // 101 gibi absürt ve imkansız oranları, 1.01 ve altını, veya NaN hatalarını tamamen ele.
+                    // (Bir futbol maçında açılan bir canlı oran maksimum 50-60 civarı olur, 100 üstü veri hatasıdır)
                     if (
-                        !Number.isFinite(
-                            odd
-                        ) ||
-                        odd <= 1
+                        !Number.isFinite(odd) ||
+                        odd <= 1.01 ||
+                        odd > 80 
                     ) {
-
                         continue;
-
                     }
 
 
