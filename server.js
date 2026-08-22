@@ -451,1206 +451,192 @@ function getCurrentTimeTR() {
 
 
 // =========================================================
-// LIVE ODDS - GÜVENLİ MARKET AYRIŞTIRMA
-// =========================================================
-//
-// AMAÇ:
-//
-// 1) "Home" gördüğümüz her marketi MS1 SANMA.
-// 2) Önce bet.name kontrol et.
-// 3) Sadece gerçek maç sonucu 1X2 marketini kabul et.
-// 4) Sadece gerçek maç toplam gol Over/Under marketini kabul et.
-// 5) Korner, yarı, takım golü, ekstra süre vs. kesinlikle karışmasın.
-// 6) suspended / blocked / stopped / finished oranları kullanma.
-// 7) API aynı selection'ı birden fazla gönderirse main=true olanı seç.
-// 8) Aynı GERÇEK market için birden fazla kaynak varsa en iyi oranı tut.
-//
+// MARKET İSİMLERİNİ STANDARDİZE ET
 // =========================================================
 
-
-// ---------------------------------------------------------
-// HEDEF GOL BAREMLERİ
-// ---------------------------------------------------------
-
-const LIVE_GOAL_LINES =
-    new Set([
-        0.5,
-        1.5,
-        2.5,
-        3.5,
-        4.5
-    ]);
-
-
-// ---------------------------------------------------------
-// TEXT NORMALIZE
-// ---------------------------------------------------------
-
-function normalizeLiveText(value) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return '';
-    }
-
-    return String(value)
+function normalizeText(value) {
+    return String(value ?? '')
         .trim()
         .toLowerCase()
-        .replace(/\s+/g, ' ');
-
+        .replace(/[\s_-]+/g, ' ');
 }
 
-
-// ---------------------------------------------------------
-// BOOLEAN NORMALIZE
-// ---------------------------------------------------------
-//
-// API bazen true,
-// bazen "true",
-// bazen 1 gibi değer döndürebilir.
-// ---------------------------------------------------------
 
 function isTrueValue(value) {
+    return value === true || value === 1 || normalizeText(value) === 'true';
+}
 
-    if (value === true) {
-        return true;
-    }
 
-    if (value === 1) {
-        return true;
-    }
+function isClosed(value) {
+    return value === true || value === 1 || normalizeText(value) === 'true';
+}
 
-    const text =
-        String(value ?? '')
-            .trim()
-            .toLowerCase();
 
-    return (
-        text === 'true' ||
-        text === '1'
+function selectionIsUnavailable(value) {
+    return [
+        value?.suspended,
+        value?.stopped,
+        value?.blocked,
+        value?.finished
+    ].some(isClosed);
+}
+
+
+function parseTargetMarket(bet, value) {
+    const betName = normalizeText(bet?.name);
+    const selection = normalizeText(
+        value?.value ?? value?.name ?? value?.selection
     );
 
-}
-
-
-// ---------------------------------------------------------
-// ORAN PARSE
-// ---------------------------------------------------------
-
-function parseLiveOdd(value) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-        return null;
-    }
-
-    const text =
-        String(value)
-            .trim()
-            .replace(',', '.');
-
-    if (!text) {
-        return null;
-    }
-
-    const odd =
-        Number(text);
-
-    if (
-        !Number.isFinite(odd) ||
-        odd <= 1
-    ) {
-        return null;
-    }
-
-    return odd;
-
-}
-
-
-// ---------------------------------------------------------
-// HANDICAP / GOL ÇİZGİSİ PARSE
-// ---------------------------------------------------------
-
-function parseGoalLine(value) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === ''
-    ) {
-        return null;
-    }
-
-    const text =
-        String(value)
-            .trim()
-            .replace(',', '.');
-
-
-    // Örn:
-    // 2.5
-    // 1.5
-    //
-    // "2.5,3" veya "2.25" gibi Asian çizgilerini
-    // bizim modele sokma.
-
-    if (
-        !/^\d+(?:\.\d+)?$/.test(text)
-    ) {
-        return null;
-    }
-
-
-    const line =
-        Number(text);
-
-
-    if (
-        !Number.isFinite(line)
-    ) {
-        return null;
-    }
-
-
-    if (
-        !LIVE_GOAL_LINES.has(line)
-    ) {
-        return null;
-    }
-
-
-    return line;
-
-}
-
-
-// =========================================================
-// BET + VALUE -> DİNO MARKET
-// =========================================================
-
-function getTargetLiveMarket(
-    bet,
-    value
-) {
-
-    const betName =
-        normalizeLiveText(
-            bet?.name
-        );
-
-
-    const selection =
-        normalizeLiveText(
-            value?.value
-        );
-
-
-    if (
-        !betName ||
-        !selection
-    ) {
-        return null;
-    }
-
-
-    // =====================================================
-    // 1) MAÇ SONUCU 1X2
-    // =====================================================
-    //
-    // Burada yalnızca FULL TIME maç sonucu kabul ediyoruz.
-    //
-    // Kabul örnekleri:
-    //
-    // Match Winner
-    // 1x2
-    // 1X2 Full Time
-    // Full Time Result
-    //
-    // RED örnekleri:
-    //
-    // 1x2 Extra Time
-    // 1x2 1st Half
-    // First Half Winner
-    // Corners Winner
-    //
-    // =====================================================
-
-
-    const winnerForbiddenWords = [
-
-        '1st half',
-        'first half',
-
-        '2nd half',
-        'second half',
-
-        'half time',
-        'halftime',
-
-        'extra time',
-
-        'penalty',
-
-        'corner',
-
-        'booking',
-
-        'card',
-
-        'offside',
-
-        'throw',
-
-        'period',
-
-        'quarter',
-
-        'double chance',
-
-        'home team',
-
-        'away team'
-
-    ];
-
-
-    const winnerForbidden =
-        winnerForbiddenWords.some(
-            word =>
-                betName.includes(word)
-        );
-
-
-    const FULL_TIME_WINNER_MARKETS =
-    new Set([
-
+    const matchWinnerNames = new Set([
         'match winner',
         '1x2',
-        '1 x 2',
-        'full time result',
         'fulltime result',
-        'full time winner',
-        'fulltime winner'
-
+        'full time result',
+        'fulltime 1x2',
+        'full time 1x2'
     ]);
 
+    if (matchWinnerNames.has(betName)) {
+        if (['home', '1'].includes(selection)) return 'MS1';
+        if (['draw', 'x'].includes(selection)) return 'X';
+        if (['away', '2'].includes(selection)) return 'MS2';
+        return null;
+    }
 
-const looksLikeWinner =
-    FULL_TIME_WINNER_MARKETS.has(
-        betName
+    const totalGoalNames = new Set([
+        'over/under line',
+        'goals over/under',
+        'total goals',
+        'match goals',
+        'total match goals'
+    ]);
+
+    if (!totalGoalNames.has(betName)) return null;
+
+    const selectionMatch = selection.match(
+        /^(over|under)(?:\s+(\d+(?:\.\d+)?))?$/
     );
 
+    if (!selectionMatch) return null;
 
-    if (
-        looksLikeWinner &&
-        !winnerForbidden
-    ) {
+    const lineValue =
+        value?.handicap ??
+        value?.line ??
+        selectionMatch[2];
 
-        if (
-            selection === 'home' ||
-            selection === '1'
-        ) {
+    const line = Number.parseFloat(String(lineValue ?? ''));
+    const allowedLines = [0.5, 1.5, 2.5, 3.5, 4.5];
 
-            return 'MS1';
-
-        }
-
-
-        if (
-            selection === 'draw' ||
-            selection === 'x'
-        ) {
-
-            return 'X';
-
-        }
-
-
-        if (
-            selection === 'away' ||
-            selection === '2'
-        ) {
-
-            return 'MS2';
-
-        }
-
-
+    if (!Number.isFinite(line) || !allowedLines.includes(line)) {
         return null;
-
     }
 
-
-    // =====================================================
-    // 2) MAÇ TOPLAM GOL OVER / UNDER
-    // =====================================================
-    //
-    // Kabul etmek istediğimiz şey:
-    //
-    // Over/Under Line
-    // Goals Over/Under
-    // Total Goals
-    //
-    // İstemediğimiz şey:
-    //
-    // Team Total
-    // Home Team Goals
-    // Away Team Goals
-    // Corners O/U
-    // Cards O/U
-    // First Half O/U
-    // Extra Time O/U
-    // Asian Total
-    //
-    // =====================================================
-
-
-    const totalForbiddenWords = [
-
-        'corner',
-
-        'booking',
-
-        'card',
-
-        'yellow',
-
-        'red card',
-
-        'offside',
-
-        'throw',
-
-        'shot',
-
-        'foul',
-
-        'asian',
-
-        'extra time',
-
-        'penalty',
-
-        '1st half',
-        'first half',
-
-        '2nd half',
-        'second half',
-
-        'half time',
-        'halftime',
-
-        'home team',
-
-        'away team',
-
-        'team total',
-
-        'home total',
-
-        'away total',
-
-        'period',
-
-        'quarter'
-
-    ];
-
-
-    const totalForbidden =
-        totalForbiddenWords.some(
-            word =>
-                betName.includes(word)
-        );
-
-
-    const looksLikeTotalGoals =
-        (
-            betName === 'over/under line' ||
-
-            betName === 'over under line' ||
-
-            betName === 'over/under' ||
-
-            betName === 'goals over/under' ||
-
-            betName === 'goal over/under' ||
-
-            betName === 'over/under goals' ||
-
-            betName === 'total goals' ||
-
-            betName === 'total goals over/under' ||
-
-            betName === 'goal line' ||
-
-            betName.includes(
-                'over/under line'
-            ) ||
-
-            betName.includes(
-                'goals over/under'
-            ) ||
-
-            betName.includes(
-                'total goals'
-            )
-        );
-
-
-    if (
-        !looksLikeTotalGoals ||
-        totalForbidden
-    ) {
-
-        return null;
-
-    }
-
-
-    // -----------------------------------------------------
-    // OVER / UNDER TARAFINI BUL
-    // -----------------------------------------------------
-
-
-    let taraf =
-        null;
-
-
-    let embeddedLine =
-        null;
-
-
-    // API formatı:
-    //
-    // value: "Over"
-    // handicap: "2.5"
-    //
-    // veya bazı yapılarda:
-    //
-    // value: "Over 2.5"
-
-
-    const selectionMatch =
-        selection.match(
-            /^(over|under)(?:\s+(\d+(?:[.,]\d+)?))?$/
-        );
-
-
-    if (!selectionMatch) {
-
-        return null;
-
-    }
-
-
-    if (
-        selectionMatch[1] ===
-        'over'
-    ) {
-
-        taraf =
-            'UST';
-
-    } else if (
-        selectionMatch[1] ===
-        'under'
-    ) {
-
-        taraf =
-            'ALT';
-
-    } else {
-
-        return null;
-
-    }
-
-
-    // Selection içinde çizgi varsa al.
-    if (
-        selectionMatch[2]
-    ) {
-
-        embeddedLine =
-            parseGoalLine(
-                selectionMatch[2]
-            );
-
-    }
-
-
-    // Yoksa handicap alanından al.
-    const handicapLine =
-        parseGoalLine(
-            value?.handicap
-        );
-
-
-    const line =
-        embeddedLine !== null
-            ? embeddedLine
-            : handicapLine;
-
-
-    if (
-        line === null
-    ) {
-
-        return null;
-
-    }
-
-
-    return (
-        `${line.toFixed(1)}_${taraf}`
-    );
-
+    return `${line}_${selectionMatch[1] === 'over' ? 'UST' : 'ALT'}`;
 }
 
 
 // =========================================================
 // LIVE ODDS PARSE
 // =========================================================
+//
+// /odds/live çağrısını TEK SEFER yapıyoruz.
+// Tüm maçların oranlarını buradan çıkarıyoruz.
+// =========================================================
 
 function parseLiveOdds(response) {
 
-    const oddsMap =
-        new Map();
+    const oddsMap = new Map();
+    const fixtures = Array.isArray(response.data?.response)
+        ? response.data.response
+        : [];
 
+    for (const fixtureOdds of fixtures) {
+        const fixtureID = Number(fixtureOdds.fixture?.id);
+        if (!fixtureID) continue;
 
-    const fixtures =
-        response?.data &&
-        Array.isArray(
-            response.data.response
-        )
-            ? response.data.response
-            : [];
+        // /odds/live bookmaker filtresi sunmaz. Bookmaker bilgisi cevapta
+        // açıkça yoksa kaynağı Bet365 olarak etiketlemiyoruz.
+        const sources = [];
 
-
-    // -----------------------------------------------------
-    // HER FIXTURE
-    // -----------------------------------------------------
-
-    for (
-        const fixtureOdds
-        of fixtures
-    ) {
-
-        const fixtureID =
-            Number(
-                fixtureOdds?.fixture?.id
-            );
-
-
-        if (
-            !Number.isFinite(
-                fixtureID
-            ) ||
-            fixtureID <= 0
-        ) {
-
-            continue;
-
-        }
-
-
-        // =================================================
-        // FIXTURE LIVE ODDS STATUS
-        // =================================================
-
-        const liveStatus =
-            fixtureOdds?.status ||
-            {};
-
-
-        // Maç durdurulmuşsa,
-        // bahisler block olmuşsa
-        // veya feed finished ise kullanma.
-
-        if (
-            isTrueValue(
-                liveStatus.stopped
-            ) ||
-
-            isTrueValue(
-                liveStatus.blocked
-            ) ||
-
-            isTrueValue(
-                liveStatus.finished
-            )
-        ) {
-
-            continue;
-
-        }
-
-
-        // =================================================
-        // FIXTURE MARKET MAP
-        // =================================================
-
-        if (
-            !oddsMap.has(
-                fixtureID
-            )
-        ) {
-
-            oddsMap.set(
-                fixtureID,
-                {}
-            );
-
-        }
-
-
-        const marketMap =
-            oddsMap.get(
-                fixtureID
-            );
-
-
-        // =================================================
-        // KAYNAKLARI HAZIRLA
-        // =================================================
-        //
-        // API-Football /odds/live normal yapısı:
-        //
-        // fixtureOdds.odds
-        //
-        // Fakat olası alternatif/legacy yapı için
-        // bookmakers desteğini de bırakıyoruz.
-        // =================================================
-
-
-        const sources =
-            [];
-
-
-        // -------------------------------------------------
-        // NORMAL LIVE ODDS FORMAT
-        // -------------------------------------------------
-
-        if (
-            Array.isArray(
-                fixtureOdds.odds
-            )
-        ) {
-
-            sources.push({
-
-                name:
-                    'API',
-
-                bets:
-                    fixtureOdds.odds
-
-            });
-
-        }
-
-
-        // -------------------------------------------------
-        // BOOKMAKER FORMAT GELİRSE
-        // -------------------------------------------------
-
-        if (
-            Array.isArray(
-                fixtureOdds.bookmakers
-            )
-        ) {
-
-            for (
-                const bookmaker
-                of fixtureOdds.bookmakers
-            ) {
-
-                const bets =
-                    Array.isArray(
-                        bookmaker?.bets
-                    )
-                        ? bookmaker.bets
-                        : (
-                            Array.isArray(
-                                bookmaker?.odds
-                            )
-                                ? bookmaker.odds
-                                : []
-                        );
-
-
-                if (
-                    bets.length === 0
-                ) {
-
-                    continue;
-
-                }
-
-
+        if (Array.isArray(fixtureOdds.bookmakers)) {
+            for (const bookmaker of fixtureOdds.bookmakers) {
                 sources.push({
-
-                    name:
-                        bookmaker?.name ||
-                        `Bookmaker ${bookmaker?.id || ''}`,
-
-                    bets:
-                        bets
-
+                    name: bookmaker.name || `Bookmaker ${bookmaker.id || ''}`.trim(),
+                    bets: Array.isArray(bookmaker.bets)
+                        ? bookmaker.bets
+                        : (Array.isArray(bookmaker.odds) ? bookmaker.odds : [])
                 });
-
             }
-
         }
 
+        if (Array.isArray(fixtureOdds.odds)) {
+            sources.push({
+                name: 'API-Football Live Odds',
+                bets: fixtureOdds.odds
+            });
+        }
 
-        // =================================================
-        // HER KAYNAK
-        // =================================================
+        const grouped = new Map();
 
-        for (
-            const source
-            of sources
-        ) {
+        for (const source of sources) {
+            for (const bet of source.bets) {
+                if (selectionIsUnavailable(bet)) continue;
 
-            const bets =
-                Array.isArray(
-                    source.bets
-                )
-                    ? source.bets
-                    : [];
+                const values = Array.isArray(bet.values) ? bet.values : [];
 
+                for (const value of values) {
+                    if (selectionIsUnavailable(value)) continue;
 
-            // =============================================
-            // HER BET
-            // =============================================
+                    const market = parseTargetMarket(bet, value);
+                    if (!market) continue;
 
-            for (
-                const bet
-                of bets
-            ) {
+                    const odd = Number.parseFloat(String(value.odd ?? value.odds ?? ''));
+                    if (!Number.isFinite(odd) || odd <= 1 || odd > 100) continue;
 
-                // Bet seviyesinde block/suspend varsa geç.
-
-                if (
-                    isTrueValue(
-                        bet?.stopped
-                    ) ||
-
-                    isTrueValue(
-                        bet?.blocked
-                    ) ||
-
-                    isTrueValue(
-                        bet?.suspended
-                    )
-                ) {
-
-                    continue;
-
-                }
-
-
-                const values =
-                    Array.isArray(
-                        bet?.values
-                    )
-                        ? bet.values
-                        : [];
-
-
-                if (
-                    values.length === 0
-                ) {
-
-                    continue;
-
-                }
-
-
-                // =========================================
-                // AYNI BET İÇİN ADAYLARI MARKET BAZINDA
-                // GRUPLA
-                // =========================================
-                //
-                // Örn:
-                //
-                // Over / 2.5 / 1.95 / main=true
-                // Over / 2.5 / 3.40 / main=false
-                //
-                // ikisi de 2.5_UST olur.
-                //
-                // Böyle durumda main=true olan alınmalı.
-                // =========================================
-
-
-                const grouped =
-                    new Map();
-
-
-                for (
-                    const value
-                    of values
-                ) {
-
-                    // -------------------------------------
-                    // SUSPENDED SELECTION
-                    // -------------------------------------
-
-                    if (
-                        isTrueValue(
-                            value?.suspended
-                        ) ||
-
-                        isTrueValue(
-                            value?.stopped
-                        ) ||
-
-                        isTrueValue(
-                            value?.blocked
-                        )
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    // -------------------------------------
-                    // GERÇEK MARKETİ BUL
-                    // -------------------------------------
-
-                    const market =
-                        getTargetLiveMarket(
-                            bet,
-                            value
-                        );
-
-
-                    if (
-                        !market
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    // -------------------------------------
-                    // ORANI OKU
-                    // -------------------------------------
-
-                    const odd =
-                        parseLiveOdd(
-                            value?.odd
-                        );
-
-
-                    if (
-                        odd === null
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    if (
-                        !grouped.has(
-                            market
-                        )
-                    ) {
-
-                        grouped.set(
-                            market,
-                            []
-                        );
-
-                    }
-
-
-                    grouped
-                        .get(
-                            market
-                        )
-                        .push({
-
-                            market:
-                                market,
-
-                            odd:
-                                odd,
-
-                            value:
-                                value
-
-                        });
-
-                }
-
-
-                // =========================================
-                // MARKET GRUPLARINI İŞLE
-                // =========================================
-
-                for (
-                    const [
+                    const candidate = {
                         market,
-                        candidates
-                    ]
-                    of grouped
-                ) {
+                        oran: odd,
+                        bookmaker: source.name,
+                        main: isTrueValue(value.main)
+                    };
 
-                    if (
-                        candidates.length === 0
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    // -------------------------------------
-                    // MAIN=TRUE VAR MI?
-                    // -------------------------------------
-
-                    const mainCandidates =
-                        candidates.filter(
-                            candidate =>
-                                isTrueValue(
-                                    candidate
-                                        .value
-                                        ?.main
-                                )
-                        );
-
-
-                    let usableCandidates;
-
-
-                    if (
-                        mainCandidates.length >
-                        0
-                    ) {
-
-                        // API açıkça primary seçim vermiş.
-                        usableCandidates =
-                            mainCandidates;
-
-                    } else {
-
-                        // main=true yok.
-                        //
-                        // Unique selectionlarda main false/null
-                        // olabileceği için direkt çöpe atmıyoruz.
-
-                        usableCandidates =
-                            candidates;
-
-                    }
-
-
-                    // -------------------------------------
-                    // AYNI BET İÇİN SEÇİLECEK ADAY
-                    // -------------------------------------
-
-
-                    let selected;
-
-
-                    if (
-                        mainCandidates.length >
-                        0
-                    ) {
-
-                        // Birden fazla main varsa
-                        // en yüksek gerçek oran.
-
-                        selected =
-                            usableCandidates.reduce(
-                                (best, current) =>
-
-                                    !best ||
-                                    current.odd >
-                                    best.odd
-
-                                        ? current
-                                        : best,
-
-                                null
-                            );
-
-                    } else if (
-                        usableCandidates.length ===
-                        1
-                    ) {
-
-                        // Unique selection.
-                        selected =
-                            usableCandidates[0];
-
-                    } else {
-
-                        // Aynı bet+market için birden fazla
-                        // oran geldi ama API main belirtmedi.
-                        //
-                        // Eski kod burada en büyük oranı alıp
-                        // sahte VALUE yaratabiliyordu.
-                        //
-                        // Güvenli tarafta kal:
-                        // en düşük oranı kullan.
-
-                        selected =
-                            usableCandidates.reduce(
-                                (best, current) =>
-
-                                    !best ||
-                                    current.odd <
-                                    best.odd
-
-                                        ? current
-                                        : best,
-
-                                null
-                            );
-
-
-                        addSystemLog(
-                            `> ⚠️ LIVE ODDS AMBIGUOUS | Fixture:${fixtureID} | ${market} | Bet:${bet?.name || '-'} | main bulunamadı | Güvenli oran:${selected?.odd}`
-                        );
-
-                    }
-
-
-                    if (
-                        !selected
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    const odd =
-                        selected.odd;
-
-
-                    // =====================================
-                    // AYNI GERÇEK MARKET İÇİN EN İYİ ORAN
-                    // =====================================
-                    //
-                    // Buraya geldiysek market artık:
-                    //
-                    // gerçek MS1 / X / MS2
-                    //
-                    // veya
-                    //
-                    // gerçek maç toplam gol marketidir.
-                    //
-                    // Farklı doğru kaynaklar varsa
-                    // yüksek oranı seçebiliriz.
-                    // =====================================
-
-
-                    if (
-                        !marketMap[market] ||
-                        odd >
-                        marketMap[market].oran
-                    ) {
-
-                        marketMap[market] = {
-
-                            oran:
-                                odd,
-
-                            bookmaker:
-                                source.name,
-
-                            bet_id:
-                                bet?.id ??
-                                null,
-
-                            bet_name:
-                                bet?.name ??
-                                null,
-
-                            selection:
-                                selected
-                                    .value
-                                    ?.value ??
-                                null,
-
-                            handicap:
-                                selected
-                                    .value
-                                    ?.handicap ??
-                                null,
-
-                            main:
-                                selected
-                                    .value
-                                    ?.main ??
-                                null
-
-                        };
-
-                    }
-
-
-                    // -------------------------------------
-                    // ÇOK YÜKSEK ORAN DEBUG
-                    // -------------------------------------
-                    //
-                    // Yanlış market kalmışsa logdan anında
-                    // hangi bet.name geldiğini görürüz.
-                    // -------------------------------------
-
-                    if (
-                        odd >= 10
-                    ) {
-
-                        addSystemLog(
-                            `> ⚠️ YÜKSEK LIVE ORAN | Fixture:${fixtureID} | DinoMarket:${market} | API Market:${bet?.name || '-'} | Selection:${selected.value?.value || '-'} | Handicap:${selected.value?.handicap ?? '-'} | Oran:${odd}`
-                        );
-
-                    }
-
+                    if (!grouped.has(market)) grouped.set(market, []);
+                    grouped.get(market).push(candidate);
                 }
-
             }
-
         }
 
+        const marketMap = {};
 
-        // =================================================
-        // HİÇ GEÇERLİ MARKET KALMADIYSA MAP'TEN ÇIKAR
-        // =================================================
+        for (const [market, candidates] of grouped) {
+            const mainCandidates = candidates.filter(candidate => candidate.main);
+            const usableCandidates = mainCandidates.length > 0
+                ? mainCandidates
+                : candidates;
 
-        if (
-            Object.keys(
-                marketMap
-            ).length === 0
-        ) {
-
-            oddsMap.delete(
-                fixtureID
+            // Sadece aynı, sıkı biçimde tanımlanmış market içindeki oranlar yarışır.
+            const selected = usableCandidates.reduce(
+                (best, candidate) =>
+                    !best || candidate.oran > best.oran ? candidate : best,
+                null
             );
 
+            if (selected) {
+                marketMap[market] = {
+                    oran: selected.oran,
+                    bookmaker: selected.bookmaker
+                };
+            }
         }
 
+        if (Object.keys(marketMap).length > 0) {
+            oddsMap.set(fixtureID, marketMap);
+        }
     }
 
-
     return oddsMap;
-
 }
-
 
 // =========================================================
 // FIXTURE STATISTICS
@@ -1662,16 +648,21 @@ function getStat(
 ) {
 
     if (
-        !Array.isArray(teamStats)
+        !Array.isArray(
+            teamStats
+        )
     ) {
+
         return null;
+
     }
 
 
     const item =
         teamStats.find(
             x =>
-                x.type === statName
+                x.type ===
+                statName
         );
 
 
@@ -1680,28 +671,54 @@ function getStat(
         item.value === null ||
         item.value === undefined
     ) {
+
         return null;
+
     }
 
 
     const value =
-        String(item.value)
-            .replace('%', '')
-            .trim();
-
-
-    if (!value) {
-        return null;
-    }
+        String(
+            item.value
+        )
+        .replace(
+            '%',
+            ''
+        );
 
 
     const parsed =
-        parseFloat(value);
+        parseFloat(
+            value
+        );
 
 
-    return Number.isFinite(parsed)
+    return Number.isFinite(
+        parsed
+    )
         ? parsed
         : null;
+
+}
+
+
+function temelStatsTam(mac) {
+    if (!mac) return false;
+
+    return [
+        mac.home_shot,
+        mac.away_shot,
+        mac.home_sot,
+        mac.away_sot,
+        mac.home_corner,
+        mac.away_corner
+    ].every(value => {
+        if (value === null || value === undefined || value === '') {
+            return false;
+        }
+
+        return Number.isFinite(Number(value));
+    });
 }
 
 
@@ -1829,191 +846,37 @@ function enrichFixturesWithStats(
 
 }
 
-function temelStatsTam(mac) {
 
-    const values = [
-
-        mac?.home_shot,
-        mac?.away_shot,
-
-        mac?.home_sot,
-        mac?.away_sot,
-
-        mac?.home_corner,
-        mac?.away_corner
-
-    ];
-
-
-    return values.every(
-        value =>
-            Number.isFinite(
-                Number(value)
-            )
-    );
-}
-
-
-// =========================================================
-// DEDICATED FIXTURE STATISTICS
-// =========================================================
-
-async function direktFixtureStatsGetir(
-    fixture
-) {
+async function direktFixtureStatsGetir(fixture) {
+    const fixtureID = Number(fixture?.fixture?.id);
+    if (!fixtureID) return null;
 
     try {
+        const response = await apiGet(
+            `/fixtures/statistics?fixture=${fixtureID}`
+        );
+        const statistics = Array.isArray(response.data?.response)
+            ? response.data.response
+            : [];
 
-        const fixtureID =
-            Number(
-                fixture?.fixture?.id
-            );
+        if (statistics.length < 2) return null;
 
-
-        if (!fixtureID) {
-            return null;
-        }
-
-
-        const response =
-            await apiGet(
-                `/fixtures/statistics?fixture=${fixtureID}`
-            );
-
-
-        const statistics =
-            Array.isArray(
-                response.data?.response
-            )
-                ? response.data.response
-                : [];
-
-
-        if (
-            statistics.length < 2
-        ) {
-
-            addSystemLog(
-                `> ⚠️ Fixture ${fixtureID}: dedicated statistics bulunamadı.`
-            );
-
-            return null;
-        }
-
-
-        const homeID =
-            fixture.teams.home.id;
-
-        const awayID =
-            fixture.teams.away.id;
-
-
-        const homeStatsObj =
-            statistics.find(
-                x =>
-                    Number(x.team?.id) ===
-                    Number(homeID)
-            );
-
-
-        const awayStatsObj =
-            statistics.find(
-                x =>
-                    Number(x.team?.id) ===
-                    Number(awayID)
-            );
-
-
-        if (
-            !homeStatsObj ||
-            !awayStatsObj
-        ) {
-
-            return null;
-        }
-
-
-        const mac = {
-
-            fixture_id:
-                fixtureID,
-
-            mac_isim:
-                `${fixture.teams.home.name} - ${fixture.teams.away.name}`,
-
-            lig:
-                fixture.league.name,
-
-            dakika:
-                fixture.fixture.status.elapsed,
-
-            skor:
-                `${fixture.goals.home ?? 0}-${fixture.goals.away ?? 0}`,
-
-            home_shot:
-                getStat(
-                    homeStatsObj.statistics,
-                    'Total Shots'
-                ),
-
-            away_shot:
-                getStat(
-                    awayStatsObj.statistics,
-                    'Total Shots'
-                ),
-
-            home_sot:
-                getStat(
-                    homeStatsObj.statistics,
-                    'Shots on Goal'
-                ),
-
-            away_sot:
-                getStat(
-                    awayStatsObj.statistics,
-                    'Shots on Goal'
-                ),
-
-            home_corner:
-                getStat(
-                    homeStatsObj.statistics,
-                    'Corner Kicks'
-                ),
-
-            away_corner:
-                getStat(
-                    awayStatsObj.statistics,
-                    'Corner Kicks'
-                )
-
+        const fixtureWithStats = {
+            ...fixture,
+            statistics
         };
 
-
-        if (
-            !temelStatsTam(mac)
-        ) {
-
-            addSystemLog(
-                `> ⚠️ ${mac.mac_isim}: temel canlı istatistiklerden biri API'de yok.`
-            );
-
-            return null;
-        }
-
-
-        return mac;
-
+        const enriched = enrichFixturesWithStats([fixtureWithStats])[0];
+        return temelStatsTam(enriched) ? enriched : null;
 
     } catch (error) {
-
         addSystemLog(
-            `> ⚠️ Fixture statistics hatası: ${error.message}`
+            `> ⚠️ Fixture ${fixtureID} statistics hatası: ${error.message}`
         );
-
         return null;
-
     }
 }
+
 
 // =========================================================
 // API FOOTBALL'DAN TÜM CANLI MAÇLARI HAZIRLA
@@ -2070,10 +933,22 @@ async function canliMaclariHazirla() {
                             match.fixture?.status?.elapsed
                         );
 
+                    const status = normalizeText(
+                        match.fixture?.status?.short ??
+                        match.fixture?.status?.long
+                    );
+
+                    const closedStatuses = new Set([
+                        'ft', 'aet', 'pen', 'p', 'canc', 'abd', 'awd', 'wo',
+                        'match finished', 'finished', 'cancelled', 'abandoned',
+                        'suspended', 'postponed', 'interrupted'
+                    ]);
+
 
                     return (
                         dakika >= 25 &&
-                        dakika <= 80
+                        dakika <= 80 &&
+                        !closedStatuses.has(status)
                     );
 
                 }
@@ -2260,60 +1135,35 @@ async function canliMaclariHazirla() {
             const fixture =
                 fixtureMap.get(
                     fixtureID
+                ) || match;
+
+
+            let enriched =
+                enrichFixturesWithStats(
+                    [fixture]
+                )[0];
+
+
+            if (!temelStatsTam(enriched)) {
+
+                addSystemLog(
+                    `> 🔄 ${match.teams.home.name} - ${match.teams.away.name}: embedded stats eksik, /fixtures/statistics deneniyor.`
                 );
 
-
-            if (!fixture) {
-
-                continue;
+                enriched = await direktFixtureStatsGetir(fixture);
 
             }
 
 
-            let enriched =
-    enrichFixturesWithStats(
-        [fixture]
-    )[0];
+            if (!temelStatsTam(enriched)) {
 
+                addSystemLog(
+                    `> ⛔ ${match.teams.home.name} - ${match.teams.away.name}: güvenilir canlı istatistik yok, modele gönderilmiyor.`
+                );
 
-// =====================================================
-// EMBEDDED STATS EKSİKSE DEDICATED ENDPOINT'E GİT
-// =====================================================
+                continue;
 
-if (
-    !enriched ||
-    !temelStatsTam(enriched)
-) {
-
-    addSystemLog(
-        `> 🔄 ${match.teams.home.name} - ${match.teams.away.name}: embedded stats eksik, dedicated statistics deneniyor...`
-    );
-
-
-    enriched =
-        await direktFixtureStatsGetir(
-            fixture
-        );
-
-}
-
-
-// =====================================================
-// HALA STATS YOKSA MODELE GÖNDERME
-// =====================================================
-
-if (
-    !enriched ||
-    !temelStatsTam(enriched)
-) {
-
-    addSystemLog(
-        `> ⛔ ${match.teams.home.name} - ${match.teams.away.name}: güvenilir canlı istatistik yok, modelden çıkarıldı.`
-    );
-
-    continue;
-
-}
+            }
 
 
             const liveOdds =
@@ -2331,6 +1181,12 @@ if (
 
                 continue;
 
+            }
+
+
+            // Python'a giden son listede eksik değer kalmasına izin verme.
+            if (!temelStatsTam(enriched)) {
+                continue;
             }
 
 
@@ -2940,6 +1796,17 @@ async function botuCalistir() {
 
             addSystemLog(
                 "> ❌ Python sonuç üretmedi."
+            );
+
+            return;
+
+        }
+
+
+        if (dinoSonuclari.length !== macListesi.length) {
+
+            addSystemLog(
+                `> ❌ Python sonuç hizası bozuk: ${macListesi.length} maç gönderildi, ${dinoSonuclari.length} sonuç döndü. Yanlış maça sonuç bağlanmaması için tarama iptal edildi.`
             );
 
             return;
