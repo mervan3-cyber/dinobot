@@ -3,52 +3,232 @@ import json
 import joblib
 import pandas as pd
 import warnings
+import os
 
-# Gereksiz uyari mesajlarini gizle
-warnings.filterwarnings('ignore') 
+warnings.filterwarnings("ignore")
 
-def ana_fonksiyon():
-    try:
-        dakika = float(sys.argv[1])
-        home_shot = float(sys.argv[2])
-        away_shot = float(sys.argv[3])
-        home_sot = float(sys.argv[4])
-        away_sot = float(sys.argv[5])
-        home_corner = float(sys.argv[6])
-        away_corner = float(sys.argv[7])
-    except (IndexError, ValueError):
-        print(json.dumps({"hata": "Parametre hatası."}))
-        sys.exit()
+# ---------------------------------------------------------
+# MODEL DOSYALARI
+# ---------------------------------------------------------
 
-    sutunlar = ['dakika', 'home_shot', 'away_shot', 'home_sot', 'away_sot', 'home_corner', 'away_corner']
-    canli_mac = pd.DataFrame([[dakika, home_shot, away_shot, home_sot, away_sot, home_corner, away_corner]], columns=sutunlar)
+HEDEFLER = [
+    "ms1",
+    "x",
+    "ms2",
+    "0.5_ust",
+    "1.5_ust",
+    "2.5_ust",
+    "3.5_ust",
+    "4.5_ust"
+]
 
-    # DÜZELTİLDİ: Dosya isimleriyle BİREBİR aynı olması için alt çizgi yerine nokta kullanıldı.
-    hedefler = ['ms1', 'x', 'ms2', '0.5_ust', '1.5_ust', '2.5_ust', '3.5_ust', '4.5_ust']
-    sonuclar = {}
+SUTUNLAR = [
+    "dakika",
+    "home_shot",
+    "away_shot",
+    "home_sot",
+    "away_sot",
+    "home_corner",
+    "away_corner"
+]
 
-    for hedef in hedefler:
-        dosya_adi = f"dino_{hedef}_modeli.pkl"
-        try:
-            model = joblib.load(dosya_adi)
-            yuzde = model.predict_proba(canli_mac)[0][1] * 100
-            
-            # Node.js tarafı '0.5_UST', 'MS1' gibi büyük harfli ve noktalı bekliyor.
-            temiz_isim = hedef.upper() 
-            sonuclar[temiz_isim] = round(yuzde, 1)
-                
-        except FileNotFoundError:
-            # Klasörde o model yoksa (Örn: dino_x_modeli.pkl yoksa) sessizce atlar
+
+# ---------------------------------------------------------
+# MODELLERİ BİR KERE YÜKLE
+# ---------------------------------------------------------
+
+def modelleri_yukle():
+    modeller = {}
+
+    for hedef in HEDEFLER:
+        dosya = f"dino_{hedef}_modeli.pkl"
+
+        if not os.path.exists(dosya):
             continue
 
-    # BEDAVA MARKETLER (ALT) - Üst ihtimallerinden otomatik türetilir
-    if '0.5_UST' in sonuclar: sonuclar['0.5_ALT'] = round(100 - sonuclar['0.5_UST'], 1)
-    if '1.5_UST' in sonuclar: sonuclar['1.5_ALT'] = round(100 - sonuclar['1.5_UST'], 1)
-    if '2.5_UST' in sonuclar: sonuclar['2.5_ALT'] = round(100 - sonuclar['2.5_UST'], 1)
-    if '3.5_UST' in sonuclar: sonuclar['3.5_ALT'] = round(100 - sonuclar['3.5_UST'], 1)
-    if '4.5_UST' in sonuclar: sonuclar['4.5_ALT'] = round(100 - sonuclar['4.5_UST'], 1)
+        try:
+            modeller[hedef] = joblib.load(dosya)
+        except Exception as e:
+            print(
+                json.dumps({
+                    "hata": f"{dosya} yüklenemedi: {str(e)}"
+                }),
+                file=sys.stderr
+            )
 
-    print(json.dumps(sonuclar))
+    return modeller
+
+
+# ---------------------------------------------------------
+# POZİTİF SINIF OLASILIĞI
+# ---------------------------------------------------------
+
+def pozitif_olasilik(model, X):
+    try:
+        probs = model.predict_proba(X)
+
+        # Modelde classes_ varsa gerçek 1 sınıfını bul
+        if hasattr(model, "classes_"):
+            classes = list(model.classes_)
+
+            if 1 in classes:
+                index = classes.index(1)
+                return probs[:, index]
+
+        # Standart binary model
+        if probs.shape[1] >= 2:
+            return probs[:, 1]
+
+        return probs[:, 0]
+
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------
+# ANA FONKSİYON
+# ---------------------------------------------------------
+
+def ana_fonksiyon():
+
+    try:
+        raw = sys.stdin.read()
+
+        if not raw.strip():
+            print(json.dumps({
+                "hata": "Python'a veri gönderilmedi."
+            }))
+            return
+
+        maclar = json.loads(raw)
+
+        if not isinstance(maclar, list):
+            print(json.dumps({
+                "hata": "Beklenen veri listesi."
+            }))
+            return
+
+    except Exception as e:
+        print(json.dumps({
+            "hata": f"JSON okuma hatası: {str(e)}"
+        }))
+        return
+
+
+    # -----------------------------------------------------
+    # MODELLERİ TEK SEFER YÜKLE
+    # -----------------------------------------------------
+
+    modeller = modelleri_yukle()
+
+    if not modeller:
+        print(json.dumps({
+            "hata": "Hiçbir .pkl modeli bulunamadı."
+        }))
+        return
+
+
+    # -----------------------------------------------------
+    # DATAFRAME
+    # -----------------------------------------------------
+
+    try:
+
+        satirlar = []
+
+        for mac in maclar:
+
+            satirlar.append([
+                float(mac.get("dakika", 0)),
+                float(mac.get("home_shot", 0)),
+                float(mac.get("away_shot", 0)),
+                float(mac.get("home_sot", 0)),
+                float(mac.get("away_sot", 0)),
+                float(mac.get("home_corner", 0)),
+                float(mac.get("away_corner", 0))
+            ])
+
+        X = pd.DataFrame(
+            satirlar,
+            columns=SUTUNLAR
+        )
+
+    except Exception as e:
+
+        print(json.dumps({
+            "hata": f"DataFrame oluşturulamadı: {str(e)}"
+        }))
+        return
+
+
+    # -----------------------------------------------------
+    # SONUÇLAR
+    # -----------------------------------------------------
+
+    sonuclar = [
+        {}
+        for _ in maclar
+    ]
+
+
+    # -----------------------------------------------------
+    # HER MODELİ TOPLU TAHMİN ET
+    # -----------------------------------------------------
+
+    for hedef, model in modeller.items():
+
+        try:
+
+            yuzdeler = pozitif_olasilik(model, X)
+
+            if yuzdeler is None:
+                continue
+
+            for i, yuzde in enumerate(yuzdeler):
+
+                if hedef not in sonuclar[i]:
+                    sonuclar[i][hedef.upper()] = round(
+                        float(yuzde) * 100,
+                        1
+                    )
+
+        except Exception:
+            continue
+
+
+    # -----------------------------------------------------
+    # ALT MARKETLERİNİ ÜRET
+    # -----------------------------------------------------
+
+    for sonuc in sonuclar:
+
+        for barem in [
+            "0.5",
+            "1.5",
+            "2.5",
+            "3.5",
+            "4.5"
+        ]:
+
+            ust = f"{barem}_UST"
+
+            if ust in sonuc:
+
+                sonuc[f"{barem}_ALT"] = round(
+                    100 - sonuc[ust],
+                    1
+                )
+
+
+    # -----------------------------------------------------
+    # NODE'A GERİ DÖN
+    # -----------------------------------------------------
+
+    print(json.dumps(
+        sonuclar,
+        ensure_ascii=False
+    ))
+
 
 if __name__ == "__main__":
     ana_fonksiyon()
