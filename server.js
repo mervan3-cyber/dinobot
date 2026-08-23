@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v11-10min-no-duplicate-2026-08-23';
+const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v12-auto-resume-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -3225,6 +3225,34 @@ app.listen(
         addSystemLog(
             "> 🚀 API-FOOTBALL Pro tarama motoru hazır."
         );
+
+
+        // PM2 / Node yeniden başladığında kalıcı hafızada sistem açık görünüyorsa
+        // dakika sayacını da yeniden kur. Aksi halde panel açık görünür fakat
+        // masterClock yalnızca kullanıcı şalteri yeniden açarsa çalışır.
+        if (
+            state.isRunning
+        ) {
+            nextRunTime = 0;
+
+            if (
+                !masterInterval
+            ) {
+                masterInterval =
+                    setInterval(
+                        masterClock,
+                        60000
+                    );
+            }
+
+            setImmediate(
+                masterClock
+            );
+
+            addSystemLog(
+                `> ♻️ Sistem açık durumu geri yüklendi. Otomatik 10 dk tarama ${state.autoScanEnabled ? 'devam ediyor' : 'panelden açılmayı bekliyor'}.`
+            );
+        }
 
     }
 );
