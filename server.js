@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v9-2026-08-23';
+const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v10-no-duplicate-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -157,7 +157,11 @@ let state = {
 
     scheduleEnabled: false,
 
-    schedules: []
+    schedules: [],
+
+    // Telegram'a başarıyla gönderilen maçlar fixture ID ile tutulur.
+    // Böylece sonraki 5/15 dakikalık taramalar aynı maçı tekrar göndermez.
+    sentFixtures: {}
 
 };
 
@@ -600,6 +604,18 @@ function loadData() {
             };
 
 
+            if (
+                !state.sentFixtures ||
+                typeof state.sentFixtures !== 'object' ||
+                Array.isArray(state.sentFixtures)
+            ) {
+                state.sentFixtures = {};
+            }
+
+
+            gonderilenFixtureKayitlariniTemizle(false);
+
+
             addSystemLog(
                 "> 💾 Kalıcı hafıza yüklendi."
             );
@@ -618,6 +634,83 @@ function loadData() {
 
     }
 
+}
+
+
+const SENT_FIXTURE_TTL_MS =
+    36 * 60 * 60 * 1000;
+
+
+function gonderilenFixtureKayitlariniTemizle(kaydet = true) {
+    if (
+        !state.sentFixtures ||
+        typeof state.sentFixtures !== 'object' ||
+        Array.isArray(state.sentFixtures)
+    ) {
+        state.sentFixtures = {};
+        if (kaydet) saveData();
+        return;
+    }
+
+    const simdi = Date.now();
+    let degisti = false;
+
+    for (const [fixtureID, kayit] of Object.entries(state.sentFixtures)) {
+        const sentAt = Number(kayit?.sentAt);
+        if (
+            !Number.isFinite(sentAt) ||
+            simdi - sentAt > SENT_FIXTURE_TTL_MS
+        ) {
+            delete state.sentFixtures[fixtureID];
+            degisti = true;
+        }
+    }
+
+    if (degisti && kaydet) {
+        saveData();
+    }
+}
+
+
+function fixtureGonderimKaydi(mac) {
+    const fixtureID = Number(mac?.fixture_id);
+    if (!Number.isFinite(fixtureID) || fixtureID <= 0) {
+        return null;
+    }
+
+    gonderilenFixtureKayitlariniTemizle(false);
+    return state.sentFixtures?.[String(fixtureID)] || null;
+}
+
+
+function fixtureGonderildiKaydet(mac, firsat) {
+    const fixtureID = Number(mac?.fixture_id);
+    if (!Number.isFinite(fixtureID) || fixtureID <= 0) {
+        addSystemLog(
+            `> ⚠️ ${mac?.mac_isim || 'Bilinmeyen maç'}: fixture ID olmadığı için tekrar kilidi kaydedilemedi.`
+        );
+        return;
+    }
+
+    if (
+        !state.sentFixtures ||
+        typeof state.sentFixtures !== 'object' ||
+        Array.isArray(state.sentFixtures)
+    ) {
+        state.sentFixtures = {};
+    }
+
+    state.sentFixtures[String(fixtureID)] = {
+        sentAt: Date.now(),
+        match: mac?.mac_isim || null,
+        market: firsat?.market || null,
+        odds: firsat?.oran ?? null,
+        minute: mac?.dakika ?? null,
+        score: mac?.skor || null
+    };
+
+    gonderilenFixtureKayitlariniTemizle(false);
+    saveData();
 }
 
 
@@ -2319,6 +2412,14 @@ async function telegramSinyaliGonder(
         );
 
 
+        // Yalnızca Telegram gönderimi gerçekten başarılı olduktan sonra kilitle.
+        // Başarısız gönderimler sonraki taramada yeniden denenebilir.
+        fixtureGonderildiKaydet(
+            mac,
+            firsat
+        );
+
+
         return true;
 
     } catch (error) {
@@ -2420,6 +2521,20 @@ async function botuCalistir() {
             if (dino.MODEL_VARYANTI === 'score_only') {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: Python beklenmedik şekilde score_only döndürdü; sinyal engellendi.`
+                );
+                continue;
+            }
+
+            const oncekiGonderim = fixtureGonderimKaydi(mac);
+            if (oncekiGonderim) {
+                const oncekiSaat = new Date(
+                    Number(oncekiGonderim.sentAt)
+                ).toLocaleString(
+                    'tr-TR',
+                    { timeZone: 'Europe/Istanbul' }
+                );
+                addSystemLog(
+                    `> 🔁 ${mac.mac_isim} [fixture:${mac.fixture_id}]: daha önce ${oncekiGonderim.market || 'sinyal'} olarak gönderildi (${oncekiSaat}); tekrar engellendi.`
                 );
                 continue;
             }
