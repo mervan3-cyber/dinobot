@@ -11,6 +11,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { SignalTracker } = require('./signal_tracker');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -20,7 +21,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v12-auto-resume-2026-08-23';
+const BUILD_VERSION = 'ml-dual-signal-tracker-ubuntu-v13-2026-08-24';
 
 app.use(cors());
 app.use(express.json());
@@ -147,6 +148,32 @@ const DATA_FILE =
         'dino_data.json'
     );
 
+const SIGNAL_HISTORY_FILE =
+    path.join(
+        __dirname,
+        'dino_signal_history.json'
+    );
+
+const SIGNAL_RULES = Object.freeze({
+    surprise: Object.freeze({
+        minProbability: 55,
+        maxProbabilityExclusive: 75,
+        minMinuteExclusive: 40,
+        maxMinute: 80
+    }),
+    strong: Object.freeze({
+        minProbability: 75,
+        minMinute: 25,
+        maxMinute: 80
+    })
+});
+
+const SIGNAL_RESULT_REFRESH_MS =
+    10 * 60 * 1000;
+
+const SIGNAL_RESULT_BATCH_SIZE =
+    20;
+
 
 let state = {
 
@@ -163,8 +190,8 @@ let state = {
 
     schedules: [],
 
-    // Telegram'a başarıyla gönderilen maçlar fixture ID ile tutulur.
-    // Böylece sonraki taramalar aynı maçı tekrar göndermez.
+    // Telegram'a başarıyla gönderilen türler fixture ID altında ayrı tutulur.
+    // Her maç bir sürpriz ve bir güçlü sinyal hakkına sahiptir.
     sentFixtures: {}
 
 };
@@ -177,6 +204,15 @@ let nextRunTime = 0;
 let masterInterval = null;
 
 let systemLogs = [];
+
+let isSignalResultRefreshing = false;
+
+let signalResultInterval = null;
+
+const signalTracker = new SignalTracker({
+    filePath: SIGNAL_HISTORY_FILE,
+    logger: message => addSystemLog(message)
+});
 
 
 // =========================================================
@@ -645,6 +681,24 @@ const SENT_FIXTURE_TTL_MS =
     36 * 60 * 60 * 1000;
 
 
+function fixtureKaydiSonGonderimZamani(kayit) {
+    if (!kayit || typeof kayit !== 'object') return null;
+
+    const zamanlar = [
+        kayit.sentAt,
+        kayit.legacy?.sentAt,
+        kayit.surprise?.sentAt,
+        kayit.strong?.sentAt
+    ]
+        .map(Number)
+        .filter(Number.isFinite);
+
+    return zamanlar.length > 0
+        ? Math.max(...zamanlar)
+        : null;
+}
+
+
 function gonderilenFixtureKayitlariniTemizle(kaydet = true) {
     if (
         !state.sentFixtures ||
@@ -660,7 +714,7 @@ function gonderilenFixtureKayitlariniTemizle(kaydet = true) {
     let degisti = false;
 
     for (const [fixtureID, kayit] of Object.entries(state.sentFixtures)) {
-        const sentAt = Number(kayit?.sentAt);
+        const sentAt = fixtureKaydiSonGonderimZamani(kayit);
         if (
             !Number.isFinite(sentAt) ||
             simdi - sentAt > SENT_FIXTURE_TTL_MS
@@ -676,14 +730,36 @@ function gonderilenFixtureKayitlariniTemizle(kaydet = true) {
 }
 
 
-function fixtureGonderimKaydi(mac) {
+function sinyalTuruAnahtari(value) {
+    return value === 'strong'
+        ? 'strong'
+        : 'surprise';
+}
+
+
+function fixtureGonderimKaydi(mac, sinyalTuru) {
     const fixtureID = Number(mac?.fixture_id);
     if (!Number.isFinite(fixtureID) || fixtureID <= 0) {
         return null;
     }
 
     gonderilenFixtureKayitlariniTemizle(false);
-    return state.sentFixtures?.[String(fixtureID)] || null;
+    const tur = sinyalTuruAnahtari(sinyalTuru);
+    const kayit = state.sentFixtures?.[String(fixtureID)] || null;
+
+    if (kayit?.[tur]) return kayit[tur];
+
+    // dino_data.json silinse bile paylaşılan sinyal geçmişi ikinci bir
+    // güvenlik katmanı olarak aynı türün yeniden gönderilmesini önler.
+    if (signalTracker.hasSignal(fixtureID, tur)) {
+        return {
+            sentAt: null,
+            market: null,
+            fromHistory: true
+        };
+    }
+
+    return null;
 }
 
 
@@ -704,7 +780,21 @@ function fixtureGonderildiKaydet(mac, firsat) {
         state.sentFixtures = {};
     }
 
-    state.sentFixtures[String(fixtureID)] = {
+    const fixtureKey = String(fixtureID);
+    const oncekiKayit = state.sentFixtures[fixtureKey];
+    const tur = sinyalTuruAnahtari(firsat?.sinyal_turu);
+
+    // Eski sürümün tek kayıtlı yapısını sakla fakat yeni sürümde sürpriz ve
+    // güçlü haklarını birbirinden bağımsız yönet.
+    const temelKayit = oncekiKayit && typeof oncekiKayit === 'object'
+        ? (
+            oncekiKayit.sentAt && !oncekiKayit.surprise && !oncekiKayit.strong
+                ? { legacy: { ...oncekiKayit } }
+                : { ...oncekiKayit }
+        )
+        : {};
+
+    temelKayit[tur] = {
         sentAt: Date.now(),
         match: mac?.mac_isim || null,
         market: firsat?.market || null,
@@ -712,6 +802,8 @@ function fixtureGonderildiKaydet(mac, firsat) {
         minute: mac?.dakika ?? null,
         score: mac?.skor || null
     };
+
+    state.sentFixtures[fixtureKey] = temelKayit;
 
     gonderilenFixtureKayitlariniTemizle(false);
     saveData();
@@ -1929,86 +2021,70 @@ function scoreOnlyGuvenlikNedeni(
     return null;
 }
 
-function valueAnaliziYap(
-    mac,
-    dino
-) {
+function sinyalTuruBelirle(mac, dinoYuzde) {
+    const dakika = Number(mac?.dakika);
+    if (!Number.isFinite(dakika)) return null;
 
-    let enIyiFirsat =
-        null;
-
-
-    let enYuksekEdge =
-        Number(
-            state.globalMinEdge
-        );
-
-
-    const markets =
-        Object.entries(
-            mac.canli_oranlar
-        );
-
-
-    for (
-        const [
-            market,
-            oddsData
-        ]
-        of markets
+    if (
+        dinoYuzde >= SIGNAL_RULES.strong.minProbability &&
+        dakika >= SIGNAL_RULES.strong.minMinute &&
+        dakika <= SIGNAL_RULES.strong.maxMinute
     ) {
+        return 'strong';
+    }
 
-        const piyasaOrani =
-            typeof oddsData === 'object'
-                ? Number(
-                    oddsData.oran
-                )
-                : Number(
-                    oddsData
-                );
+    if (
+        dinoYuzde >= SIGNAL_RULES.surprise.minProbability &&
+        dinoYuzde < SIGNAL_RULES.surprise.maxProbabilityExclusive &&
+        dakika > SIGNAL_RULES.surprise.minMinuteExclusive &&
+        dakika <= SIGNAL_RULES.surprise.maxMinute
+    ) {
+        return 'surprise';
+    }
 
-
-        if (
-            !Number.isFinite(
-                piyasaOrani
-            ) ||
-            piyasaOrani <= 1
-        ) {
-
-            continue;
-
-        }
+    return null;
+}
 
 
-        const dinoYuzde =
-            Number(
-                dino[market]
-            );
+function firsatAdayiDahaIyiMi(yeniAday, mevcutAday) {
+    if (!mevcutAday) return true;
+
+    const yeniOlasilik = Number(yeniAday?.dino_yuzde);
+    const mevcutOlasilik = Number(mevcutAday?.dino_yuzde);
+    if (yeniOlasilik !== mevcutOlasilik) {
+        return yeniOlasilik > mevcutOlasilik;
+    }
+
+    return Number(yeniAday?.edge) > Number(mevcutAday?.edge);
+}
 
 
-        if (
-            !Number.isFinite(
-                dinoYuzde
-            )
-        ) {
+function valueAnalizleriYap(mac, dino) {
+    const secilenler = {
+        surprise: null,
+        strong: null
+    };
+    const minimumEdge = Number(state.globalMinEdge);
+    const markets = Object.entries(mac.canli_oranlar || {});
 
-            continue;
+    for (const [market, oddsData] of markets) {
+        const piyasaOrani = typeof oddsData === 'object'
+            ? Number(oddsData.oran)
+            : Number(oddsData);
 
-        }
+        if (!Number.isFinite(piyasaOrani) || piyasaOrani <= 1) continue;
 
+        const dinoYuzde = Number(dino[market]);
+        if (!Number.isFinite(dinoYuzde)) continue;
 
-        const piyasaYuzde =
-            (
-                1 /
-                piyasaOrani
-            ) *
-            100;
-
-
-        const edge =
-            dinoYuzde -
-            piyasaYuzde;
-
+        const piyasaYuzde = (1 / piyasaOrani) * 100;
+        const edge = dinoYuzde - piyasaYuzde;
+        const sinyalTuru = sinyalTuruBelirle(mac, dinoYuzde);
+        const turEtiketi = sinyalTuru === 'strong'
+            ? 'GÜÇLÜ'
+            : sinyalTuru === 'surprise'
+                ? 'SÜRPRİZ'
+                : 'SINIF DIŞI';
 
         const scoreOnlyRedNedeni = scoreOnlyGuvenlikNedeni(
             mac,
@@ -2019,14 +2095,12 @@ function valueAnaliziYap(
             edge
         );
 
-
         addSystemLog(
-            `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)}`
+            `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
         );
 
-
         if (scoreOnlyRedNedeni) {
-            if (edge >= Number(state.globalMinEdge)) {
+            if (edge >= minimumEdge) {
                 addSystemLog(
                     `> 🛡️ ${mac.mac_isim} | ${market}: fallback güvenlik filtresi reddetti (${scoreOnlyRedNedeni}).`
                 );
@@ -2034,47 +2108,31 @@ function valueAnaliziYap(
             continue;
         }
 
+        if (!sinyalTuru || edge < minimumEdge) continue;
 
-        if (
-            edge >=
-            enYuksekEdge
-        ) {
+        const aday = {
+            market,
+            sinyal_turu: sinyalTuru,
+            edge: edge.toFixed(1),
+            dino_yuzde: dinoYuzde,
+            oran: piyasaOrani,
+            piyasa_yuzde: piyasaYuzde.toFixed(1),
+            bookmaker: typeof oddsData === 'object'
+                ? oddsData.bookmaker
+                : 'Bilinmiyor',
+            model_varyanti: dino?.MODEL_VARYANTI || 'live_only'
+        };
 
-            enYuksekEdge =
-                edge;
-
-
-            enIyiFirsat = {
-
-                market:
-                    market,
-
-                edge:
-                    edge.toFixed(1),
-
-                dino_yuzde:
-                    dinoYuzde,
-
-                oran:
-                    piyasaOrani,
-
-                piyasa_yuzde:
-                    piyasaYuzde.toFixed(1),
-
-                bookmaker:
-                    typeof oddsData === 'object'
-                        ? oddsData.bookmaker
-                        : 'Bilinmiyor'
-
-            };
-
+        // Bir sınıfta birden fazla market uygunsa doğruluk önceliğiyle Dino
+        // ihtimali en yüksek olanı, eşitlikte EDGE'i yüksek olanı seç.
+        if (firsatAdayiDahaIyiMi(aday, secilenler[sinyalTuru])) {
+            secilenler[sinyalTuru] = aday;
         }
-
     }
 
-
-    return enIyiFirsat;
-
+    // Aynı maçta iki tür de aynı taramada çıkabilir. Güçlü sinyali önce
+    // gönder, ardından risk almak isteyenler için sürpriz sinyali gönder.
+    return [secilenler.strong, secilenler.surprise].filter(Boolean);
 }
 
 
@@ -2293,6 +2351,72 @@ function telegramEkStatsSatirlari(mac) {
 }
 
 
+function paylasilanCanliStatsAnlikGoruntusu(mac) {
+    return {
+        home: {
+            shots: mac?.home_shot ?? null,
+            shotsOnGoal: mac?.home_sot ?? null,
+            corners: mac?.home_corner ?? null,
+            possession: mac?.home_possession ?? null,
+            yellowCards: mac?.home_yellow ?? null,
+            redCards: mac?.home_red ?? null,
+            fouls: mac?.home_fouls ?? null,
+            offsides: mac?.home_offsides ?? null,
+            saves: mac?.home_saves ?? null,
+            xg: mac?.home_xg ?? null
+        },
+        away: {
+            shots: mac?.away_shot ?? null,
+            shotsOnGoal: mac?.away_sot ?? null,
+            corners: mac?.away_corner ?? null,
+            possession: mac?.away_possession ?? null,
+            yellowCards: mac?.away_yellow ?? null,
+            redCards: mac?.away_red ?? null,
+            fouls: mac?.away_fouls ?? null,
+            offsides: mac?.away_offsides ?? null,
+            saves: mac?.away_saves ?? null,
+            xg: mac?.away_xg ?? null
+        }
+    };
+}
+
+
+function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
+    try {
+        const kayit = signalTracker.recordSent({
+            fixtureId: mac?.fixture_id,
+            signalType: firsat?.sinyal_turu,
+            sentAt: new Date().toISOString(),
+            telegramMessageId: telegramMesaji?.message_id ?? null,
+            match: mac?.mac_isim,
+            league: mac?.lig,
+            minute: mac?.dakika,
+            score: mac?.skor,
+            market: firsat?.market,
+            dinoProbability: firsat?.dino_yuzde,
+            edge: firsat?.edge,
+            odds: firsat?.oran,
+            bookmaker: firsat?.bookmaker,
+            marketProbability: firsat?.piyasa_yuzde,
+            modelVariant: firsat?.model_varyanti,
+            statsSource: mac?.stats_source,
+            liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
+            analysis: yorum
+        });
+
+        addSystemLog(
+            `> 🗃️ Paylaşılan sinyal kaydedildi: ${kayit.match} | ${kayit.signalType === 'strong' ? 'GÜÇLÜ' : 'SÜRPRİZ'} | ${kayit.market}`
+        );
+    } catch (error) {
+        // Telegram gönderilmiş olsa bile takip dosyası hatası aynı mesajın
+        // yeniden atılmasına sebep olmamalı; gönderim kilidi ayrı tutulur.
+        addSystemLog(
+            `> ⚠️ Paylaşılan sinyal takip dosyasına yazılamadı: ${error.message}`
+        );
+    }
+}
+
+
 async function sinyalOncesiCanlilikDogrula(mac) {
     try {
         const response = await apiGet(
@@ -2377,14 +2501,24 @@ async function telegramSinyaliGonder(
 
     const ekCanliStats = telegramEkStatsSatirlari(mac);
 
+    const gucluSinyal = firsat?.sinyal_turu === 'strong';
+    const sinyalBasligi = gucluSinyal
+        ? '🟢 DİNO GÜÇLÜ SİNYAL'
+        : '🟡 DİNO SÜRPRİZ SİNYAL';
+    const sinyalAciklamasi = gucluSinyal
+        ? 'Doğruluk öncelikli güçlü sinyal'
+        : 'Risk almak isteyenler için sürpriz sinyal';
+
 
     const mesaj =
 
-`🔥 <b>DİNO VALUE ALARM</b> 🔥
+`<b>${sinyalBasligi}</b>
 --------------------------------------
 ⚽️ <b>Maç:</b> ${telegramHtml(mac.mac_isim)}
 🏆 <b>Lig:</b> ${telegramHtml(mac.lig)}
 ⏱ <b>Dakika:</b> ${telegramHtml(mac.dakika)} | <b>Skor:</b> ${telegramHtml(mac.skor)}
+
+🏷️ <b>Sinyal Sınıfı:</b> ${telegramHtml(sinyalAciklamasi)}
 
 🎯 <b>Value Market:</b> ${telegramHtml(firsat.market)}
 📈 <b>EDGE:</b> +${telegramHtml(firsat.edge)}%
@@ -2406,7 +2540,7 @@ async function telegramSinyaliGonder(
 
     try {
 
-        await bot.sendMessage(
+        const telegramMesaji = await bot.sendMessage(
             kanalID,
             mesaj,
             {
@@ -2421,6 +2555,15 @@ async function telegramSinyaliGonder(
         fixtureGonderildiKaydet(
             mac,
             firsat
+        );
+
+        // İstatistik dosyasına yalnızca Telegram API'si başarı döndürdükten
+        // sonra yaz. Böylece taranan fakat paylaşılmayan maçlar asla girmez.
+        paylasilanSinyaliKaydet(
+            mac,
+            firsat,
+            yorum,
+            telegramMesaji
         );
 
 
@@ -2514,10 +2657,10 @@ async function botuCalistir() {
                 `> 🩺 ML (${mac.mac_isim}) | Varyant: ${dino.MODEL_VARYANTI || 'live_only'} | ${JSON.stringify(dino)}`
             );
 
-            const firsat = valueAnaliziYap(mac, dino);
-            if (!firsat) {
+            const firsatlar = valueAnalizleriYap(mac, dino);
+            if (!Array.isArray(firsatlar) || firsatlar.length === 0) {
                 addSystemLog(
-                    `> ❌ ${mac.mac_isim} pas geçildi (EDGE veya güvenlik filtresini geçemedi).`
+                    `> ❌ ${mac.mac_isim} pas geçildi (olasılık sınıfı, EDGE veya güvenlik filtresini geçemedi).`
                 );
                 continue;
             }
@@ -2529,40 +2672,71 @@ async function botuCalistir() {
                 continue;
             }
 
-            const oncekiGonderim = fixtureGonderimKaydi(mac);
-            if (oncekiGonderim) {
-                const oncekiSaat = new Date(
-                    Number(oncekiGonderim.sentAt)
-                ).toLocaleString(
-                    'tr-TR',
-                    { timeZone: 'Europe/Istanbul' }
+            const gonderilecekFirsatlar = [];
+
+            for (const firsat of firsatlar) {
+                const oncekiGonderim = fixtureGonderimKaydi(
+                    mac,
+                    firsat.sinyal_turu
                 );
-                addSystemLog(
-                    `> 🔁 ${mac.mac_isim} [fixture:${mac.fixture_id}]: daha önce ${oncekiGonderim.market || 'sinyal'} olarak gönderildi (${oncekiSaat}); tekrar engellendi.`
-                );
-                continue;
+
+                if (oncekiGonderim) {
+                    const sentAt = Number(oncekiGonderim.sentAt);
+                    const oncekiSaat = Number.isFinite(sentAt)
+                        ? new Date(sentAt).toLocaleString(
+                            'tr-TR',
+                            { timeZone: 'Europe/Istanbul' }
+                        )
+                        : 'geçmiş kayıt';
+                    const turEtiketi = firsat.sinyal_turu === 'strong'
+                        ? 'GÜÇLÜ'
+                        : 'SÜRPRİZ';
+                    addSystemLog(
+                        `> 🔁 ${mac.mac_isim} [fixture:${mac.fixture_id}]: ${turEtiketi} hakkı daha önce kullanıldı (${oncekiSaat}); aynı tür tekrar engellendi.`
+                    );
+                    continue;
+                }
+
+                gonderilecekFirsatlar.push(firsat);
             }
 
-            addSystemLog(
-                `> 🚨 ML VALUE: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}%`
+            if (gonderilecekFirsatlar.length === 0) continue;
+
+            for (const firsat of gonderilecekFirsatlar) {
+                const turEtiketi = firsat.sinyal_turu === 'strong'
+                    ? 'GÜÇLÜ'
+                    : 'SÜRPRİZ';
+                addSystemLog(
+                    `> 🚨 ML VALUE: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}% | ${turEtiketi}`
+                );
+            }
+
+            // Aynı maçta güçlü ve sürpriz market aynı taramada çıkabilir.
+            // Gemini açıklamaları paralel hazırlanır; market seçimine karışmaz.
+            const yorumlar = await Promise.all(
+                gonderilecekFirsatlar.map(
+                    firsat => geminiYorumuYaz(mac, firsat)
+                )
             );
 
-            // Gemini yalnızca ML sonucunu açıklar; market/oran seçmez.
-            const yorum = await geminiYorumuYaz(mac, firsat);
+            // İki sinyal de aynı veri anına ait olduğundan canlılık/skor bir kez
+            // doğrulanır ve ardından bekleme süresi olmadan arka arkaya gönderilir.
+            if (!await sinyalOncesiCanlilikDogrula(mac)) continue;
 
-            // Telegram'dan hemen önce fixture'ı API'den yeniden doğrula.
-            // Skor değiştiyse model sonucu artık eski olduğu için bu tur gönderme.
-            if (!await sinyalOncesiCanlilikDogrula(mac)) {
-                continue;
-            }
+            for (let firsatIndex = 0; firsatIndex < gonderilecekFirsatlar.length; firsatIndex++) {
+                const firsat = gonderilecekFirsatlar[firsatIndex];
+                const yorum = yorumlar[firsatIndex];
+                const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
 
-            const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
-
-            if (gonderildi) {
-                onaylanan++;
-                addSystemLog(
-                    `> ✅ ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
-                );
+                if (gonderildi) {
+                    onaylanan++;
+                    const turEtiketi = firsat.sinyal_turu === 'strong'
+                        ? 'GÜÇLÜ'
+                        : 'SÜRPRİZ';
+                    addSystemLog(
+                        `> ✅ ${turEtiketi} ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
+                    );
+                }
             }
         }
 
@@ -2730,6 +2904,186 @@ function masterClock() {
     }
 
 }
+
+
+// =========================================================
+// PAYLAŞILAN SİNYAL SONUÇ TAKİBİ
+// =========================================================
+
+async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
+    if (isSignalResultRefreshing) {
+        return {
+            success: false,
+            busy: true,
+            message: 'Sonuç kontrolü zaten çalışıyor.'
+        };
+    }
+
+    const fixtureIDs = signalTracker.unresolvedFixtureIds();
+    if (fixtureIDs.length === 0) {
+        return {
+            success: true,
+            checkedFixtures: 0,
+            resolvedSignals: 0,
+            message: 'Bekleyen paylaşılan sinyal yok.'
+        };
+    }
+
+    isSignalResultRefreshing = true;
+    let checkedFixtures = 0;
+    let resolvedSignals = 0;
+
+    try {
+        for (
+            let index = 0;
+            index < fixtureIDs.length;
+            index += SIGNAL_RESULT_BATCH_SIZE
+        ) {
+            const batch = fixtureIDs.slice(
+                index,
+                index + SIGNAL_RESULT_BATCH_SIZE
+            );
+            const response = await apiGet(
+                `/fixtures?ids=${batch.join('-')}`
+            );
+            const fixtures = Array.isArray(response.data?.response)
+                ? response.data.response
+                : [];
+
+            checkedFixtures += batch.length;
+            for (const fixture of fixtures) {
+                resolvedSignals += signalTracker.settleFixture(fixture);
+            }
+        }
+
+        if (resolvedSignals > 0 || manuel) {
+            addSystemLog(
+                `> 🧾 Paylaşılan sinyal sonuç kontrolü: ${checkedFixtures} maç incelendi, ${resolvedSignals} sinyal sonuçlandı.`
+            );
+        }
+
+        return {
+            success: true,
+            checkedFixtures,
+            resolvedSignals,
+            message: resolvedSignals > 0
+                ? `${resolvedSignals} sinyalin sonucu güncellendi.`
+                : 'Henüz sonuçlanan yeni sinyal yok.'
+        };
+    } catch (error) {
+        addSystemLog(
+            `> ⚠️ Paylaşılan sinyal sonuçları güncellenemedi: ${error.message}`
+        );
+        return {
+            success: false,
+            checkedFixtures,
+            resolvedSignals,
+            message: error.message
+        };
+    } finally {
+        isSignalResultRefreshing = false;
+    }
+}
+
+
+function csvHucre(value) {
+    if (value === null || value === undefined) return '';
+    const text = typeof value === 'object'
+        ? JSON.stringify(value)
+        : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+}
+
+
+function paylasilanSinyallerCsvOlustur(signals) {
+    const headers = [
+        'signal_id', 'fixture_id', 'signal_type', 'sent_at', 'match', 'league',
+        'minute', 'score', 'market', 'dino_probability', 'edge', 'odds',
+        'bookmaker', 'market_probability', 'model_variant', 'stats_source',
+        'home_shots', 'home_shots_on_goal', 'home_corners', 'home_possession',
+        'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
+        'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
+        'away_yellow', 'away_red', 'away_fouls', 'away_offsides', 'away_saves', 'away_xg',
+        'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
+    ];
+
+    const rows = signals.map(signal => {
+        const home = signal?.liveStats?.home || {};
+        const away = signal?.liveStats?.away || {};
+        const settlement = signal?.settlement || {};
+        return [
+            signal.signalId, signal.fixtureId, signal.signalType, signal.sentAt,
+            signal.match, signal.league, signal.minute, signal.score, signal.market,
+            signal.dinoProbability, signal.edge, signal.odds, signal.bookmaker,
+            signal.marketProbability, signal.modelVariant, signal.statsSource,
+            home.shots, home.shotsOnGoal, home.corners, home.possession,
+            home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
+            away.shots, away.shotsOnGoal, away.corners, away.possession,
+            away.yellowCards, away.redCards, away.fouls, away.offsides, away.saves, away.xg,
+            settlement.result, settlement.profit, settlement.finalScore,
+            settlement.fixtureStatus, settlement.resolvedAt
+        ].map(csvHucre).join(',');
+    });
+
+    return [headers.map(csvHucre).join(','), ...rows].join('\n');
+}
+
+
+app.get(
+    '/api/signal-history',
+    (req, res) => {
+        res.json({
+            summary: signalTracker.summary(),
+            signals: signalTracker.list(req.query.limit)
+        });
+    }
+);
+
+
+app.post(
+    '/api/signal-history/refresh',
+    async (req, res) => {
+        const result = await paylasilanSinyalSonuclariniGuncelle({ manuel: true });
+        res.json({
+            ...result,
+            summary: signalTracker.summary()
+        });
+    }
+);
+
+
+app.get(
+    '/api/signal-history/export',
+    (req, res) => {
+        const gun = new Date().toISOString().slice(0, 10);
+        const payload = signalTracker.exportPayload({
+            buildVersion: BUILD_VERSION,
+            rules: SIGNAL_RULES,
+            note: 'Bu dosya yalnızca Telegram API\'sine başarıyla gönderilen sinyalleri içerir.'
+        });
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-paylasilan-sinyaller-${gun}.json"`
+        );
+        res.send(JSON.stringify(payload, null, 2));
+    }
+);
+
+
+app.get(
+    '/api/signal-history/export.csv',
+    (req, res) => {
+        const gun = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-paylasilan-sinyaller-${gun}.csv"`
+        );
+        res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(signalTracker.list(100000))}`);
+    }
+);
 
 
 // =========================================================
@@ -3159,6 +3513,14 @@ app.get(
                 scoreOnlySignals: false
             },
 
+            signalRules:
+                SIGNAL_RULES,
+
+            signalTracking: {
+                isRefreshing: isSignalResultRefreshing,
+                summary: signalTracker.summary()
+            },
+
             nextRunTime:
                 nextRunTime,
 
@@ -3176,6 +3538,8 @@ app.get(
 // =========================================================
 
 loadData();
+
+signalTracker.load();
 
 
 const PORT =
@@ -3216,6 +3580,14 @@ app.listen(
             "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
+        addSystemLog(
+            "> 🟡 Sürpriz: Dino %55–74.9 ve 41–80. dakika | 🟢 Güçlü: Dino %75+ ve 25–80. dakika."
+        );
+
+        addSystemLog(
+            "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
+        );
+
 
         addSystemLog(
             `> 🐍 Python: ${pythonBinary}`
@@ -3224,6 +3596,24 @@ app.listen(
 
         addSystemLog(
             "> 🚀 API-FOOTBALL Pro tarama motoru hazır."
+        );
+
+        if (!signalResultInterval) {
+            signalResultInterval = setInterval(
+                () => {
+                    paylasilanSinyalSonuclariniGuncelle()
+                        .catch(error => addSystemLog(`> ⚠️ Sonuç takip zamanlayıcısı: ${error.message}`));
+                },
+                SIGNAL_RESULT_REFRESH_MS
+            );
+        }
+
+        setTimeout(
+            () => {
+                paylasilanSinyalSonuclariniGuncelle()
+                    .catch(error => addSystemLog(`> ⚠️ İlk sonuç kontrolü: ${error.message}`));
+            },
+            15000
         );
 
 
