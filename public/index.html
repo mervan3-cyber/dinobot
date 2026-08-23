@@ -92,6 +92,54 @@
             accent-color: var(--primary);
         }
 
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 30px;
+            flex: 0 0 auto;
+        }
+
+        .switch input {
+            width: 0;
+            height: 0;
+            opacity: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            background: #555d65;
+            transition: 0.2s;
+        }
+
+        .switch-slider::before {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            left: 4px;
+            top: 4px;
+            border-radius: 50%;
+            background: #fff;
+            transition: 0.2s;
+        }
+
+        .switch input:checked + .switch-slider {
+            background: var(--success);
+        }
+
+        .switch input:checked + .switch-slider::before {
+            transform: translateX(24px);
+        }
+
+        .switch input:disabled + .switch-slider {
+            cursor: wait;
+            opacity: 0.55;
+        }
+
         button,
         .button-link {
             width: 100%;
@@ -427,6 +475,20 @@
             <button id="toggle-btn" type="button" style="width:auto; padding:10px 20px;" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
         </div>
 
+        <div class="card flex-between" style="background:#17221a; border-color:#356e3a;">
+            <div>
+                <div class="flex-between" style="justify-content:flex-start; margin-bottom:5px;">
+                    <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
+                    <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+                </div>
+                <p class="muted" id="auto-scan-description">Gün boyu yalnızca 25–80. dakikadaki canlı maçları tarar.</p>
+            </div>
+            <label class="switch" title="Otomatik taramayı aç/kapat">
+                <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
+                <span class="switch-slider"></span>
+            </label>
+        </div>
+
         <div class="card flex-between status-action" style="background:#191c1f; border-color:var(--primary);">
             <div>
                 <h3 style="margin-bottom: 5px; color: var(--primary);">⚡ Hızlı Tarama</h3>
@@ -532,8 +594,9 @@
 
         <div class="card">
             <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
+            <p class="muted" style="margin-bottom:12px;">Kapalı bırakırsan otomatik sistem gün boyu 10 dakikada bir çalışır. Açarsan yalnızca aşağıdaki saat aralıklarında çalışır.</p>
             <div class="flex-between" style="margin-bottom:15px;">
-                <label class="muted" for="schedule-enabled">Zamanlayıcıyı aktifleştir</label>
+                <label class="muted" for="schedule-enabled">Özel saat programını aktifleştir</label>
                 <input type="checkbox" id="schedule-enabled">
             </div>
             <div id="schedule-list" style="margin-bottom:15px;"></div>
@@ -551,7 +614,7 @@
                 </div>
                 <label class="muted" for="new-mode">Çalışma modu</label>
                 <select id="new-mode">
-                    <option value="loop">15 Dakikada Bir Tara</option>
+                    <option value="loop">10 Dakikada Bir Tara</option>
                     <option value="5 Dakikada Bir Tara">5 Dakikada Bir Tara</option>
                     <option value="single">Saati Gelince Tek Sefer Tara</option>
                 </select>
@@ -583,6 +646,7 @@
 
         let isBotRunning = false;
         let isScanning = false;
+        let autoScanEnabled = true;
         let schedules = [];
         let autoScroll = true;
         let coverageMatches = [];
@@ -681,19 +745,36 @@
             scanButton.textContent = isScanning ? "TARANIYOR…" : "ŞİMDİ TARA";
         }
 
+        function renderAutoScanState() {
+            const checkbox = document.getElementById("auto-scan-enabled");
+            const badge = document.getElementById("auto-scan-badge");
+            const description = document.getElementById("auto-scan-description");
+
+            checkbox.checked = autoScanEnabled;
+            badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
+            badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
+            description.textContent = autoScanEnabled
+                ? "Gün boyu yalnızca 25–80. dakikadaki canlı maçları 10 dakikada bir tarar."
+                : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
+        }
+
         async function checkStatus() {
             try {
                 const data = await apiFetch("/api/status");
                 setConnection(true);
                 isBotRunning = Boolean(data.isRunning);
                 isScanning = Boolean(data.isScanning);
+                autoScanEnabled = data.autoScanEnabled !== false;
                 renderBotState();
+                renderAutoScanState();
 
                 document.getElementById("build-version").textContent = data.buildVersion || "-";
                 document.getElementById("quota-remaining").textContent = data.quotaRemaining ?? "-";
-                document.getElementById("next-run").textContent = data.nextRunTime
-                    ? formatDateTime(data.nextRunTime)
-                    : "Bekliyor";
+                document.getElementById("next-run").textContent = !autoScanEnabled
+                    ? "Otomatik kapalı"
+                    : data.nextRunTime
+                        ? formatDateTime(data.nextRunTime)
+                        : "Bekliyor";
 
                 if (data.minEdge !== undefined && data.minEdge !== null) {
                     document.getElementById("min-edge").value = data.minEdge;
@@ -713,6 +794,8 @@
                 if (data.globalMinEdge !== undefined && data.globalMinEdge !== null) {
                     document.getElementById("min-edge").value = data.globalMinEdge;
                 }
+                autoScanEnabled = data.autoScanEnabled !== false;
+                renderAutoScanState();
                 document.getElementById("schedule-enabled").checked = Boolean(data.scheduleEnabled);
                 schedules = Array.isArray(data.schedules) ? data.schedules : [];
                 renderSchedules();
@@ -898,6 +981,31 @@
             }
         }
 
+        async function saveAutoScan(enabled) {
+            const checkbox = document.getElementById("auto-scan-enabled");
+            checkbox.disabled = true;
+            try {
+                const result = await apiFetch("/api/settings", {
+                    method: "POST",
+                    body: JSON.stringify({ autoScanEnabled: Boolean(enabled) })
+                });
+                if (result.success === false) throw new Error("Otomatik tarama ayarı kaydedilemedi.");
+
+                autoScanEnabled = Boolean(enabled);
+                renderAutoScanState();
+                showToast(autoScanEnabled
+                    ? "10 dakikalık otomatik tarama açıldı."
+                    : "Otomatik tarama kapatıldı; manuel tarama kullanılabilir.");
+                await Promise.allSettled([checkStatus(), fetchLogs()]);
+            } catch (error) {
+                autoScanEnabled = !Boolean(enabled);
+                renderAutoScanState();
+                showToast(error.message, true);
+            } finally {
+                checkbox.disabled = false;
+            }
+        }
+
         function renderSchedules() {
             const list = document.getElementById("schedule-list");
             list.replaceChildren();
@@ -922,7 +1030,7 @@
                 const mode = document.createElement("div");
                 mode.className = "muted";
                 mode.textContent = schedule.mode === "loop"
-                    ? "15 Dk Döngü"
+                    ? "10 Dk Döngü"
                     : schedule.mode === "5 Dakikada Bir Tara"
                         ? "5 Dk Döngü"
                         : "Tek Sefer";
