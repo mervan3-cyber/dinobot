@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-strict-live-stats-ubuntu-v8-2026-08-23';
+const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v9-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -192,6 +192,23 @@ let lastApiRequestTime =
 let quotaRemaining =
     null;
 
+const COVERAGE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+let leagueCoverageCache = new Map();
+let leagueCoverageLoadedAt = 0;
+let statisticsCoverageSnapshot = {
+    updatedAt: null,
+    totalCandidates: 0,
+    supportedCount: 0,
+    unsupportedCount: 0,
+    unknownCount: 0,
+    completeStatsCount: 0,
+    incompleteStatsCount: 0,
+    supportedLeagues: [],
+    unsupportedLeagues: [],
+    unknownLeagues: [],
+    matches: []
+};
+
 
 function sleep(ms) {
 
@@ -299,6 +316,203 @@ async function apiGet(url, config = {}) {
     await apiQueue;
 
     return result;
+}
+
+
+// =========================================================
+// LİG / SEZON CANLI İSTATİSTİK KAPSAMI
+// =========================================================
+
+function coverageKey(leagueID, season) {
+    const id = Number(leagueID);
+    const year = Number(season);
+    return Number.isFinite(id) && Number.isFinite(year)
+        ? `${id}:${year}`
+        : null;
+}
+
+
+function coverageResponseIsle(items) {
+    if (!Array.isArray(items)) return;
+
+    for (const item of items) {
+        const leagueID = Number(item?.league?.id);
+        const leagueName = item?.league?.name || 'Bilinmeyen Lig';
+        const country = item?.country?.name || null;
+        const seasons = Array.isArray(item?.seasons) ? item.seasons : [];
+
+        for (const season of seasons) {
+            const key = coverageKey(leagueID, season?.year);
+            if (!key) continue;
+
+            const raw = season?.coverage?.fixtures?.statistics_fixtures;
+            const supported = raw === true
+                ? true
+                : raw === false
+                    ? false
+                    : null;
+
+            leagueCoverageCache.set(key, {
+                leagueID,
+                leagueName,
+                country,
+                season: Number(season.year),
+                supported
+            });
+        }
+    }
+}
+
+
+async function coverageCacheYukle() {
+    const cacheFresh =
+        leagueCoverageCache.size > 0 &&
+        Date.now() - leagueCoverageLoadedAt < COVERAGE_CACHE_TTL_MS;
+
+    if (cacheFresh) return;
+
+    try {
+        const response = await apiGet('/leagues?current=true');
+        coverageResponseIsle(response.data?.response || []);
+        leagueCoverageLoadedAt = Date.now();
+        addSystemLog(
+            `> 🗺️ Lig istatistik kapsamı yenilendi: ${leagueCoverageCache.size} lig/sezon kaydı.`
+        );
+    } catch (error) {
+        addSystemLog(
+            `> ⚠️ Lig coverage listesi alınamadı: ${error.message}. Bilinmeyen ligler doğrudan maç istatistiğiyle doğrulanacak.`
+        );
+    }
+}
+
+
+async function fixtureCoverageGetir(fixture) {
+    const leagueID = Number(fixture?.league?.id);
+    const season = Number(fixture?.league?.season);
+    const key = coverageKey(leagueID, season);
+
+    if (!key) {
+        return {
+            supported: null,
+            leagueID,
+            leagueName: fixture?.league?.name || 'Bilinmeyen Lig',
+            season
+        };
+    }
+
+    await coverageCacheYukle();
+
+    if (leagueCoverageCache.has(key)) {
+        return leagueCoverageCache.get(key);
+    }
+
+    // current=true listesinde bulunmayan özel sezon/kupa için yalnızca bir kez
+    // lig-sezon detayı sorulur ve sonuç aynı altı saatlik cache'e eklenir.
+    try {
+        const response = await apiGet(
+            `/leagues?id=${leagueID}&season=${season}`
+        );
+        coverageResponseIsle(response.data?.response || []);
+    } catch (error) {
+        addSystemLog(
+            `> ⚠️ Coverage detayı alınamadı (${fixture?.league?.name || leagueID} ${season}): ${error.message}`
+        );
+    }
+
+    return leagueCoverageCache.get(key) || {
+        supported: null,
+        leagueID,
+        leagueName: fixture?.league?.name || 'Bilinmeyen Lig',
+        season
+    };
+}
+
+
+function coverageLigListesi(rows, status) {
+    const unique = new Map();
+    for (const row of rows.filter(item => item.coverageStatus === status)) {
+        const key = `${row.leagueID}:${row.season}`;
+        if (!unique.has(key)) {
+            unique.set(key, {
+                leagueID: row.leagueID,
+                league: row.league,
+                season: row.season
+            });
+        }
+    }
+    return Array.from(unique.values());
+}
+
+
+async function istatistikCoverageFiltrele(fixtures) {
+    const rows = [];
+    const allowed = [];
+
+    for (const fixture of fixtures) {
+        const coverage = await fixtureCoverageGetir(fixture);
+        const coverageStatus = coverage.supported === true
+            ? 'supported'
+            : coverage.supported === false
+                ? 'unsupported'
+                : 'unknown';
+        const row = {
+            fixtureID: Number(fixture?.fixture?.id),
+            match: `${fixture?.teams?.home?.name || 'Ev Sahibi'} - ${fixture?.teams?.away?.name || 'Deplasman'}`,
+            leagueID: Number(fixture?.league?.id),
+            league: fixture?.league?.name || coverage.leagueName || 'Bilinmeyen Lig',
+            season: Number(fixture?.league?.season),
+            minute: fixture?.fixture?.status?.elapsed ?? null,
+            coverageStatus,
+            statisticsChecked: false,
+            actualStatsComplete: null,
+            statsTeamCount: null
+        };
+        rows.push(row);
+
+        // Yalnızca açıkça false olan ligleri çıkar. Metadata bulunamazsa gerçek
+        // /fixtures/statistics cevabı son ve daha kesin kontrolü yapar.
+        if (coverageStatus !== 'unsupported') {
+            fixture.stats_coverage = coverageStatus;
+            allowed.push(fixture);
+        }
+    }
+
+    statisticsCoverageSnapshot = {
+        updatedAt: new Date().toISOString(),
+        totalCandidates: rows.length,
+        supportedCount: rows.filter(row => row.coverageStatus === 'supported').length,
+        unsupportedCount: rows.filter(row => row.coverageStatus === 'unsupported').length,
+        unknownCount: rows.filter(row => row.coverageStatus === 'unknown').length,
+        completeStatsCount: 0,
+        incompleteStatsCount: 0,
+        supportedLeagues: coverageLigListesi(rows, 'supported'),
+        unsupportedLeagues: coverageLigListesi(rows, 'unsupported'),
+        unknownLeagues: coverageLigListesi(rows, 'unknown'),
+        matches: rows
+    };
+
+    return allowed;
+}
+
+
+function coverageSnapshotMacGuncelle(mac) {
+    const fixtureID = Number(mac?.fixture_id);
+    const row = statisticsCoverageSnapshot.matches.find(
+        item => Number(item.fixtureID) === fixtureID
+    );
+    if (!row) return;
+
+    row.statisticsChecked = true;
+    row.actualStatsComplete = temelStatsTam(mac);
+    row.statsTeamCount = Number(mac?.stats_team_count || 0);
+    statisticsCoverageSnapshot.completeStatsCount =
+        statisticsCoverageSnapshot.matches.filter(
+            item => item.statisticsChecked && item.actualStatsComplete === true
+        ).length;
+    statisticsCoverageSnapshot.incompleteStatsCount =
+        statisticsCoverageSnapshot.matches.filter(
+            item => item.statisticsChecked && item.actualStatsComplete === false
+        ).length;
 }
 
 
@@ -1080,6 +1294,34 @@ async function canliMaclariHazirla() {
             `> 🌐 Birleştirilmiş 25-80 dakika aday havuzu: ${uygunMaclar.length} maç.`
         );
 
+        uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar);
+
+        addSystemLog(
+            `> 🧭 Coverage filtresi: ${statisticsCoverageSnapshot.supportedCount} destekli | ${statisticsCoverageSnapshot.unsupportedCount} desteklenmiyor | ${statisticsCoverageSnapshot.unknownCount} bilinmiyor.`
+        );
+
+        if (statisticsCoverageSnapshot.supportedLeagues.length > 0) {
+            addSystemLog(
+                `> ✅ İstatistik destekli canlı ligler: ${statisticsCoverageSnapshot.supportedLeagues.map(item => `${item.league} (${item.season})`).join(' | ')}`
+            );
+        }
+
+        if (statisticsCoverageSnapshot.unsupportedLeagues.length > 0) {
+            addSystemLog(
+                `> 🚫 İstatistik kapsamı olmayan ve çıkarılan ligler: ${statisticsCoverageSnapshot.unsupportedLeagues.map(item => `${item.league} (${item.season})`).join(' | ')}`
+            );
+        }
+
+        if (statisticsCoverageSnapshot.unknownLeagues.length > 0) {
+            addSystemLog(
+                `> ❓ Coverage bilgisi bulunamayan ligler gerçek /fixtures/statistics cevabıyla kontrol edilecek: ${statisticsCoverageSnapshot.unknownLeagues.map(item => `${item.league} (${item.season})`).join(' | ')}`
+            );
+        }
+
+        addSystemLog(
+            `> 🎛️ Coverage filtresinden sonra ${uygunMaclar.length} canlı aday kaldı.`
+        );
+
 
         addSystemLog(
             `> 💰 Oran bulunan fixture: ${oddsMap.size}`
@@ -1310,6 +1552,8 @@ async function canliMaclariHazirla() {
 
             enriched.model_hazir = temelStatsTam(enriched);
 
+            coverageSnapshotMacGuncelle(enriched);
+
 
             macVerileri.push(
                 enriched
@@ -1322,6 +1566,10 @@ async function canliMaclariHazirla() {
 
         }
 
+
+        addSystemLog(
+            `> 📈 Gerçek maç istatistiği sonucu: ${statisticsCoverageSnapshot.completeStatsCount} tam | ${statisticsCoverageSnapshot.incompleteStatsCount} eksik.`
+        );
 
         return macVerileri;
 
@@ -2629,6 +2877,91 @@ app.post(
 
 
 // =========================================================
+// API: İSTATİSTİK KAPSAMI
+// =========================================================
+
+app.get(
+    '/api/statistics-coverage',
+    (req, res) => {
+        res.json(statisticsCoverageSnapshot);
+    }
+);
+
+
+function coverageHtmlEscape(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+
+app.get(
+    '/statistics-coverage',
+    (req, res) => {
+        const snapshot = statisticsCoverageSnapshot;
+        const rows = snapshot.matches.map(match => {
+            const coverageLabel = match.coverageStatus === 'supported'
+                ? '✅ Destekli'
+                : match.coverageStatus === 'unsupported'
+                    ? '🚫 Desteklenmiyor'
+                    : '❓ Bilinmiyor';
+            const actualLabel = match.actualStatsComplete === true
+                ? '✅ Tam'
+                : match.actualStatsComplete === false
+                    ? '❌ Eksik'
+                    : '⏳ Kontrol edilmedi';
+            return `<tr>
+                <td>${coverageHtmlEscape(match.match)}</td>
+                <td>${coverageHtmlEscape(match.league)}</td>
+                <td>${coverageHtmlEscape(match.season)}</td>
+                <td>${coverageHtmlEscape(match.minute)}'</td>
+                <td>${coverageLabel}</td>
+                <td>${actualLabel}</td>
+                <td>${coverageHtmlEscape(match.statsTeamCount ?? '-')}</td>
+            </tr>`;
+        }).join('');
+
+        res.type('html').send(`<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="15">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Dino İstatistik Kapsamı</title>
+    <style>
+        body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:24px}
+        h1{font-size:24px} .cards{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+        .card{background:#222;border:1px solid #444;border-radius:10px;padding:14px;min-width:145px}
+        .card b{display:block;font-size:24px;color:#41d17d;margin-top:6px}
+        table{width:100%;border-collapse:collapse;background:#1a1a1a}
+        th,td{padding:10px;border-bottom:1px solid #333;text-align:left;font-size:14px}
+        th{background:#292929;position:sticky;top:0} .muted{color:#aaa;font-size:13px}
+    </style>
+</head>
+<body>
+    <h1>📊 Dino Canlı İstatistik Kapsamı</h1>
+    <div class="muted">Son güncelleme: ${coverageHtmlEscape(snapshot.updatedAt || 'Henüz tarama yapılmadı')} · Sayfa 15 saniyede yenilenir.</div>
+    <div class="cards">
+        <div class="card">Canlı aday<b>${snapshot.totalCandidates}</b></div>
+        <div class="card">Coverage destekli<b>${snapshot.supportedCount}</b></div>
+        <div class="card">Çıkarılan<b>${snapshot.unsupportedCount}</b></div>
+        <div class="card">Gerçek stats tam<b>${snapshot.completeStatsCount}</b></div>
+        <div class="card">Gerçek stats eksik<b>${snapshot.incompleteStatsCount}</b></div>
+    </div>
+    <table>
+        <thead><tr><th>Maç</th><th>Lig</th><th>Sezon</th><th>Dakika</th><th>Lig kapsamı</th><th>Gerçek veri</th><th>API takım</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7">Henüz tarama sonucu yok.</td></tr>'}</tbody>
+    </table>
+</body>
+</html>`);
+    }
+);
+
+
+// =========================================================
 // API: STATUS
 // =========================================================
 
@@ -2650,8 +2983,21 @@ app.get(
             minEdge:
                 state.globalMinEdge,
 
-            scoreOnlyGuard:
-                SCORE_ONLY_GUARD,
+            statisticsCoverage: {
+                updatedAt: statisticsCoverageSnapshot.updatedAt,
+                totalCandidates: statisticsCoverageSnapshot.totalCandidates,
+                supportedCount: statisticsCoverageSnapshot.supportedCount,
+                unsupportedCount: statisticsCoverageSnapshot.unsupportedCount,
+                unknownCount: statisticsCoverageSnapshot.unknownCount,
+                completeStatsCount: statisticsCoverageSnapshot.completeStatsCount,
+                incompleteStatsCount: statisticsCoverageSnapshot.incompleteStatsCount
+            },
+
+            strictLiveStats: {
+                required: true,
+                requiredFields: MODEL_STAT_FIELDS,
+                scoreOnlySignals: false
+            },
 
             nextRunTime:
                 nextRunTime,
@@ -2697,7 +3043,12 @@ app.listen(
 
 
         addSystemLog(
-            `> 🛡️ Fallback koruması: ${SCORE_ONLY_GUARD.minMinute}'+ | MS %${SCORE_ONLY_GUARD.minResultProbability}+ | Gol %${SCORE_ONLY_GUARD.minTotalProbability}+ | EDGE %${SCORE_ONLY_GUARD.minEdge}+ | Oran ≤${SCORE_ONLY_GUARD.maxOdd} | Tarama limiti ${SCORE_ONLY_GUARD.maxSignalsPerScan}`
+            "> 🗺️ Lig coverage filtresi aktif: statistics_fixtures=false olan ligler taramadan çıkarılır."
+        );
+
+
+        addSystemLog(
+            "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
 
