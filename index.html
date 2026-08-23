@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino İddaa | Admin Kontrol Merkezi</title>
+    <style>
+        :root {
+            --primary: #ff9800;
+            --primary-dark: #c77700;
+            --bg: #101214;
+            --surface: #1b1e21;
+            --surface-2: #262a2e;
+            --surface-3: #141719;
+            --text: #f4f4f4;
+            --text-secondary: #aeb5bc;
+            --success: #4caf50;
+            --danger: #f44336;
+            --warning: #ffc107;
+            --info: #2196f3;
+            --border: #343a40;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top, #20252a 0, var(--bg) 42%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 960px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid #2b3035;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42);
+        }
+
+        #login-screen {
+            max-width: 500px;
+            margin-top: min(18vh, 150px);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        h3 {
+            font-size: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        input[type="password"],
+        input[type="number"],
+        input[type="time"],
+        select {
+            width: 100%;
+            padding: 11px;
+            margin: 8px 0;
+            border: 1px solid #383e44;
+            border-radius: 7px;
+            background: #292d31;
+            color: #fff;
+            outline: none;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.14);
+        }
+
+        input[type="checkbox"] {
+            width: 19px;
+            height: 19px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 30px;
+            flex: 0 0 auto;
+        }
+
+        .switch input {
+            width: 0;
+            height: 0;
+            opacity: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            background: #555d65;
+            transition: 0.2s;
+        }
+
+        .switch-slider::before {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            left: 4px;
+            top: 4px;
+            border-radius: 50%;
+            background: #fff;
+            transition: 0.2s;
+        }
+
+        .switch input:checked + .switch-slider {
+            background: var(--success);
+        }
+
+        .switch input:checked + .switch-slider::before {
+            transform: translateX(24px);
+        }
+
+        .switch input:disabled + .switch-slider {
+            cursor: wait;
+            opacity: 0.55;
+        }
+
+        button,
+        .button-link {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 7px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.2s;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        button:hover,
+        .button-link:hover {
+            opacity: 0.9;
+        }
+
+        button:active,
+        .button-link:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .muted {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .status-badge,
+        .mini-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .bg-danger { background: var(--danger); }
+        .bg-success { background: var(--success); }
+        .bg-warning { background: var(--warning); color: #171717; }
+        .bg-info { background: var(--info); }
+        .bg-muted { background: #555d65; }
+
+        .top-meta {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .meta-item,
+        .metric {
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 11px;
+            min-width: 0;
+        }
+
+        .meta-label,
+        .metric-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            margin-bottom: 5px;
+        }
+
+        .meta-value {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .metric-value {
+            display: block;
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .metric.success .metric-value { color: #68d66d; }
+        .metric.danger .metric-value { color: #ff7167; }
+        .metric.warning .metric-value { color: #ffd34f; }
+        .metric.info .metric-value { color: #64b5f6; }
+
+        .ml-panel {
+            display: grid;
+            grid-template-columns: 1.5fr repeat(3, minmax(110px, 0.6fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .ml-main {
+            background: #171b1e;
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .ml-main strong {
+            display: block;
+            margin-top: 5px;
+            line-height: 1.35;
+        }
+
+        .ml-cell {
+            background: #171b1e;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .ml-cell strong {
+            display: block;
+            font-size: 1.12rem;
+            margin-top: 5px;
+        }
+
+        .positive {
+            color: #67d86e;
+        }
+
+        .warning-text {
+            color: #ffd24a;
+        }
+
+        .logs {
+            background: #050706;
+            color: #18f255;
+            font-family: Consolas, "Courier New", monospace;
+            padding: 11px;
+            border-radius: 7px;
+            height: 230px;
+            overflow-y: auto;
+            font-size: 0.78rem;
+            line-height: 1.52;
+            border: 1px solid #343a40;
+        }
+
+        .log-line {
+            font-family: inherit;
+            overflow-wrap: anywhere;
+        }
+
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            background: #191c1f;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 7px;
+            align-items: center;
+            border: 1px solid #30353a;
+        }
+
+        .coverage-toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+
+        .filter-button {
+            width: auto;
+            padding: 7px 11px;
+            margin: 0;
+            background: #3b4147;
+            font-size: 0.76rem;
+        }
+
+        .filter-button.active {
+            background: var(--primary);
+        }
+
+        .table-wrap {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: auto;
+            max-height: 340px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #171a1d;
+            min-width: 690px;
+        }
+
+        th,
+        td {
+            padding: 9px;
+            border-bottom: 1px solid #30353a;
+            text-align: left;
+            font-size: 0.77rem;
+            vertical-align: middle;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #292e33;
+            color: #f0f0f0;
+        }
+
+        .empty-row {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 18px;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 22px;
+            transform: translateX(-50%);
+            max-width: calc(100vw - 30px);
+            background: #252a2e;
+            color: #fff;
+            border: 1px solid #454c52;
+            border-radius: 8px;
+            padding: 11px 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
+            z-index: 10;
+            font-size: 0.85rem;
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+        }
+
+        @media (max-width: 760px) {
+            body { padding: 8px; }
+            .container { padding: 13px; }
+            .top-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .metric:first-child { grid-column: span 2; }
+            .ml-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .ml-main { grid-column: 1 / -1; }
+        }
+
+        @media (max-width: 480px) {
+            .flex-between { align-items: flex-start; }
+            .ml-panel { grid-template-columns: 1fr; }
+            .ml-main { grid-column: auto; }
+            .status-action { flex-direction: column; align-items: stretch; }
+            .status-action button { width: 100% !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="login-screen">
+        <h2>🦖 Dino Admin Paneli</h2>
+        <input type="password" id="admin-pass" placeholder="Admin Şifresini Girin" autocomplete="current-password">
+        <button id="login-button" type="button" onclick="login()">Giriş Yap</button>
+        <p id="login-error" class="hidden" style="color: var(--danger); text-align: center; margin-top: 10px;">Hatalı şifre!</p>
+        <p id="login-server" class="muted" style="text-align:center; margin-top:8px;"></p>
+    </div>
+
+    <div class="container hidden" id="dashboard">
+        <h2>⚙️ Sistem Kontrolü</h2>
+
+        <div class="top-meta">
+            <div class="meta-item">
+                <span class="meta-label">Sunucu bağlantısı</span>
+                <span class="meta-value" id="connection-state">Bağlanıyor…</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Sürüm</span>
+                <span class="meta-value" id="build-version">-</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">API kalan istek</span>
+                <span class="meta-value" id="quota-remaining">-</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Sonraki tarama</span>
+                <span class="meta-value" id="next-run">-</span>
+            </div>
+        </div>
+
+        <div class="card flex-between status-action">
+            <div>
+                <h3 style="margin-bottom: 6px;">Sistem Şalteri</h3>
+                <span class="status-badge bg-danger" id="bot-status-badge">SİSTEM KAPALI</span>
+                <span class="status-badge bg-muted" id="scan-status-badge">TARAMA BEKLİYOR</span>
+            </div>
+            <button id="toggle-btn" type="button" style="width:auto; padding:10px 20px;" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
+        </div>
+
+        <div class="card flex-between" style="background:#17221a; border-color:#356e3a;">
+            <div>
+                <div class="flex-between" style="justify-content:flex-start; margin-bottom:5px;">
+                    <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
+                    <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+                </div>
+                <p class="muted" id="auto-scan-description">Gün boyu yalnızca 25–80. dakikadaki canlı maçları tarar.</p>
+            </div>
+            <label class="switch" title="Otomatik taramayı aç/kapat">
+                <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
+                <span class="switch-slider"></span>
+            </label>
+        </div>
+
+        <div class="card flex-between status-action" style="background:#191c1f; border-color:var(--primary);">
+            <div>
+                <h3 style="margin-bottom: 5px; color: var(--primary);">⚡ Hızlı Tarama</h3>
+                <p class="muted">Saati beklemeden hemen bir tarama başlatır.</p>
+            </div>
+            <button id="force-scan-btn" type="button" style="width:auto; padding:10px 15px; margin:0;" onclick="forceScan()">ŞİMDİ TARA</button>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <div>
+                    <h3>🧠 Son Makine Kararı</h3>
+                    <p class="muted" style="margin-top:4px;">Python modelinin son çıktısı; Gemini yorumundan ayrıdır.</p>
+                </div>
+                <span class="mini-badge bg-muted" id="ml-variant-badge">SONUÇ YOK</span>
+            </div>
+            <div class="ml-panel">
+                <div class="ml-main">
+                    <span class="muted">Maç</span>
+                    <strong id="ml-match">Henüz model sonucu oluşmadı.</strong>
+                </div>
+                <div class="ml-cell">
+                    <span class="muted">Seçilen market</span>
+                    <strong id="ml-market">-</strong>
+                </div>
+                <div class="ml-cell">
+                    <span class="muted">Dino ihtimali</span>
+                    <strong id="ml-probability">-</strong>
+                </div>
+                <div class="ml-cell">
+                    <span class="muted">EDGE</span>
+                    <strong class="positive" id="ml-edge">-</strong>
+                </div>
+            </div>
+            <p class="muted" id="ml-note" style="margin-top:10px;">Canlı şut, isabet, korner, dakika ve skor verisi tamamlandığında model çalışır.</p>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <div>
+                    <h3>📊 Canlı İstatistik Kapsamı</h3>
+                    <p class="muted" id="coverage-updated" style="margin-top:4px;">Henüz tarama yapılmadı.</p>
+                </div>
+                <a class="button-link" id="coverage-detail-link" href="#" target="_blank" rel="noopener" style="width:auto; margin:0; padding:8px 11px; background:var(--info); font-size:.76rem;">Detay Sayfası</a>
+            </div>
+
+            <div class="metrics">
+                <div class="metric info">
+                    <span class="metric-label">Canlı aday</span>
+                    <span class="metric-value" id="coverage-total">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Coverage destekli</span>
+                    <span class="metric-value" id="coverage-supported">0</span>
+                </div>
+                <div class="metric danger">
+                    <span class="metric-label">Çıkarılan</span>
+                    <span class="metric-value" id="coverage-unsupported">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Gerçek stats tam</span>
+                    <span class="metric-value" id="coverage-complete">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Gerçek stats eksik</span>
+                    <span class="metric-value" id="coverage-incomplete">0</span>
+                </div>
+            </div>
+
+            <div class="coverage-toolbar">
+                <button type="button" class="filter-button active" data-filter="all" onclick="setCoverageFilter('all', this)">Tümü</button>
+                <button type="button" class="filter-button" data-filter="complete" onclick="setCoverageFilter('complete', this)">✅ Stats tam</button>
+                <button type="button" class="filter-button" data-filter="incomplete" onclick="setCoverageFilter('incomplete', this)">❌ Stats eksik</button>
+                <button type="button" class="filter-button" data-filter="unsupported" onclick="setCoverageFilter('unsupported', this)">🚫 Coverage yok</button>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Maç</th>
+                            <th>Lig</th>
+                            <th>Dk.</th>
+                            <th>Lig kapsamı</th>
+                            <th>Gerçek veri</th>
+                            <th>API takım</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coverage-rows">
+                        <tr><td colspan="6" class="empty-row">Henüz tarama sonucu yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
+            <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
+            <input type="number" min="0" max="100" step="0.5" id="min-edge" value="15" placeholder="Örn: 15">
+            <p class="muted">Yalnızca bu eşiğe ulaşan ve güvenlik filtrelerini geçen ML sinyalleri gönderilir.</p>
+            <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
+            <p class="muted" style="margin-bottom:12px;">Kapalı bırakırsan otomatik sistem gün boyu 10 dakikada bir çalışır. Açarsan yalnızca aşağıdaki saat aralıklarında çalışır.</p>
+            <div class="flex-between" style="margin-bottom:15px;">
+                <label class="muted" for="schedule-enabled">Özel saat programını aktifleştir</label>
+                <input type="checkbox" id="schedule-enabled">
+            </div>
+            <div id="schedule-list" style="margin-bottom:15px;"></div>
+            <div style="background:#1b1e21; padding:12px; border-radius:7px; border:1px dashed #555; margin-bottom:10px;">
+                <h4 style="margin-bottom:8px; color:var(--primary); font-size:.9rem;">➕ Yeni Aralık Ekle</h4>
+                <div class="flex-between" style="margin-bottom:8px;">
+                    <div style="width:48%;">
+                        <label class="muted" for="new-start">Başlangıç</label>
+                        <input type="time" id="new-start" value="13:00">
+                    </div>
+                    <div style="width:48%;">
+                        <label class="muted" for="new-end">Bitiş</label>
+                        <input type="time" id="new-end" value="14:00">
+                    </div>
+                </div>
+                <label class="muted" for="new-mode">Çalışma modu</label>
+                <select id="new-mode">
+                    <option value="loop">10 Dakikada Bir Tara</option>
+                    <option value="5 Dakikada Bir Tara">5 Dakikada Bir Tara</option>
+                    <option value="single">Saati Gelince Tek Sefer Tara</option>
+                </select>
+                <button type="button" style="background:var(--info); padding:8px;" onclick="addSchedule()">Listeye Ekle</button>
+            </div>
+            <button type="button" style="background:var(--success);" onclick="saveSchedule()">Tüm Programı Sunucuya İlet</button>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <div>
+                    <h3>📡 Canlı Sistem Radarı</h3>
+                    <p class="muted" style="margin-top:4px;">Tarama, istatistik ve ML işlemleri anlık olarak burada görünür.</p>
+                </div>
+                <button type="button" style="width:auto; margin:0; padding:7px 10px; background:#454c52; font-size:.75rem;" onclick="fetchLogs()">Yenile</button>
+            </div>
+            <div class="logs" id="log-box"><div class="log-line">&gt; Panel sunucuya bağlandı. Kayıtlar bekleniyor...</div></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script>
+        const CORRECT_PASS = "enessro";
+        const REMOTE_BACKEND_URL = "http://91.198.66.192:3000";
+        const BACKEND_URL = window.location.protocol === "file:"
+            ? REMOTE_BACKEND_URL
+            : window.location.origin;
+
+        let isBotRunning = false;
+        let isScanning = false;
+        let autoScanEnabled = true;
+        let schedules = [];
+        let autoScroll = true;
+        let coverageMatches = [];
+        let coverageFilter = "all";
+        let pollingStarted = false;
+
+        const logBox = document.getElementById("log-box");
+        document.getElementById("login-server").textContent = `Sunucu: ${BACKEND_URL}`;
+        document.getElementById("coverage-detail-link").href = `${BACKEND_URL}/statistics-coverage`;
+
+        logBox.addEventListener("scroll", () => {
+            autoScroll = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 12;
+        });
+
+        document.getElementById("admin-pass").addEventListener("keydown", event => {
+            if (event.key === "Enter") login();
+        });
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.toggle("error", isError);
+            toast.classList.remove("hidden");
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
+        }
+
+        async function apiFetch(path, options = {}) {
+            const response = await fetch(`${BACKEND_URL}${path}`, {
+                ...options,
+                headers: {
+                    ...(options.body ? { "Content-Type": "application/json" } : {}),
+                    ...(options.headers || {})
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Sunucu ${response.status} hatası döndürdü.`);
+            }
+
+            return response.json();
+        }
+
+        async function login() {
+            const password = document.getElementById("admin-pass").value;
+            if (password !== CORRECT_PASS) {
+                document.getElementById("login-error").classList.remove("hidden");
+                return;
+            }
+
+            document.getElementById("login-error").classList.add("hidden");
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("dashboard").classList.remove("hidden");
+
+            await refreshAll();
+            if (!pollingStarted) {
+                pollingStarted = true;
+                setInterval(fetchLogs, 2500);
+                setInterval(checkStatus, 5000);
+                setInterval(fetchCoverage, 7500);
+            }
+        }
+
+        async function refreshAll() {
+            await Promise.allSettled([checkStatus(), fetchSettings(), fetchCoverage(), fetchLogs()]);
+        }
+
+        function setConnection(connected) {
+            const element = document.getElementById("connection-state");
+            element.textContent = connected ? "● Bağlı" : "● Bağlantı yok";
+            element.style.color = connected ? "#68d66d" : "#ff7167";
+        }
+
+        function formatDateTime(value) {
+            if (!value) return "-";
+            const date = new Date(value);
+            return Number.isNaN(date.getTime())
+                ? "-"
+                : date.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
+        }
+
+        function renderBotState() {
+            const badge = document.getElementById("bot-status-badge");
+            const scanBadge = document.getElementById("scan-status-badge");
+            const toggleButton = document.getElementById("toggle-btn");
+            const scanButton = document.getElementById("force-scan-btn");
+
+            badge.textContent = isBotRunning ? "SİSTEM AÇIK" : "SİSTEM KAPALI";
+            badge.className = `status-badge ${isBotRunning ? "bg-success" : "bg-danger"}`;
+            toggleButton.textContent = isBotRunning ? "SİSTEMİ DURDUR" : "SİSTEMİ BAŞLAT";
+            toggleButton.style.background = isBotRunning ? "var(--danger)" : "var(--primary)";
+
+            scanBadge.textContent = isScanning ? "TARAMA SÜRÜYOR" : "TARAMA BEKLİYOR";
+            scanBadge.className = `status-badge ${isScanning ? "bg-warning" : "bg-muted"}`;
+            scanButton.disabled = !isBotRunning || isScanning;
+            scanButton.textContent = isScanning ? "TARANIYOR…" : "ŞİMDİ TARA";
+        }
+
+        function renderAutoScanState() {
+            const checkbox = document.getElementById("auto-scan-enabled");
+            const badge = document.getElementById("auto-scan-badge");
+            const description = document.getElementById("auto-scan-description");
+
+            checkbox.checked = autoScanEnabled;
+            badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
+            badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
+            description.textContent = autoScanEnabled
+                ? "Gün boyu yalnızca 25–80. dakikadaki canlı maçları 10 dakikada bir tarar."
+                : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
+        }
+
+        async function checkStatus() {
+            try {
+                const data = await apiFetch("/api/status");
+                setConnection(true);
+                isBotRunning = Boolean(data.isRunning);
+                isScanning = Boolean(data.isScanning);
+                autoScanEnabled = data.autoScanEnabled !== false;
+                renderBotState();
+                renderAutoScanState();
+
+                document.getElementById("build-version").textContent = data.buildVersion || "-";
+                document.getElementById("quota-remaining").textContent = data.quotaRemaining ?? "-";
+                document.getElementById("next-run").textContent = !autoScanEnabled
+                    ? "Otomatik kapalı"
+                    : data.nextRunTime
+                        ? formatDateTime(data.nextRunTime)
+                        : "Bekliyor";
+
+                if (data.minEdge !== undefined && data.minEdge !== null) {
+                    document.getElementById("min-edge").value = data.minEdge;
+                }
+
+                if (data.statisticsCoverage) {
+                    renderCoverageSummary(data.statisticsCoverage);
+                }
+            } catch (error) {
+                setConnection(false);
+            }
+        }
+
+        async function fetchSettings() {
+            try {
+                const data = await apiFetch("/api/settings");
+                if (data.globalMinEdge !== undefined && data.globalMinEdge !== null) {
+                    document.getElementById("min-edge").value = data.globalMinEdge;
+                }
+                autoScanEnabled = data.autoScanEnabled !== false;
+                renderAutoScanState();
+                document.getElementById("schedule-enabled").checked = Boolean(data.scheduleEnabled);
+                schedules = Array.isArray(data.schedules) ? data.schedules : [];
+                renderSchedules();
+            } catch (error) {
+                showToast(`Ayarlar alınamadı: ${error.message}`, true);
+            }
+        }
+
+        async function fetchLogs() {
+            try {
+                const logs = await apiFetch("/api/logs");
+                setConnection(true);
+                if (!Array.isArray(logs)) return;
+
+                const shouldScroll = autoScroll;
+                logBox.replaceChildren();
+                if (logs.length === 0) {
+                    const line = document.createElement("div");
+                    line.className = "log-line";
+                    line.textContent = "> Henüz log kaydı yok.";
+                    logBox.appendChild(line);
+                } else {
+                    for (const entry of logs) {
+                        const line = document.createElement("div");
+                        line.className = "log-line";
+                        line.textContent = String(entry);
+                        logBox.appendChild(line);
+                    }
+                }
+
+                if (shouldScroll) logBox.scrollTop = logBox.scrollHeight;
+                renderLatestMlDecision(logs);
+            } catch (error) {
+                setConnection(false);
+            }
+        }
+
+        function parseMlOutputs(logs) {
+            const outputs = [];
+            for (const rawEntry of logs) {
+                const entry = String(rawEntry);
+                const marker = "ML (";
+                const markerIndex = entry.indexOf(marker);
+                const variantMarker = ") | Varyant:";
+                if (markerIndex < 0 || !entry.includes(variantMarker)) continue;
+
+                const matchStart = markerIndex + marker.length;
+                const matchEnd = entry.indexOf(variantMarker, matchStart);
+                if (matchEnd < 0) continue;
+
+                const variantStart = matchEnd + variantMarker.length;
+                const jsonSeparator = entry.indexOf(" | {", variantStart);
+                if (jsonSeparator < 0) continue;
+
+                const matchName = entry.slice(matchStart, matchEnd).trim();
+                const variant = entry.slice(variantStart, jsonSeparator).trim();
+                const jsonText = entry.slice(jsonSeparator + 3).trim();
+
+                try {
+                    outputs.push({ matchName, variant, values: JSON.parse(jsonText) });
+                } catch (_) {
+                    // Eksik veya kesilmiş log satırı paneli durdurmasın.
+                }
+            }
+            return outputs;
+        }
+
+        function parseValueSelections(logs) {
+            const selections = [];
+            for (const rawEntry of logs) {
+                const entry = String(rawEntry);
+                const marker = "ML VALUE:";
+                const markerIndex = entry.indexOf(marker);
+                if (markerIndex < 0) continue;
+
+                const parts = entry.slice(markerIndex + marker.length).split("|").map(part => part.trim());
+                if (parts.length < 3) continue;
+                const edge = Number(parts[2].replace("+", "").replace("%", "").replace(",", "."));
+                selections.push({
+                    matchName: parts[0],
+                    market: parts[1],
+                    edge: Number.isFinite(edge) ? edge : null
+                });
+            }
+            return selections;
+        }
+
+        function renderLatestMlDecision(logs) {
+            const outputs = parseMlOutputs(logs);
+            const selections = parseValueSelections(logs);
+            const selection = selections.at(-1);
+            let output = null;
+
+            if (selection) {
+                output = [...outputs].reverse().find(item => item.matchName === selection.matchName) || null;
+            }
+            if (!output) output = outputs.at(-1) || null;
+
+            if (!output) return;
+
+            const variantBadge = document.getElementById("ml-variant-badge");
+            const variantLabels = {
+                live_only: "CANLI STATS",
+                live_plus_prematch: "CANLI + PREMATCH",
+                score_only: "SKOR FALLBACK"
+            };
+            variantBadge.textContent = variantLabels[output.variant] || output.variant || "ML";
+            variantBadge.className = `mini-badge ${output.variant === "score_only" ? "bg-danger" : "bg-success"}`;
+
+            document.getElementById("ml-match").textContent = selection?.matchName || output.matchName;
+            document.getElementById("ml-market").textContent = selection?.market || "Filtreyi geçmedi";
+
+            const probability = selection?.market ? Number(output.values?.[selection.market]) : NaN;
+            document.getElementById("ml-probability").textContent = Number.isFinite(probability)
+                ? `%${probability.toFixed(1)}`
+                : "-";
+            document.getElementById("ml-edge").textContent = selection?.edge !== null && selection?.edge !== undefined
+                ? `+%${selection.edge.toFixed(1)}`
+                : "-";
+
+            document.getElementById("ml-note").textContent = output.variant === "score_only"
+                ? "Uyarı: Skor fallback sonucu oluşmuş. Son backend bu sinyalin Telegram'a gönderilmesini engeller."
+                : "Bu olasılık Python modelinden gelir. Gemini yalnızca seçilen sonucu metin olarak açıklar.";
+        }
+
+        async function toggleBot() {
+            const action = isBotRunning ? "/api/stop" : "/api/start";
+            const button = document.getElementById("toggle-btn");
+            button.disabled = true;
+            try {
+                const result = await apiFetch(action, { method: "POST" });
+                if (result.success === false) throw new Error(result.message || "İşlem reddedildi.");
+                showToast(result.message || "Sistem durumu güncellendi.");
+                await Promise.allSettled([checkStatus(), fetchLogs()]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function forceScan() {
+            if (!isBotRunning) {
+                showToast("Önce sistem şalterini açmalısın.", true);
+                return;
+            }
+            if (isScanning) {
+                showToast("Tarama zaten devam ediyor.", true);
+                return;
+            }
+
+            const button = document.getElementById("force-scan-btn");
+            button.disabled = true;
+            try {
+                const result = await apiFetch("/api/force-scan", { method: "POST" });
+                if (result.success === false) throw new Error(result.message || "Tarama başlatılamadı.");
+                showToast(result.message || "Tarama başladı.");
+                await Promise.allSettled([checkStatus(), fetchLogs()]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                renderBotState();
+            }
+        }
+
+        async function saveSettings() {
+            const edge = Number(document.getElementById("min-edge").value);
+            if (!Number.isFinite(edge) || edge < 0 || edge > 100) {
+                showToast("EDGE değeri 0 ile 100 arasında olmalı.", true);
+                return;
+            }
+
+            try {
+                const result = await apiFetch("/api/settings", {
+                    method: "POST",
+                    body: JSON.stringify({ oran: edge })
+                });
+                if (result.success === false) throw new Error("EDGE ayarı kaydedilemedi.");
+                showToast(`Minimum EDGE %${edge} olarak kaydedildi.`);
+                await Promise.allSettled([checkStatus(), fetchLogs()]);
+            } catch (error) {
+                showToast(error.message, true);
+            }
+        }
+
+        async function saveAutoScan(enabled) {
+            const checkbox = document.getElementById("auto-scan-enabled");
+            checkbox.disabled = true;
+            try {
+                const result = await apiFetch("/api/settings", {
+                    method: "POST",
+                    body: JSON.stringify({ autoScanEnabled: Boolean(enabled) })
+                });
+                if (result.success === false) throw new Error("Otomatik tarama ayarı kaydedilemedi.");
+
+                autoScanEnabled = Boolean(enabled);
+                renderAutoScanState();
+                showToast(autoScanEnabled
+                    ? "10 dakikalık otomatik tarama açıldı."
+                    : "Otomatik tarama kapatıldı; manuel tarama kullanılabilir.");
+                await Promise.allSettled([checkStatus(), fetchLogs()]);
+            } catch (error) {
+                autoScanEnabled = !Boolean(enabled);
+                renderAutoScanState();
+                showToast(error.message, true);
+            } finally {
+                checkbox.disabled = false;
+            }
+        }
+
+        function renderSchedules() {
+            const list = document.getElementById("schedule-list");
+            list.replaceChildren();
+
+            if (schedules.length === 0) {
+                const empty = document.createElement("div");
+                empty.className = "muted";
+                empty.style.cssText = "text-align:center; padding:10px;";
+                empty.textContent = "Henüz program eklenmedi.";
+                list.appendChild(empty);
+                return;
+            }
+
+            schedules.forEach(schedule => {
+                const row = document.createElement("div");
+                row.className = "schedule-item";
+
+                const info = document.createElement("div");
+                const time = document.createElement("strong");
+                time.style.cssText = "color:var(--primary); font-size:.9rem;";
+                time.textContent = `${schedule.start} - ${schedule.end}`;
+                const mode = document.createElement("div");
+                mode.className = "muted";
+                mode.textContent = schedule.mode === "loop"
+                    ? "10 Dk Döngü"
+                    : schedule.mode === "5 Dakikada Bir Tara"
+                        ? "5 Dk Döngü"
+                        : "Tek Sefer";
+                info.append(time, mode);
+
+                const removeButton = document.createElement("button");
+                removeButton.type = "button";
+                removeButton.style.cssText = "width:auto; margin:0; padding:6px 12px; background:var(--danger); font-size:.78rem;";
+                removeButton.textContent = "Sil";
+                removeButton.addEventListener("click", () => removeSchedule(String(schedule.id)));
+
+                row.append(info, removeButton);
+                list.appendChild(row);
+            });
+        }
+
+        function addSchedule() {
+            const start = document.getElementById("new-start").value;
+            const end = document.getElementById("new-end").value;
+            const mode = document.getElementById("new-mode").value;
+
+            if (!start || !end) {
+                showToast("Başlangıç ve bitiş saatini seçmelisin.", true);
+                return;
+            }
+
+            schedules.push({ id: Date.now().toString(), start, end, mode });
+            renderSchedules();
+        }
+
+        function removeSchedule(idToRemove) {
+            schedules = schedules.filter(schedule => String(schedule.id) !== String(idToRemove));
+            renderSchedules();
+        }
+
+        async function saveSchedule() {
+            const enabled = document.getElementById("schedule-enabled").checked;
+            try {
+                const result = await apiFetch("/api/settings", {
+                    method: "POST",
+                    body: JSON.stringify({ scheduleEnabled: enabled, schedules })
+                });
+                if (result.success === false) throw new Error("Program kaydedilemedi.");
+                showToast("Zamanlayıcı programı sunucuya kaydedildi.");
+                await Promise.allSettled([fetchSettings(), fetchLogs()]);
+            } catch (error) {
+                showToast(error.message, true);
+            }
+        }
+
+        function renderCoverageSummary(data) {
+            document.getElementById("coverage-total").textContent = data.totalCandidates ?? 0;
+            document.getElementById("coverage-supported").textContent = data.supportedCount ?? 0;
+            document.getElementById("coverage-unsupported").textContent = data.unsupportedCount ?? 0;
+            document.getElementById("coverage-complete").textContent = data.completeStatsCount ?? 0;
+            document.getElementById("coverage-incomplete").textContent = data.incompleteStatsCount ?? 0;
+            document.getElementById("coverage-updated").textContent = data.updatedAt
+                ? `Son güncelleme: ${formatDateTime(data.updatedAt)}`
+                : "Henüz tarama yapılmadı.";
+        }
+
+        async function fetchCoverage() {
+            try {
+                const data = await apiFetch("/api/statistics-coverage");
+                renderCoverageSummary(data || {});
+                coverageMatches = Array.isArray(data?.matches) ? data.matches : [];
+                renderCoverageRows();
+            } catch (error) {
+                // Eski backend çalışıyorsa ana kontroller çalışmaya devam etsin.
+            }
+        }
+
+        function setCoverageFilter(filter, button) {
+            coverageFilter = filter;
+            document.querySelectorAll(".filter-button").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+            renderCoverageRows();
+        }
+
+        function coverageLabel(status) {
+            if (status === "supported") return { text: "✅ Destekli", className: "positive" };
+            if (status === "unsupported") return { text: "🚫 Yok", className: "warning-text" };
+            return { text: "❓ Bilinmiyor", className: "muted" };
+        }
+
+        function actualStatsLabel(match) {
+            if (match.actualStatsComplete === true) return { text: "✅ Tam", className: "positive" };
+            if (match.actualStatsComplete === false) return { text: "❌ Eksik", className: "warning-text" };
+            return { text: "⏳ Bekliyor", className: "muted" };
+        }
+
+        function coverageMatchesFilter(match) {
+            if (coverageFilter === "complete") return match.actualStatsComplete === true;
+            if (coverageFilter === "incomplete") return match.actualStatsComplete === false;
+            if (coverageFilter === "unsupported") return match.coverageStatus === "unsupported";
+            return true;
+        }
+
+        function renderCoverageRows() {
+            const body = document.getElementById("coverage-rows");
+            body.replaceChildren();
+            const rows = coverageMatches.filter(coverageMatchesFilter);
+
+            if (rows.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 6;
+                cell.className = "empty-row";
+                cell.textContent = coverageMatches.length === 0
+                    ? "Henüz tarama sonucu yok."
+                    : "Bu filtreye uygun maç yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const match of rows) {
+                const row = document.createElement("tr");
+                const coverage = coverageLabel(match.coverageStatus);
+                const actual = actualStatsLabel(match);
+                const values = [
+                    String(match.match || "-"),
+                    `${match.league || "-"}${match.season ? ` (${match.season})` : ""}`,
+                    match.minute === null || match.minute === undefined ? "-" : `${match.minute}'`,
+                    coverage.text,
+                    actual.text,
+                    match.statsTeamCount ?? "-"
+                ];
+
+                values.forEach((value, index) => {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    if (index === 3) cell.className = coverage.className;
+                    if (index === 4) cell.className = actual.className;
+                    row.appendChild(cell);
+                });
+                body.appendChild(row);
+            }
+        }
+    </script>
+</body>
+</html>

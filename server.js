@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v10-no-duplicate-2026-08-23';
+const BUILD_VERSION = 'ml-coverage-filter-ubuntu-v11-10min-no-duplicate-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -155,12 +155,16 @@ let state = {
     // Başlangıç EDGE
     globalMinEdge: 3,
 
+    // Ana sistem açıkken periyodik taramayı ayrıca açıp kapatır.
+    // Kapalıyken paneldeki manuel "Şimdi Tara" çalışmaya devam eder.
+    autoScanEnabled: true,
+
     scheduleEnabled: false,
 
     schedules: [],
 
     // Telegram'a başarıyla gönderilen maçlar fixture ID ile tutulur.
-    // Böylece sonraki 5/15 dakikalık taramalar aynı maçı tekrar göndermez.
+    // Böylece sonraki taramalar aynı maçı tekrar göndermez.
     sentFixtures: {}
 
 };
@@ -2581,7 +2585,8 @@ async function botuCalistir() {
 function masterClock() {
 
     if (
-        !state.isRunning
+        !state.isRunning ||
+        !state.autoScanEnabled
     ) {
 
         return;
@@ -2689,7 +2694,7 @@ function masterClock() {
 
 
     let beklemeSuresi =
-        15 *
+        10 *
         60 *
         1000;
 
@@ -2921,6 +2926,8 @@ app.post(
     '/api/settings',
     (req, res) => {
 
+        let autoScanYeniAcildi = false;
+
         if (
             req.body.oran !== undefined
         ) {
@@ -2942,6 +2949,28 @@ app.post(
 
             }
 
+        }
+
+
+        if (
+            req.body.autoScanEnabled !== undefined
+        ) {
+            const oncekiAutoScan =
+                state.autoScanEnabled;
+
+            state.autoScanEnabled =
+                Boolean(
+                    req.body.autoScanEnabled
+                );
+
+            autoScanYeniAcildi =
+                !oncekiAutoScan &&
+                state.autoScanEnabled;
+
+            if (autoScanYeniAcildi) {
+                // Açıldıktan sonra ilk tarama için 10 dakika bekletme.
+                nextRunTime = 0;
+            }
         }
 
 
@@ -2973,8 +3002,18 @@ app.post(
 
 
         addSystemLog(
-            `> ⚙️ Ayarlar güncellendi. Minimum EDGE: %${state.globalMinEdge}`
+            `> ⚙️ Ayarlar güncellendi. Minimum EDGE: %${state.globalMinEdge} | Otomatik 10 dk tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'}`
         );
+
+
+        if (
+            autoScanYeniAcildi &&
+            state.isRunning
+        ) {
+            setImmediate(
+                masterClock
+            );
+        }
 
 
         res.json({
@@ -3095,6 +3134,12 @@ app.get(
             isScanning:
                 isScanning,
 
+            autoScanEnabled:
+                state.autoScanEnabled,
+
+            scanIntervalMinutes:
+                10,
+
             minEdge:
                 state.globalMinEdge,
 
@@ -3154,6 +3199,11 @@ app.listen(
 
         addSystemLog(
             `> 🎯 Minimum EDGE: %${state.globalMinEdge}`
+        );
+
+
+        addSystemLog(
+            `> 🔄 Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Döngü: 10 dakika | Maç aralığı: 25-80. dakika.`
         );
 
 
