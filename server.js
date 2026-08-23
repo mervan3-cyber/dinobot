@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-live-guard-ubuntu-v5-2026-08-23';
+const BUILD_VERSION = 'ml-strict-fallback-ubuntu-v6-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -1441,6 +1441,61 @@ function yapayZekaAnaliziYap(
 // VALUE ENGINE
 // =========================================================
 
+// İstatistik gelmeyen maçlar yalnızca dakika + skor modeliyle değerlendirilir.
+// Bu model için doğruluk öncelikli, değiştirilemeyen ek bir güvenlik kapısı vardır.
+// Genel EDGE ayarı daha aşağı çekilse bile fallback sinyalleri gevşemez.
+const SCORE_ONLY_GUARD = Object.freeze({
+    minMinute: 60,
+    minResultProbability: 85,
+    minTotalProbability: 80,
+    minEdge: 10,
+    maxOdd: 2.50
+});
+
+
+const SCORE_ONLY_RESULT_MARKETS = new Set([
+    'MS1',
+    'X',
+    'MS2'
+]);
+
+
+function scoreOnlyGuvenlikNedeni(
+    mac,
+    dino,
+    market,
+    dinoYuzde,
+    piyasaOrani,
+    edge
+) {
+    if (dino?.MODEL_VARYANTI !== 'score_only') {
+        return null;
+    }
+
+    const dakika = Number(mac?.dakika);
+    if (!Number.isFinite(dakika) || dakika < SCORE_ONLY_GUARD.minMinute) {
+        return `dakika ${dakika || '?'} < ${SCORE_ONLY_GUARD.minMinute}`;
+    }
+
+    const gerekliOlasilik = SCORE_ONLY_RESULT_MARKETS.has(market)
+        ? SCORE_ONLY_GUARD.minResultProbability
+        : SCORE_ONLY_GUARD.minTotalProbability;
+
+    if (dinoYuzde < gerekliOlasilik) {
+        return `olasılık %${dinoYuzde} < %${gerekliOlasilik}`;
+    }
+
+    if (edge < SCORE_ONLY_GUARD.minEdge) {
+        return `EDGE %${edge.toFixed(1)} < %${SCORE_ONLY_GUARD.minEdge}`;
+    }
+
+    if (piyasaOrani > SCORE_ONLY_GUARD.maxOdd) {
+        return `oran ${piyasaOrani} > ${SCORE_ONLY_GUARD.maxOdd}`;
+    }
+
+    return null;
+}
+
 function valueAnaliziYap(
     mac,
     dino
@@ -1522,9 +1577,29 @@ function valueAnaliziYap(
             piyasaYuzde;
 
 
+        const scoreOnlyRedNedeni = scoreOnlyGuvenlikNedeni(
+            mac,
+            dino,
+            market,
+            dinoYuzde,
+            piyasaOrani,
+            edge
+        );
+
+
         addSystemLog(
             `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)}`
         );
+
+
+        if (scoreOnlyRedNedeni) {
+            if (edge >= Number(state.globalMinEdge)) {
+                addSystemLog(
+                    `> 🛡️ ${mac.mac_isim} | ${market}: fallback güvenlik filtresi reddetti (${scoreOnlyRedNedeni}).`
+                );
+            }
+            continue;
+        }
 
 
         if (
@@ -1797,7 +1872,7 @@ async function telegramSinyaliGonder(
 🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
 🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
 📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
-🧠 <b>Model:</b> ${temelStatsTam(mac) ? 'Canlı istatistik modeli' : 'Dakika + skor fallback modeli'}
+🧠 <b>Model:</b> ${temelStatsTam(mac) ? 'Canlı istatistik modeli' : 'Dakika + skor fallback modeli (sıkı güvenlik)'}
 
 📌 <b>Canlı İstatistikler</b>
 🏠 ${telegramHtml(statGoster(mac.home_shot))} Şut | ${telegramHtml(statGoster(mac.home_sot))} İsabet | ${telegramHtml(statGoster(mac.home_corner))} Korner
@@ -1897,7 +1972,7 @@ async function botuCalistir() {
             const firsat = valueAnaliziYap(mac, dino);
             if (!firsat) {
                 addSystemLog(
-                    `> ❌ ${mac.mac_isim} pas geçildi (EDGE ${state.globalMinEdge}% altında).`
+                    `> ❌ ${mac.mac_isim} pas geçildi (EDGE veya güvenlik filtresini geçemedi).`
                 );
                 continue;
             }
@@ -2376,6 +2451,9 @@ app.get(
             minEdge:
                 state.globalMinEdge,
 
+            scoreOnlyGuard:
+                SCORE_ONLY_GUARD,
+
             nextRunTime:
                 nextRunTime,
 
@@ -2416,6 +2494,11 @@ app.listen(
 
         addSystemLog(
             `> 🎯 Minimum EDGE: %${state.globalMinEdge}`
+        );
+
+
+        addSystemLog(
+            `> 🛡️ Fallback koruması: ${SCORE_ONLY_GUARD.minMinute}'+ | MS %${SCORE_ONLY_GUARD.minResultProbability}+ | Gol %${SCORE_ONLY_GUARD.minTotalProbability}+ | EDGE %${SCORE_ONLY_GUARD.minEdge}+ | Oran ≤${SCORE_ONLY_GUARD.maxOdd}`
         );
 
 
