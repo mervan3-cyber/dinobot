@@ -271,6 +271,42 @@
         .metric.warning .metric-value { color: #ffd34f; }
         .metric.info .metric-value { color: #64b5f6; }
 
+        .signal-metrics {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .tracker-actions {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .tracker-actions button {
+            width: auto;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+        }
+
+        .signal-type-label,
+        .result-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 7px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .signal-type-label.strong { background:#285f31; color:#8df095; }
+        .signal-type-label.surprise { background:#665515; color:#ffe078; }
+        .result-label.win { background:#285f31; color:#8df095; }
+        .result-label.loss { background:#702b27; color:#ffaaa3; }
+        .result-label.pending { background:#414850; color:#d6dce1; }
+        .result-label.neutral { background:#44546a; color:#b9d7ff; }
+
         .ml-panel {
             display: grid;
             grid-template-columns: 1.5fr repeat(3, minmax(110px, 0.6fr));
@@ -421,6 +457,7 @@
             .container { padding: 13px; }
             .top-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .signal-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .metric:first-child { grid-column: span 2; }
             .ml-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
             .ml-main { grid-column: 1 / -1; }
@@ -524,6 +561,69 @@
                 </div>
             </div>
             <p class="muted" id="ml-note" style="margin-top:10px;">Canlı şut, isabet, korner, dakika ve skor verisi tamamlandığında model çalışır.</p>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <div>
+                    <h3>📈 Paylaşılan Sinyal Takibi</h3>
+                    <p class="muted" id="signal-history-updated" style="margin-top:4px;">Yalnızca Telegram'da başarıyla paylaşılan sinyaller burada tutulur.</p>
+                </div>
+                <div class="tracker-actions">
+                    <button id="signal-refresh-btn" type="button" style="background:var(--success);" onclick="refreshSignalResults()">Sonuçları Kontrol Et</button>
+                    <button type="button" style="background:var(--info);" onclick="downloadSignalExport('json')">JSON İndir</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadSignalExport('csv')">CSV İndir</button>
+                </div>
+            </div>
+
+            <div class="metrics signal-metrics">
+                <div class="metric info">
+                    <span class="metric-label">Paylaşılan</span>
+                    <span class="metric-value" id="signal-total">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Sonuç bekleyen</span>
+                    <span class="metric-value" id="signal-pending">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Sürpriz başarı</span>
+                    <span class="metric-value" id="signal-surprise-rate">-</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Güçlü başarı</span>
+                    <span class="metric-value" id="signal-strong-rate">-</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Kazanan / Kaybeden</span>
+                    <span class="metric-value" id="signal-win-loss">0 / 0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Teorik ROI</span>
+                    <span class="metric-value" id="signal-roi">-</span>
+                </div>
+            </div>
+
+            <p class="muted" style="margin-bottom:10px;">Her maç için en fazla 1 sürpriz ve 1 güçlü sinyal kaydedilir. İkisi aynı dakikada ve aynı ya da farklı markette olabilir.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tür</th>
+                            <th>Maç</th>
+                            <th>Dk.</th>
+                            <th>Market</th>
+                            <th>Dino</th>
+                            <th>Oran</th>
+                            <th>Sonuç</th>
+                            <th>Final</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signal-history-rows">
+                        <tr><td colspan="8" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="card">
@@ -707,11 +807,18 @@
                 setInterval(fetchLogs, 2500);
                 setInterval(checkStatus, 5000);
                 setInterval(fetchCoverage, 7500);
+                setInterval(fetchSignalHistory, 10000);
             }
         }
 
         async function refreshAll() {
-            await Promise.allSettled([checkStatus(), fetchSettings(), fetchCoverage(), fetchLogs()]);
+            await Promise.allSettled([
+                checkStatus(),
+                fetchSettings(),
+                fetchCoverage(),
+                fetchSignalHistory(),
+                fetchLogs()
+            ]);
         }
 
         function setConnection(connected) {
@@ -1079,6 +1186,136 @@
             } catch (error) {
                 showToast(error.message, true);
             }
+        }
+
+        function formatPercent(value) {
+            if (value === null || value === undefined || value === "") return "-";
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? `%${parsed.toFixed(1)}` : "-";
+        }
+
+        function signalTypeInfo(type) {
+            return type === "strong"
+                ? { text: "🟢 Güçlü", className: "strong" }
+                : { text: "🟡 Sürpriz", className: "surprise" };
+        }
+
+        function signalResultInfo(result) {
+            if (result === "W") return { text: "✅ Kazandı", className: "win" };
+            if (result === "L") return { text: "❌ Kaybetti", className: "loss" };
+            if (result === "PUSH") return { text: "↩️ İade", className: "neutral" };
+            if (result === "VOID") return { text: "🚫 Geçersiz", className: "neutral" };
+            return { text: "⏳ Bekliyor", className: "pending" };
+        }
+
+        function renderSignalHistory(data) {
+            const summary = data?.summary || {};
+            const overall = summary.overall || {};
+            const surprise = summary.byType?.surprise || {};
+            const strong = summary.byType?.strong || {};
+
+            document.getElementById("signal-total").textContent = overall.total ?? 0;
+            document.getElementById("signal-pending").textContent = overall.pending ?? 0;
+            document.getElementById("signal-surprise-rate").textContent = formatPercent(surprise.hitRate);
+            document.getElementById("signal-strong-rate").textContent = formatPercent(strong.hitRate);
+            document.getElementById("signal-win-loss").textContent = `${overall.wins ?? 0} / ${overall.losses ?? 0}`;
+            document.getElementById("signal-roi").textContent = formatPercent(overall.roi);
+            document.getElementById("signal-history-updated").textContent = summary.updatedAt
+                ? `Son kayıt güncellemesi: ${formatDateTime(summary.updatedAt)} · Yalnızca Telegram paylaşımları`
+                : "Yalnızca Telegram'da başarıyla paylaşılan sinyaller burada tutulur.";
+
+            const body = document.getElementById("signal-history-rows");
+            body.replaceChildren();
+            const signals = Array.isArray(data?.signals) ? data.signals : [];
+
+            if (signals.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 8;
+                cell.className = "empty-row";
+                cell.textContent = "Henüz paylaşılan sinyal yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const signal of signals) {
+                const row = document.createElement("tr");
+                const typeInfo = signalTypeInfo(signal.signalType);
+                const resultInfo = signalResultInfo(signal?.settlement?.result);
+
+                const typeCell = document.createElement("td");
+                const typeBadge = document.createElement("span");
+                typeBadge.className = `signal-type-label ${typeInfo.className}`;
+                typeBadge.textContent = typeInfo.text;
+                typeCell.appendChild(typeBadge);
+                row.appendChild(typeCell);
+
+                const plainValues = [
+                    signal.match || "-",
+                    signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
+                    signal.market || "-",
+                    formatPercent(signal.dinoProbability),
+                    Number.isFinite(Number(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                ];
+                for (const value of plainValues) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                }
+
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+
+                const finalCell = document.createElement("td");
+                finalCell.textContent = signal?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+                body.appendChild(row);
+            }
+        }
+
+        async function fetchSignalHistory() {
+            try {
+                const data = await apiFetch("/api/signal-history?limit=100");
+                renderSignalHistory(data || {});
+            } catch (_) {
+                // Takip uç noktası geçici olarak cevap vermezse diğer panel
+                // kontrolleri çalışmaya devam etsin.
+            }
+        }
+
+        async function refreshSignalResults() {
+            const button = document.getElementById("signal-refresh-btn");
+            button.disabled = true;
+            button.textContent = "KONTROL EDİLİYOR…";
+            try {
+                const result = await apiFetch("/api/signal-history/refresh", { method: "POST" });
+                if (result.success === false && !result.busy) {
+                    throw new Error(result.message || "Sonuçlar güncellenemedi.");
+                }
+                showToast(result.message || "Sonuç kontrolü tamamlandı.");
+                await Promise.allSettled([fetchSignalHistory(), fetchLogs()]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sonuçları Kontrol Et";
+            }
+        }
+
+        function downloadSignalExport(format) {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const link = document.createElement("a");
+            link.href = `${BACKEND_URL}/api/signal-history${suffix}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
         }
 
         function renderCoverageSummary(data) {
