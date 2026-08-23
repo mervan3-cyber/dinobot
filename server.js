@@ -20,7 +20,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-resilient-stats-ubuntu-v7-2026-08-23';
+const BUILD_VERSION = 'ml-strict-live-stats-ubuntu-v8-2026-08-23';
 
 app.use(cors());
 app.use(express.json());
@@ -1282,7 +1282,7 @@ async function canliMaclariHazirla() {
 
             if (!temelStatsTam(enriched)) {
                 addSystemLog(
-                    `> 🧩 ${enriched.mac_isim}: temel istatistik eksik; dakika + skor fallback modeli kullanılacak.`
+                    `> ⛔ ${enriched.mac_isim}: altı temel canlı istatistik tamamlanamadı; Python'a gönderilmeyecek.`
                 );
             }
 
@@ -2100,31 +2100,38 @@ async function botuCalistir() {
         addSystemLog('> 🔍 ML taraması başlatıldı...');
 
         const hazirlananMaclar = await canliMaclariHazirla();
-        const macListesi = hazirlananMaclar.filter(hazirMacHalaUygunMu);
+        const canliMaclar = hazirlananMaclar.filter(hazirMacHalaUygunMu);
 
-        // Tam canlı istatistikli maçlar her zaman önce değerlendirilir.
-        // Array.sort modern Node sürümlerinde stabildir; aynı gruptaki VIP sırası korunur.
-        macListesi.sort(
-            (a, b) => Number(temelStatsTam(b)) - Number(temelStatsTam(a))
+        if (canliMaclar.length !== hazirlananMaclar.length) {
+            addSystemLog(
+                `> ⛔ Model öncesi canlılık filtresi ${hazirlananMaclar.length - canliMaclar.length} maçı çıkardı.`
+            );
+        }
+
+        // Python modeli yalnızca iki takım için şut, isabetli şut ve korner
+        // alanlarının tamamı gerçek API verisi olarak mevcutsa çalışır.
+        // score_only modeli dosyada geriye dönük uyumluluk için kalır fakat
+        // canlı sinyal hattında hiçbir zaman çağrılmaz.
+        const macListesi = canliMaclar.filter(temelStatsTam);
+        const statsEksikMacSayisi = canliMaclar.length - macListesi.length;
+
+        addSystemLog(
+            `> 📡 İstatistik kapsamı: ${macListesi.length} tam | ${statsEksikMacSayisi} eksik ve engellendi.`
         );
 
-        if (macListesi.length !== hazirlananMaclar.length) {
+        if (statsEksikMacSayisi > 0) {
             addSystemLog(
-                `> ⛔ Model öncesi canlılık filtresi ${hazirlananMaclar.length - macListesi.length} maçı çıkardı.`
+                `> 🛡️ ${statsEksikMacSayisi} maç canlı istatistikleri eksik olduğu için Python'a hiç gönderilmedi.`
             );
         }
 
         if (macListesi.length === 0) {
-            addSystemLog('> ℹ️ Model kapsamına uygun ve oranlı canlı maç bulunamadı.');
+            addSystemLog('> ℹ️ Oranı ve altı temel canlı istatistiği eksiksiz olan maç bulunamadı. Sinyal üretilmedi.');
             return;
         }
 
         addSystemLog(
-            `> 📊 Yeni modele ${macListesi.length} maç gönderiliyor (tam stats + skor fallback)...`
-        );
-
-        addSystemLog(
-            `> 📡 İstatistik kapsamı: ${macListesi.filter(temelStatsTam).length} tam | ${macListesi.filter(mac => !temelStatsTam(mac)).length} kısmi/boş.`
+            `> 📊 Python canlı istatistik modeline yalnızca ${macListesi.length} tam istatistikli maç gönderiliyor.`
         );
 
         const dinoSonuclari = await yapayZekaAnaliziYap(macListesi);
@@ -2139,7 +2146,6 @@ async function botuCalistir() {
         }
 
         let onaylanan = 0;
-        let fallbackGonderilen = 0;
         for (let i = 0; i < macListesi.length; i++) {
             const mac = macListesi[i];
             const dino = dinoSonuclari[i];
@@ -2163,12 +2169,9 @@ async function botuCalistir() {
                 continue;
             }
 
-            if (
-                dino.MODEL_VARYANTI === 'score_only' &&
-                fallbackGonderilen >= SCORE_ONLY_GUARD.maxSignalsPerScan
-            ) {
+            if (dino.MODEL_VARYANTI === 'score_only') {
                 addSystemLog(
-                    `> 🛡️ ${mac.mac_isim}: tarama başına fallback limiti (${SCORE_ONLY_GUARD.maxSignalsPerScan}) dolu.`
+                    `> ⛔ ${mac.mac_isim}: Python beklenmedik şekilde score_only döndürdü; sinyal engellendi.`
                 );
                 continue;
             }
@@ -2190,9 +2193,6 @@ async function botuCalistir() {
 
             if (gonderildi) {
                 onaylanan++;
-                if (dino.MODEL_VARYANTI === 'score_only') {
-                    fallbackGonderilen++;
-                }
                 addSystemLog(
                     `> ✅ ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
                 );
