@@ -189,16 +189,7 @@ def model_tahmini(model, features):
     return softmax(logits, model.get("temperature", 1.0))
 
 
-def mac_tahmini(mac, models):
-    if istatistikler_tam(mac):
-        features = temel_ozellikler(mac)
-        prematch_var = prematch_ekle(mac, features)
-        variant = "live_plus_prematch" if prematch_var else "live_only"
-    else:
-        features = skor_ozellikleri(mac)
-        variant = "score_only"
-    selected = models[variant]
-
+def model_ciktisi(selected, features, variant):
     result_probs = model_tahmini(selected["result"], features)
     remaining_probs = model_tahmini(selected["remaining_goals"], features)
     current_total = features["home_score"] + features["away_score"]
@@ -218,6 +209,38 @@ def mac_tahmini(mac, models):
         )
         output[f"{line}_UST"] = round(p_over * 100, 1)
         output[f"{line}_ALT"] = round((1.0 - p_over) * 100, 1)
+
+    return output
+
+
+def mac_tahmini(mac, models):
+    live_only_output = None
+
+    if istatistikler_tam(mac):
+        live_features = temel_ozellikler(mac)
+        prematch_features = dict(live_features)
+        prematch_var = prematch_ekle(mac, prematch_features)
+
+        if prematch_var:
+            variant = "live_plus_prematch"
+            features = prematch_features
+            live_only_output = model_ciktisi(
+                models["live_only"],
+                live_features,
+                "live_only"
+            )
+        else:
+            variant = "live_only"
+            features = live_features
+    else:
+        features = skor_ozellikleri(mac)
+        variant = "score_only"
+
+    selected = models[variant]
+    output = model_ciktisi(selected, features, variant)
+
+    if live_only_output is not None:
+        output["LIVE_ONLY"] = live_only_output
 
     return output
 

@@ -13,6 +13,10 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
 const { CandidateTracker } = require('./candidate_tracker');
+const {
+    parsePrematchOddsPayload,
+    PrematchOddsCache
+} = require('./prematch_odds');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -22,7 +26,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-candidate-audit-ubuntu-v14-2026-08-26';
+const BUILD_VERSION = 'ml-prematch-precision-ubuntu-v15-2026-08-27';
 
 app.use(cors());
 app.use(express.json());
@@ -161,9 +165,21 @@ const CANDIDATE_HISTORY_FILE =
         'dino_candidate_history.json'
     );
 
+const PREMATCH_CACHE_FILE =
+    path.join(
+        __dirname,
+        'dino_prematch_cache.json'
+    );
+
 const SIGNAL_RULES = Object.freeze({
-    surprise: Object.freeze({
+    shadow: Object.freeze({
         minProbability: 60,
+        maxProbabilityExclusive: 70,
+        minMinuteExclusive: 40,
+        maxMinute: 80
+    }),
+    surprise: Object.freeze({
+        minProbability: 70,
         maxProbabilityExclusive: 75,
         minMinuteExclusive: 40,
         maxMinute: 80
@@ -176,6 +192,23 @@ const SIGNAL_RULES = Object.freeze({
 });
 
 const MIN_SIGNAL_ODD = 1.40;
+
+// Kiralama hedefinde doğruluk önceliği: Telegram yalnızca gerçekten
+// pre-match + canlı istatistik modeline geçen maçları kabul eder.
+const PRECISION_MODE = Object.freeze({
+    requirePrematchOneXTwo: true,
+    requireExactPrematchTotal: true,
+    minPrematchTotalSupport: 45
+});
+
+const PREFERRED_PREMATCH_BOOKMAKER_NAME =
+    process.env.PREMATCH_BOOKMAKER_NAME || 'Bet365';
+
+let preferredPrematchBookmakerId =
+    Number(process.env.PREMATCH_BOOKMAKER_ID) || null;
+
+const PREMATCH_SUCCESS_TTL_MS = 8 * 24 * 60 * 60 * 1000;
+const PREMATCH_MISS_TTL_MS = 60 * 60 * 1000;
 
 const SIGNAL_RESULT_REFRESH_MS =
     10 * 60 * 1000;
@@ -227,6 +260,11 @@ const candidateTracker = new CandidateTracker({
     filePath: CANDIDATE_HISTORY_FILE,
     logger: message => addSystemLog(message),
     maxRecords: 50000
+});
+
+const prematchOddsCache = new PrematchOddsCache({
+    filePath: PREMATCH_CACHE_FILE,
+    logger: message => addSystemLog(message)
 });
 
 
@@ -491,7 +529,9 @@ async function istatistikCoverageFiltrele(fixtures) {
             coverageStatus,
             statisticsChecked: false,
             actualStatsComplete: null,
-            statsTeamCount: null
+            statsTeamCount: null,
+            prematchAvailable: null,
+            prematchSource: null
         };
         rows.push(row);
 
@@ -531,6 +571,8 @@ function coverageSnapshotMacGuncelle(mac) {
     row.statisticsChecked = true;
     row.actualStatsComplete = temelStatsTam(mac);
     row.statsTeamCount = Number(mac?.stats_team_count || 0);
+    row.prematchAvailable = mac?.prematch_available === true;
+    row.prematchSource = mac?.prematch_source || null;
     statisticsCoverageSnapshot.completeStatsCount =
         statisticsCoverageSnapshot.matches.filter(
             item => item.statisticsChecked && item.actualStatsComplete === true
@@ -1087,6 +1129,208 @@ function parseLiveOdds(response) {
     return oddsMap;
 }
 
+
+// =========================================================
+// PRE-MATCH ODDS + CACHE
+// =========================================================
+
+let prematchBookmakerLookupDone = false;
+
+
+async function preferredPrematchBookmakerIdCoz() {
+    if (preferredPrematchBookmakerId || prematchBookmakerLookupDone) {
+        return preferredPrematchBookmakerId;
+    }
+
+    prematchBookmakerLookupDone = true;
+
+    try {
+        const response = await apiGet(
+            '/odds/bookmakers',
+            {
+                params: {
+                    search: PREFERRED_PREMATCH_BOOKMAKER_NAME
+                }
+            }
+        );
+        const bookmakers = Array.isArray(response.data?.response)
+            ? response.data.response
+            : [];
+        const wanted = normalizeText(PREFERRED_PREMATCH_BOOKMAKER_NAME);
+        const selected = bookmakers.find(
+            bookmaker => normalizeText(bookmaker?.name) === wanted
+        ) || bookmakers.find(
+            bookmaker => normalizeText(bookmaker?.name).includes(wanted)
+        );
+        const resolvedId = Number(selected?.id);
+
+        if (Number.isFinite(resolvedId) && resolvedId > 0) {
+            preferredPrematchBookmakerId = resolvedId;
+            addSystemLog(
+                `> 🧭 Pre-match öncelikli kaynak çözüldü: ${selected.name} [${resolvedId}].`
+            );
+        }
+    } catch (error) {
+        addSystemLog(
+            `> ⚠️ Pre-match bookmaker kimliği çözülemedi; piyasa konsensüsü denenecek (${error.message}).`
+        );
+    }
+
+    return preferredPrematchBookmakerId;
+}
+
+
+function prematchOneXTwoTam(result) {
+    const oneXTwo = result?.oneXTwo;
+    return ['home', 'draw', 'away'].every(key => {
+        const value = Number(oneXTwo?.[key]);
+        return Number.isFinite(value) && value > 0 && value < 1;
+    });
+}
+
+
+async function prematchOddsGetir(fixtureId) {
+    const numericFixtureId = Number(fixtureId);
+    if (!Number.isFinite(numericFixtureId) || numericFixtureId <= 0) return null;
+
+    const cached = prematchOddsCache.get(numericFixtureId);
+    if (cached) {
+        return cached.status === 'ok' ? cached.result : null;
+    }
+
+    try {
+        const bookmakerId = await preferredPrematchBookmakerIdCoz();
+        const payloads = [];
+
+        if (bookmakerId) {
+            const preferredResponse = await apiGet(
+                '/odds',
+                {
+                    params: {
+                        fixture: numericFixtureId,
+                        bookmaker: bookmakerId
+                    }
+                }
+            );
+            payloads.push(preferredResponse.data || {});
+        }
+
+        let combinedPayload = {
+            response: payloads.flatMap(payload =>
+                Array.isArray(payload?.response) ? payload.response : []
+            )
+        };
+        let parsed = parsePrematchOddsPayload(combinedPayload, {
+            preferredBookmakerId: bookmakerId,
+            preferredBookmakerName: PREFERRED_PREMATCH_BOOKMAKER_NAME
+        });
+
+        // Tercih edilen bookmaker bu fixture'da yoksa ilk sayfadaki farklı
+        // bookmaker'ları konsensüs olarak kullan. Kaynak etiketi gerçek cevaptan gelir.
+        if (
+            !bookmakerId ||
+            !prematchOneXTwoTam(parsed) ||
+            Object.keys(parsed?.totals || {}).length < 5
+        ) {
+            const fallbackResponse = await apiGet(
+                '/odds',
+                {
+                    params: {
+                        fixture: numericFixtureId,
+                        page: 1
+                    }
+                }
+            );
+            payloads.push(fallbackResponse.data || {});
+            combinedPayload = {
+                response: payloads.flatMap(payload =>
+                    Array.isArray(payload?.response) ? payload.response : []
+                )
+            };
+            parsed = parsePrematchOddsPayload(combinedPayload, {
+                preferredBookmakerId: bookmakerId,
+                preferredBookmakerName: PREFERRED_PREMATCH_BOOKMAKER_NAME
+            });
+        }
+
+        if (!prematchOneXTwoTam(parsed)) {
+            prematchOddsCache.set(numericFixtureId, null, {
+                status: 'missing',
+                ttlMs: PREMATCH_MISS_TTL_MS
+            });
+            return null;
+        }
+
+        const result = {
+            ...parsed,
+            fixtureId: numericFixtureId,
+            fetchedAt: new Date().toISOString()
+        };
+        prematchOddsCache.set(numericFixtureId, result, {
+            status: 'ok',
+            ttlMs: PREMATCH_SUCCESS_TTL_MS
+        });
+        return result;
+
+    } catch (error) {
+        prematchOddsCache.set(numericFixtureId, null, {
+            status: 'missing',
+            ttlMs: PREMATCH_MISS_TTL_MS
+        });
+        addSystemLog(
+            `> ⚠️ Fixture ${numericFixtureId} pre-match oranı alınamadı (${error.message}).`
+        );
+        return null;
+    }
+}
+
+
+function prematchVerisiniMacaEkle(mac, prematch) {
+    const oneXTwo = prematch?.oneXTwo || null;
+    mac.prematch_available = prematchOneXTwoTam(prematch);
+    mac.prematch_p_home = mac.prematch_available ? Number(oneXTwo.home) : null;
+    mac.prematch_p_draw = mac.prematch_available ? Number(oneXTwo.draw) : null;
+    mac.prematch_p_away = mac.prematch_available ? Number(oneXTwo.away) : null;
+    mac.prematch_source = mac.prematch_available ? oneXTwo.source : null;
+    mac.prematch_bookmaker_id = mac.prematch_available
+        ? oneXTwo.bookmakerId ?? null
+        : null;
+    mac.prematch_totals = prematch?.totals && typeof prematch.totals === 'object'
+        ? prematch.totals
+        : {};
+}
+
+
+function prematchMarketDestegi(mac, market) {
+    const probabilityPercent = value => {
+        if (value === null || value === undefined || value === '') return null;
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric * 100 : null;
+    };
+
+    if (market === 'MS1') return probabilityPercent(mac?.prematch_p_home);
+    if (market === 'X') return probabilityPercent(mac?.prematch_p_draw);
+    if (market === 'MS2') return probabilityPercent(mac?.prematch_p_away);
+
+    const match = String(market || '').match(/^(\d+(?:\.\d+)?)_(ALT|UST)$/);
+    if (!match) return null;
+
+    const total = mac?.prematch_totals?.[String(Number(match[1]))];
+    const rawValue = match[2] === 'UST' ? total?.over : total?.under;
+    if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+    const value = Number(rawValue);
+    return Number.isFinite(value) ? value * 100 : null;
+}
+
+
+function prematchMarketKaynagi(mac, market) {
+    const match = String(market || '').match(/^(\d+(?:\.\d+)?)_(ALT|UST)$/);
+    if (match) {
+        return mac?.prematch_totals?.[String(Number(match[1]))]?.source || null;
+    }
+    return mac?.prematch_source || null;
+}
+
 // =========================================================
 // FIXTURE STATISTICS
 // =========================================================
@@ -1597,6 +1841,8 @@ async function canliMaclariHazirla() {
         // -------------------------------------------------
 
         const macVerileri = [];
+        let prematchTamMacSayisi = 0;
+        let prematchEksikMacSayisi = 0;
 
 
         for (
@@ -1723,6 +1969,26 @@ async function canliMaclariHazirla() {
 
             enriched.model_hazir = temelStatsTam(enriched);
 
+            // Pre-match verisi yalnızca canlı istatistiği gerçekten tam olan
+            // adaylar için çekilir. Sonuç fixture bazında diske önbelleklenir;
+            // sonraki 10 dakikalık taramalar yeni API isteği üretmez.
+            const prematch = enriched.model_hazir
+                ? await prematchOddsGetir(fixtureID)
+                : null;
+            prematchVerisiniMacaEkle(enriched, prematch);
+
+            if (enriched.prematch_available) {
+                prematchTamMacSayisi++;
+                addSystemLog(
+                    `> 🧭 ${enriched.mac_isim}: pre-match hazır (${enriched.prematch_source}).`
+                );
+            } else {
+                prematchEksikMacSayisi++;
+                addSystemLog(
+                    `> 🟠 ${enriched.mac_isim}: pre-match 1X2 bulunamadı; yalnız gölge denetimde kalacak.`
+                );
+            }
+
             coverageSnapshotMacGuncelle(enriched);
 
 
@@ -1740,6 +2006,10 @@ async function canliMaclariHazirla() {
 
         addSystemLog(
             `> 📈 Gerçek maç istatistiği sonucu: ${statisticsCoverageSnapshot.completeStatsCount} tam | ${statisticsCoverageSnapshot.incompleteStatsCount} eksik.`
+        );
+
+        addSystemLog(
+            `> 🧭 Pre-match kapsamı: ${prematchTamMacSayisi} hazır | ${prematchEksikMacSayisi} eksik. Önbellek: ${JSON.stringify(prematchOddsCache.summary())}`
         );
 
         return macVerileri;
@@ -2024,6 +2294,15 @@ function sinyalTuruBelirle(mac, dinoYuzde) {
         return 'surprise';
     }
 
+    if (
+        dinoYuzde >= SIGNAL_RULES.shadow.minProbability &&
+        dinoYuzde < SIGNAL_RULES.shadow.maxProbabilityExclusive &&
+        dakika > SIGNAL_RULES.shadow.minMinuteExclusive &&
+        dakika <= SIGNAL_RULES.shadow.maxMinute
+    ) {
+        return 'shadow';
+    }
+
     return null;
 }
 
@@ -2065,8 +2344,11 @@ function adayDenetimKaydiOlustur({
     dinoYuzde,
     piyasaYuzde,
     edge,
-    sinyalTuru
+    sinyalTuru,
+    liveOnlyDino
 }) {
+    const liveOnlyProbability = Number(liveOnlyDino?.[market]);
+    const prematchSupport = prematchMarketDestegi(mac, market);
     return {
         recordId: `${scanId}-${Number(mac.fixture_id)}-${market}`,
         scanId,
@@ -2091,6 +2373,25 @@ function adayDenetimKaydiOlustur({
             ? oddsData.bookmaker
             : 'Bilinmiyor',
         modelVariant: dino?.MODEL_VARYANTI || 'live_only',
+        liveOnlyProbability: Number.isFinite(liveOnlyProbability)
+            ? liveOnlyProbability
+            : null,
+        prematchProbabilityDelta: Number.isFinite(liveOnlyProbability)
+            ? Number((dinoYuzde - liveOnlyProbability).toFixed(1))
+            : null,
+        prematchAvailable: mac?.prematch_available === true,
+        prematchSource: mac?.prematch_source || null,
+        prematchProbabilities: mac?.prematch_available
+            ? {
+                home: Number(mac.prematch_p_home),
+                draw: Number(mac.prematch_p_draw),
+                away: Number(mac.prematch_p_away)
+            }
+            : null,
+        prematchMarketSupport: Number.isFinite(prematchSupport)
+            ? Number(prematchSupport.toFixed(1))
+            : null,
+        prematchMarketSource: prematchMarketKaynagi(mac, market),
         statsSource: mac.stats_source || null,
         statsComplete: temelStatsTam(mac),
         liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
@@ -2105,7 +2406,7 @@ function adayDenetimKaydiOlustur({
 const MODEL_MARKET_PATTERN = /^(MS1|X|MS2|[0-4]\.5_(ALT|UST))$/;
 
 
-function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
+function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}) {
     const secilenler = {
         surprise: null,
         strong: null
@@ -2140,6 +2441,8 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
             ? 'GÜÇLÜ'
             : sinyalTuru === 'surprise'
                 ? 'SÜRPRİZ'
+                : sinyalTuru === 'shadow'
+                    ? 'GÖLGE'
                 : 'SINIF DIŞI';
 
         const auditRecord = adayDenetimKaydiOlustur({
@@ -2153,7 +2456,8 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
             dinoYuzde,
             piyasaYuzde,
             edge,
-            sinyalTuru
+            sinyalTuru,
+            liveOnlyDino
         });
         auditRecords.push(auditRecord);
 
@@ -2198,7 +2502,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
 
         if (!sinyalTuru) {
             auditRecord.decision = 'class_outside';
-            auditRecord.decisionDetail = 'Dino ihtimali ve dakika, sürpriz/güçlü sınıfına uymadı.';
+            auditRecord.decisionDetail = 'Dino ihtimali ve dakika, gölge/sürpriz/güçlü sınıfına uymadı.';
             continue;
         }
 
@@ -2212,6 +2516,37 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
             auditRecord.decision = 'edge_below_minimum';
             auditRecord.decisionDetail = `EDGE %${edge.toFixed(1)}, minimum %${minimumEdge} altında.`;
             continue;
+        }
+
+        if (sinyalTuru === 'shadow') {
+            auditRecord.decision = 'shadow_probability';
+            auditRecord.decisionDetail = 'Dino %60–69.9: Telegram dışı gölge sinyal olarak kaydedildi.';
+            continue;
+        }
+
+        if (
+            PRECISION_MODE.requirePrematchOneXTwo &&
+            dino?.MODEL_VARYANTI !== 'live_plus_prematch'
+        ) {
+            auditRecord.decision = 'prematch_missing';
+            auditRecord.decisionDetail = 'Precision modunda pre-match 1X2 zorunlu; maç live_only kaldı.';
+            continue;
+        }
+
+        const totalMarket = /_(ALT|UST)$/.test(market);
+        if (totalMarket && PRECISION_MODE.requireExactPrematchTotal) {
+            const prematchSupport = prematchMarketDestegi(mac, market);
+            if (!Number.isFinite(prematchSupport)) {
+                auditRecord.decision = 'prematch_total_missing';
+                auditRecord.decisionDetail = `${market} çizgisi için pre-match ÜST/ALT desteği bulunamadı.`;
+                continue;
+            }
+
+            if (prematchSupport < PRECISION_MODE.minPrematchTotalSupport) {
+                auditRecord.decision = 'prematch_total_conflict';
+                auditRecord.decisionDetail = `Pre-match ${market} desteği %${prematchSupport.toFixed(1)}, gereken %${PRECISION_MODE.minPrematchTotalSupport} altında.`;
+                continue;
+            }
         }
 
         auditRecord.decision = 'eligible_not_selected';
@@ -2228,6 +2563,13 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
                 ? oddsData.bookmaker
                 : 'Bilinmiyor',
             model_varyanti: dino?.MODEL_VARYANTI || 'live_only',
+            live_only_yuzde: Number.isFinite(Number(liveOnlyDino?.[market]))
+                ? Number(liveOnlyDino[market])
+                : null,
+            prematch_destek_yuzde: Number.isFinite(prematchMarketDestegi(mac, market))
+                ? Number(prematchMarketDestegi(mac, market).toFixed(1))
+                : null,
+            prematch_kaynak: prematchMarketKaynagi(mac, market),
             auditRecord
         };
 
@@ -2318,6 +2660,9 @@ async function geminiYorumuYaz(
         const analysisRule = statsAvailable
             ? 'Yalnızca yukarıda açıkça verilen canlı istatistikleri, skor ve dakikayı kullan. Eksik alanları tahmin etme.'
             : 'Yalnızca skor, dakika, seçilmiş market ve model olasılığını kullan; bulunmayan canlı istatistikleri uydurma.';
+        const prematchDescription = mac?.prematch_available
+            ? `Kaynak: ${mac.prematch_source}\nEv: %${(Number(mac.prematch_p_home) * 100).toFixed(1)} | Beraberlik: %${(Number(mac.prematch_p_draw) * 100).toFixed(1)} | Deplasman: %${(Number(mac.prematch_p_away) * 100).toFixed(1)}\nSeçilen market pre-match desteği: ${Number.isFinite(Number(firsat?.prematch_destek_yuzde)) ? `%${firsat.prematch_destek_yuzde}` : 'Bu çizgide veri yok'}`
+            : 'Pre-match veri yok.';
 
 
         const prompt = `
@@ -2340,6 +2685,9 @@ ${mac.skor}
 Canlı veri:
 ${statsDescription}
 
+Pre-match piyasa verisi:
+${prematchDescription}
+
 Seçilen market:
 ${firsat.market}
 
@@ -2358,7 +2706,7 @@ EDGE:
 Görevin:
 Bu value'nun istatistiksel olarak neden oluştuğunu 3 kısa cümlede profesyonel biçimde açıkla.
 
-${analysisRule}
+${analysisRule} Pre-match yüzdeleri mevcutsa takım gücü bağlamı olarak kullan; bunları canlı istatistik diye sunma.
 
 Tahmin dışında yeni bir bahis önermeye çalışma.
 
@@ -2515,6 +2863,17 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
             bookmaker: firsat?.bookmaker,
             marketProbability: firsat?.piyasa_yuzde,
             modelVariant: firsat?.model_varyanti,
+            liveOnlyProbability: firsat?.live_only_yuzde,
+            prematchSource: mac?.prematch_source,
+            prematchProbabilities: mac?.prematch_available
+                ? {
+                    home: mac.prematch_p_home,
+                    draw: mac.prematch_p_draw,
+                    away: mac.prematch_p_away
+                }
+                : null,
+            prematchMarketSupport: firsat?.prematch_destek_yuzde,
+            prematchMarketSource: firsat?.prematch_kaynak,
             statsSource: mac?.stats_source,
             liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
             analysis: yorum
@@ -2624,6 +2983,18 @@ async function telegramSinyaliGonder(
     const sinyalAciklamasi = gucluSinyal
         ? 'Doğruluk öncelikli güçlü sinyal'
         : 'Risk almak isteyenler için sürpriz sinyal';
+    const modelEtiketi = firsat?.model_varyanti === 'live_plus_prematch'
+        ? 'Canlı istatistik + pre-match modeli'
+        : 'Canlı istatistik modeli';
+    const prematchSatiri = mac?.prematch_available
+        ? `\n🧭 <b>Pre-Match:</b> ${telegramHtml(mac.prematch_source)} | 1:%${telegramHtml((Number(mac.prematch_p_home) * 100).toFixed(1))} X:%${telegramHtml((Number(mac.prematch_p_draw) * 100).toFixed(1))} 2:%${telegramHtml((Number(mac.prematch_p_away) * 100).toFixed(1))}`
+        : '';
+    const prematchMarketSatiri = Number.isFinite(Number(firsat?.prematch_destek_yuzde))
+        ? `\n🧩 <b>Pre-Match Market Desteği:</b> %${telegramHtml(firsat.prematch_destek_yuzde)}`
+        : '';
+    const liveOnlySatiri = Number.isFinite(Number(firsat?.live_only_yuzde))
+        ? `\n🔬 <b>Live-Only Karşılığı:</b> %${telegramHtml(firsat.live_only_yuzde)}`
+        : '';
 
 
     const mesaj =
@@ -2642,7 +3013,7 @@ async function telegramSinyaliGonder(
 🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
 🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
 📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
-🧠 <b>Model:</b> ${temelStatsTam(mac) ? 'Canlı istatistik modeli' : 'Dakika + skor fallback modeli (sıkı güvenlik)'}
+🧠 <b>Model:</b> ${telegramHtml(modelEtiketi)}${prematchSatiri}${prematchMarketSatiri}${liveOnlySatiri}
 
 📌 <b>Canlı İstatistikler</b>
 🏠 ${telegramHtml(statGoster(mac.home_shot))} Şut | ${telegramHtml(statGoster(mac.home_sot))} İsabet | ${telegramHtml(statGoster(mac.home_corner))} Korner
@@ -2749,6 +3120,8 @@ async function botuCalistir() {
             `> 📊 Python canlı istatistik modeline yalnızca ${macListesi.length} tam istatistikli maç gönderiliyor.`
         );
 
+        // Python aynı süreçte pre-match'li kararı ve live_only A/B gölge
+        // sonucunu birlikte döndürür; dizi hizası tek çağrıyla korunur.
         const dinoSonuclari = await yapayZekaAnaliziYap(macListesi);
         if (
             !Array.isArray(dinoSonuclari) ||
@@ -2764,6 +3137,9 @@ async function botuCalistir() {
         for (let i = 0; i < macListesi.length; i++) {
             const mac = macListesi[i];
             const dino = dinoSonuclari[i];
+            const liveOnlyDino = dino?.LIVE_ONLY || (
+                dino?.MODEL_VARYANTI === 'live_only' ? dino : null
+            );
 
             if (!dino || dino.HATA || Object.keys(dino).length === 0) {
                 addSystemLog(
@@ -2784,6 +3160,9 @@ async function botuCalistir() {
                     statsComplete: temelStatsTam(mac),
                     liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
                     modelVariant: dino?.MODEL_VARYANTI || null,
+                    liveOnlyProbability: null,
+                    prematchAvailable: mac?.prematch_available === true,
+                    prematchSource: mac?.prematch_source || null,
                     minimumEdgeAtEvaluation: Number(state.globalMinEdge),
                     minimumOddAtEvaluation: MIN_SIGNAL_ODD,
                     decision: 'model_error',
@@ -2801,7 +3180,8 @@ async function botuCalistir() {
                 dino,
                 {
                     scanId,
-                    capturedAt: scanCapturedAt
+                    capturedAt: scanCapturedAt,
+                    liveOnlyDino
                 }
             );
             candidateAuditRows.push(...degerlendirme.auditRecords);
@@ -3186,7 +3566,9 @@ function paylasilanSinyallerCsvOlustur(signals) {
     const headers = [
         'signal_id', 'fixture_id', 'signal_type', 'sent_at', 'match', 'league',
         'minute', 'score', 'market', 'dino_probability', 'edge', 'odds',
-        'bookmaker', 'market_probability', 'model_variant', 'stats_source',
+        'bookmaker', 'market_probability', 'model_variant', 'live_only_probability',
+        'prematch_source', 'prematch_home', 'prematch_draw', 'prematch_away',
+        'prematch_market_support', 'prematch_market_source', 'stats_source',
         'home_shots', 'home_shots_on_goal', 'home_corners', 'home_possession',
         'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
         'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
@@ -3202,7 +3584,10 @@ function paylasilanSinyallerCsvOlustur(signals) {
             signal.signalId, signal.fixtureId, signal.signalType, signal.sentAt,
             signal.match, signal.league, signal.minute, signal.score, signal.market,
             signal.dinoProbability, signal.edge, signal.odds, signal.bookmaker,
-            signal.marketProbability, signal.modelVariant, signal.statsSource,
+            signal.marketProbability, signal.modelVariant, signal.liveOnlyProbability,
+            signal.prematchSource, signal.prematchProbabilities?.home,
+            signal.prematchProbabilities?.draw, signal.prematchProbabilities?.away,
+            signal.prematchMarketSupport, signal.prematchMarketSource, signal.statsSource,
             home.shots, home.shotsOnGoal, home.corners, home.possession,
             home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
             away.shots, away.shotsOnGoal, away.corners, away.possession,
@@ -3246,6 +3631,9 @@ app.get(
         const payload = signalTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
+            minimumSignalOdd: MIN_SIGNAL_ODD,
+            currentMinimumEdge: state.globalMinEdge,
+            precisionMode: PRECISION_MODE,
             note: 'Bu dosya yalnızca Telegram API\'sine başarıyla gönderilen sinyalleri içerir.'
         });
 
@@ -3278,7 +3666,10 @@ function adayGecmisiCsvOlustur(records) {
         'record_id', 'scan_id', 'captured_at', 'fixture_id', 'match', 'league',
         'minute', 'score', 'market', 'signal_class', 'dino_probability', 'edge',
         'odds', 'market_probability', 'bookmaker', 'decision', 'decision_detail',
-        'minimum_edge', 'minimum_odd', 'model_variant', 'stats_source',
+        'minimum_edge', 'minimum_odd', 'model_variant', 'live_only_probability',
+        'prematch_probability_delta', 'prematch_available', 'prematch_source',
+        'prematch_home', 'prematch_draw', 'prematch_away',
+        'prematch_market_support', 'prematch_market_source', 'stats_source',
         'home_shots', 'home_shots_on_goal', 'home_corners', 'home_possession',
         'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
         'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
@@ -3296,7 +3687,12 @@ function adayGecmisiCsvOlustur(records) {
             record.signalClass, record.dinoProbability, record.edge, record.odds,
             record.marketProbability, record.bookmaker, record.decision,
             record.decisionDetail, record.minimumEdgeAtEvaluation,
-            record.minimumOddAtEvaluation, record.modelVariant, record.statsSource,
+            record.minimumOddAtEvaluation, record.modelVariant,
+            record.liveOnlyProbability, record.prematchProbabilityDelta,
+            record.prematchAvailable, record.prematchSource,
+            record.prematchProbabilities?.home, record.prematchProbabilities?.draw,
+            record.prematchProbabilities?.away, record.prematchMarketSupport,
+            record.prematchMarketSource, record.statsSource,
             home.shots, home.shotsOnGoal, home.corners, home.possession,
             home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
             away.shots, away.shotsOnGoal, away.corners, away.possession,
@@ -3331,6 +3727,7 @@ app.get(
             rules: SIGNAL_RULES,
             currentMinimumEdge: state.globalMinEdge,
             minimumSignalOdd: MIN_SIGNAL_ODD,
+            precisionMode: PRECISION_MODE,
             note: 'Tam istatistikli maçlarda modelin gördüğü tüm canlı market anları; Telegram\'a gönderilmeyenler dahil.'
         });
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -3692,6 +4089,11 @@ app.get(
                 : match.actualStatsComplete === false
                     ? '❌ Eksik'
                     : '⏳ Kontrol edilmedi';
+            const prematchLabel = match.prematchAvailable === true
+                ? `🧭 ${coverageHtmlEscape(match.prematchSource || 'Hazır')}`
+                : match.prematchAvailable === false
+                    ? '❌ Yok'
+                    : '⏳ Kontrol edilmedi';
             return `<tr>
                 <td>${coverageHtmlEscape(match.match)}</td>
                 <td>${coverageHtmlEscape(match.league)}</td>
@@ -3699,6 +4101,7 @@ app.get(
                 <td>${coverageHtmlEscape(match.minute)}'</td>
                 <td>${coverageLabel}</td>
                 <td>${actualLabel}</td>
+                <td>${prematchLabel}</td>
                 <td>${coverageHtmlEscape(match.statsTeamCount ?? '-')}</td>
             </tr>`;
         }).join('');
@@ -3731,8 +4134,8 @@ app.get(
         <div class="card">Gerçek stats eksik<b>${snapshot.incompleteStatsCount}</b></div>
     </div>
     <table>
-        <thead><tr><th>Maç</th><th>Lig</th><th>Sezon</th><th>Dakika</th><th>Lig kapsamı</th><th>Gerçek veri</th><th>API takım</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="7">Henüz tarama sonucu yok.</td></tr>'}</tbody>
+        <thead><tr><th>Maç</th><th>Lig</th><th>Sezon</th><th>Dakika</th><th>Lig kapsamı</th><th>Gerçek veri</th><th>Pre-Match</th><th>API takım</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="8">Henüz tarama sonucu yok.</td></tr>'}</tbody>
     </table>
 </body>
 </html>`);
@@ -3770,6 +4173,15 @@ app.get(
 
             minimumSignalOdd:
                 MIN_SIGNAL_ODD,
+
+            precisionMode:
+                PRECISION_MODE,
+
+            prematchTracking: {
+                preferredBookmakerName: PREFERRED_PREMATCH_BOOKMAKER_NAME,
+                preferredBookmakerId: preferredPrematchBookmakerId,
+                cache: prematchOddsCache.summary()
+            },
 
             statisticsCoverage: {
                 updatedAt: statisticsCoverageSnapshot.updatedAt,
@@ -3821,6 +4233,8 @@ signalTracker.load();
 
 candidateTracker.load();
 
+prematchOddsCache.load();
+
 
 const PORT =
     process.env.PORT ||
@@ -3849,6 +4263,10 @@ app.listen(
             `> 💵 Minimum canlı oran: ${MIN_SIGNAL_ODD.toFixed(2)}`
         );
 
+        addSystemLog(
+            `> 🧭 Precision pre-match modu: AÇIK | Tercih: ${PREFERRED_PREMATCH_BOOKMAKER_NAME} | Pre-match yoksa Telegram yok.`
+        );
+
 
         addSystemLog(
             `> 🔄 Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Döngü: 10 dakika | Maç aralığı: 25-80. dakika.`
@@ -3865,7 +4283,7 @@ app.listen(
         );
 
         addSystemLog(
-            "> 🟡 Sürpriz: Dino %60–74.9 ve 41–80. dakika | 🟢 Güçlü: Dino %75+ ve 25–80. dakika."
+            "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 41–80. dakika | 🟢 Güçlü: %75+ ve 25–80. dakika."
         );
 
         addSystemLog(

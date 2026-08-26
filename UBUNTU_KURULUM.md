@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino v14
+# Ubuntu Kurulumu — Dino v15 Precision Prematch
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. Mevcut .env
 dosyanızı silmeyin veya paylaşmayın. node_modules klasörünü yeniden kopyalamanız
@@ -12,6 +12,7 @@ Paketteki dosyaları proje klasörünüze aynı dizin yapısıyla kopyalayın. B
 - server.js
 - signal_tracker.js
 - candidate_tracker.js
+- prematch_odds.js
 - public/index.html
 - index.html (paneli dosya olarak açan kurulumlar için aynı kopya)
 - tahmin_yap.py
@@ -27,11 +28,22 @@ istatistikli maçlarda modelin gördüğü bütün market anlarını, eleme nede
 ve final sonuçlarını tutar. Telegram'a gitmeyen adayları sonradan incelemek için
 bu dosyayı da silmeyin.
 
+İlk açılışta dino_prematch_cache.json otomatik oluşur. Fixture bazında pre-match
+oranlarını sakladığı için aynı maçın 10 dakikalık taramalarında gereksiz API
+isteği yapılmaz. Güncellemelerde bu dosyayı da koruyun.
+
 ## Ortam değişkenleri
 
 Mevcut .env dosyanızda anahtarlarınız bulunmalıdır. Python için önerilen satır:
 
     PYTHON_BIN=python3
+
+İsteğe bağlı pre-match bookmaker ayarları:
+
+    PREMATCH_BOOKMAKER_NAME=Bet365
+
+Bookmaker kimliği API'den ada göre çözülür. Kimliği elle sabitlemek isterseniz
+`PREMATCH_BOOKMAKER_ID` ekleyebilirsiniz; normal kurulumda gerekli değildir.
 
 API, Telegram veya Gemini anahtarlarını sohbetlerde ve ekran görüntülerinde
 paylaşmayın.
@@ -51,21 +63,28 @@ PM2 kullanıyorsanız:
 
 Başlangıç logunda şu sürüm görünmelidir:
 
-    ml-candidate-audit-ubuntu-v14-2026-08-26
+    ml-prematch-precision-ubuntu-v15-2026-08-27
 
 Ayrıca şu iki satır görünür:
 
     Minimum canlı oran: 1.40
-    Sürpriz: Dino %60–74.9 ve 41–80. dakika | Güçlü: Dino %75+ ve 25–80. dakika.
+    Gölge: Dino %60–69.9 | Sürpriz: %70–74.9 | Güçlü: %75+
+    Precision pre-match modu: AÇIK
     Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü.
     Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir.
 
 ## Yeni sinyal düzeni
 
-- Sürpriz sinyal: Dino olasılığı %60–74.9, dakika 41–80.
+- Gölge sinyal: Dino olasılığı %60–69.9, dakika 41–80; Telegram'a gönderilmez.
+- Sürpriz sinyal: Dino olasılığı %70–74.9, dakika 41–80.
 - Güçlü sinyal: Dino olasılığı %75+, dakika 25–80.
 - Her iki sınıf da paneldeki minimum EDGE ayarını geçmelidir.
 - Her iki sınıf için canlı oran en az 1.40 olmalıdır.
+- Telegram sinyali için pre-match 1X2 verisi zorunludur. Böylece Python
+  `live_plus_prematch` varyantını kullanır.
+- ALT/ÜST sinyallerinde seçilen çizginin pre-match taraf olasılığı en az %45
+  olmalıdır. Veri yoksa veya pre-match piyasa ters yöndeyse sinyal yalnız aday
+  geçmişinde kalır.
 - Mevcut skor nedeniyle zaten kazanmış veya kaybetmiş toplam gol çizgileri
   stale/hatalı oran kabul edilerek engellenir.
 - Her maç en fazla bir sürpriz ve bir güçlü sinyal gönderebilir.
@@ -94,7 +113,8 @@ paylaşılmışsa iki ayrı sinyal kaydı oluşur fakat fixture kimliği aynı k
 
 Paneldeki Tam-Stat Aday Denetimi, Telegram'a gönderilmeyen marketleri de kaydeder.
 Her kayıtta Dino ihtimali, oran, EDGE, dakika, skor, canlı istatistikler ve kesin
-karar nedeni bulunur. Model tahmini bulunup canlı oranı bulunmayan marketler de
+karar nedeni bulunur. Live-only olasılık, pre-match'li olasılık, aradaki fark ve
+pre-match market desteği de kaydedilir. Model tahmini bulunup canlı oranı bulunmayan marketler de
 `live_odds_missing` kararıyla tutulur. Sonuç bekleyen adaylar paylaşılan sinyallerle aynı toplu API
 isteğinde kontrol edilir; böylece gereksiz ayrı sonuç istekleri oluşturulmaz.
 

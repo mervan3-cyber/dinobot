@@ -254,6 +254,9 @@ class CandidateTracker {
         let sent = 0;
         let invalidMarket = 0;
         let unsentWinners = 0;
+        let shadowSignals = 0;
+        let prematchBlocked = 0;
+        let livePlusPrematch = 0;
 
         for (const record of this.data.records) {
             uniqueFixtures.add(Number(record.fixtureId));
@@ -267,6 +270,11 @@ class CandidateTracker {
 
             if (decision === 'sent') sent++;
             if (decision === 'market_already_decided') invalidMarket++;
+            if (decision === 'shadow_probability') shadowSignals++;
+            if (['prematch_missing', 'prematch_total_missing', 'prematch_total_conflict'].includes(decision)) {
+                prematchBlocked++;
+            }
+            if (record.modelVariant === 'live_plus_prematch') livePlusPrematch++;
             if (
                 record?.settlement?.result === 'W' &&
                 decision !== 'sent' &&
@@ -284,6 +292,9 @@ class CandidateTracker {
             sent,
             invalidMarket,
             unsentWinners,
+            shadowSignals,
+            prematchBlocked,
+            livePlusPrematch,
             overall,
             byDecision,
             byClass
