@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
+const { CandidateTracker } = require('./candidate_tracker');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -21,7 +22,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-dual-signal-tracker-ubuntu-v13-2026-08-24';
+const BUILD_VERSION = 'ml-candidate-audit-ubuntu-v14-2026-08-26';
 
 app.use(cors());
 app.use(express.json());
@@ -81,7 +82,7 @@ const apiClient = axios.create({
         ipv4Agent,
 
     timeout:
-        15000
+        30000
 });
 
 
@@ -154,9 +155,15 @@ const SIGNAL_HISTORY_FILE =
         'dino_signal_history.json'
     );
 
+const CANDIDATE_HISTORY_FILE =
+    path.join(
+        __dirname,
+        'dino_candidate_history.json'
+    );
+
 const SIGNAL_RULES = Object.freeze({
     surprise: Object.freeze({
-        minProbability: 55,
+        minProbability: 60,
         maxProbabilityExclusive: 75,
         minMinuteExclusive: 40,
         maxMinute: 80
@@ -167,6 +174,8 @@ const SIGNAL_RULES = Object.freeze({
         maxMinute: 80
     })
 });
+
+const MIN_SIGNAL_ODD = 1.40;
 
 const SIGNAL_RESULT_REFRESH_MS =
     10 * 60 * 1000;
@@ -212,6 +221,12 @@ let signalResultInterval = null;
 const signalTracker = new SignalTracker({
     filePath: SIGNAL_HISTORY_FILE,
     logger: message => addSystemLog(message)
+});
+
+const candidateTracker = new CandidateTracker({
+    filePath: CANDIDATE_HISTORY_FILE,
+    logger: message => addSystemLog(message),
+    maxRecords: 50000
 });
 
 
@@ -265,101 +280,68 @@ function sleep(ms) {
 
 
 async function apiGet(url, config = {}) {
+    const queuedRequest = apiQueue
+        .catch(() => undefined)
+        .then(async () => {
+            const maximumAttempts = 3;
+            let lastError = null;
 
-    let result;
+            for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
+                const elapsed = Date.now() - lastApiRequestTime;
+                const minimumDelay = 250;
 
-    apiQueue =
-        apiQueue.then(async () => {
+                if (elapsed < minimumDelay) {
+                    await sleep(minimumDelay - elapsed);
+                }
 
-            const now =
-                Date.now();
+                lastApiRequestTime = Date.now();
 
-            const elapsed =
-                now -
-                lastApiRequestTime;
-
-            const minimumDelay =
-                250;
-
-            if (
-                elapsed <
-                minimumDelay
-            ) {
-
-                await sleep(
-                    minimumDelay -
-                    elapsed
-                );
-
-            }
-
-            lastApiRequestTime =
-                Date.now();
-
-
-            try {
-
-                result =
-                    await apiClient.get(
-                        url,
-                        config
-                    );
-
-
-                const remaining =
-                    result.headers[
+                try {
+                    const result = await apiClient.get(url, config);
+                    const remaining = result.headers[
                         'x-ratelimit-requests-remaining'
                     ];
 
-                if (
-                    remaining !== undefined
-                ) {
+                    if (remaining !== undefined) {
+                        quotaRemaining = Number(remaining);
+                    }
 
-                    quotaRemaining =
-                        Number(
-                            remaining
-                        );
+                    return result;
+                } catch (error) {
+                    lastError = error;
+                    const status = Number(error.response?.status);
+                    const timeoutOrNetwork =
+                        error.code === 'ECONNABORTED' ||
+                        error.code === 'ETIMEDOUT' ||
+                        !error.response;
+                    const retryable = status === 429 || status >= 500 || timeoutOrNetwork;
 
-                }
+                    if (!retryable || attempt >= maximumAttempts) {
+                        error.message = `${url}: ${error.message}`;
+                        throw error;
+                    }
 
-            } catch (error) {
-
-                if (
-                    error.response &&
-                    error.response.status === 429
-                ) {
-
+                    const waitMs = status === 429
+                        ? 15000
+                        : attempt * 5000;
                     addSystemLog(
-                        "> ⚠️ API 429! 15 saniye bekleniyor..."
+                        `> ⚠️ API geçici hata [${url}] (${error.message}). ${Math.round(waitMs / 1000)} sn sonra ${attempt + 1}/${maximumAttempts} deneniyor.`
                     );
-
-                    await sleep(
-                        15000
-                    );
-
-                    lastApiRequestTime =
-                        Date.now();
-
-                    result =
-                        await apiClient.get(
-                            url,
-                            config
-                        );
-
-                } else {
-
-                    throw error;
-
+                    await sleep(waitMs);
                 }
-
             }
 
+            throw lastError || new Error(`${url}: API isteği tamamlanamadı.`);
         });
 
+    // Tek timeout kuyruk zincirini kalıcı olarak reddedilmiş bırakmaz.
+    // Hatayı yalnızca bu isteğin çağrıcısı alır.
+    apiQueue = queuedRequest.then(
+        () => undefined,
+        () => undefined
+    );
 
-    await apiQueue;
-
-    return result;
+    return queuedRequest;
 }
 
 
@@ -2059,32 +2041,127 @@ function firsatAdayiDahaIyiMi(yeniAday, mevcutAday) {
 }
 
 
-function valueAnalizleriYap(mac, dino) {
+function toplamGolMarketiSkoraGoreSonuclanmisMi(market, skor) {
+    const marketMatch = String(market || '').match(
+        /^(\d+(?:\.\d+)?)_(ALT|UST)$/
+    );
+    const scoreMatch = String(skor || '').match(/^(\d+)\s*-\s*(\d+)$/);
+    if (!marketMatch || !scoreMatch) return false;
+
+    const line = Number(marketMatch[1]);
+    const totalGoals = Number(scoreMatch[1]) + Number(scoreMatch[2]);
+    return Number.isFinite(line) && Number.isFinite(totalGoals) && totalGoals > line;
+}
+
+
+function adayDenetimKaydiOlustur({
+    scanId,
+    capturedAt,
+    mac,
+    dino,
+    market,
+    oddsData,
+    piyasaOrani,
+    dinoYuzde,
+    piyasaYuzde,
+    edge,
+    sinyalTuru
+}) {
+    return {
+        recordId: `${scanId}-${Number(mac.fixture_id)}-${market}`,
+        scanId,
+        capturedAt,
+        fixtureId: Number(mac.fixture_id),
+        match: mac.mac_isim,
+        league: mac.lig,
+        minute: Number(mac.dakika),
+        score: mac.skor,
+        statusShort: mac.status_short || null,
+        market,
+        signalClass: sinyalTuru,
+        dinoProbability: dinoYuzde,
+        odds: piyasaOrani,
+        marketProbability: Number.isFinite(piyasaYuzde)
+            ? Number(piyasaYuzde.toFixed(1))
+            : null,
+        edge: Number.isFinite(edge)
+            ? Number(edge.toFixed(1))
+            : null,
+        bookmaker: oddsData && typeof oddsData === 'object'
+            ? oddsData.bookmaker
+            : 'Bilinmiyor',
+        modelVariant: dino?.MODEL_VARYANTI || 'live_only',
+        statsSource: mac.stats_source || null,
+        statsComplete: temelStatsTam(mac),
+        liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
+        minimumEdgeAtEvaluation: Number(state.globalMinEdge),
+        minimumOddAtEvaluation: MIN_SIGNAL_ODD,
+        decision: 'evaluating',
+        decisionDetail: null
+    };
+}
+
+
+const MODEL_MARKET_PATTERN = /^(MS1|X|MS2|[0-4]\.5_(ALT|UST))$/;
+
+
+function valueAnalizleriYap(mac, dino, { scanId, capturedAt } = {}) {
     const secilenler = {
         surprise: null,
         strong: null
     };
+    const auditRecords = [];
     const minimumEdge = Number(state.globalMinEdge);
-    const markets = Object.entries(mac.canli_oranlar || {});
+    const liveOdds = mac.canli_oranlar || {};
+    const marketNames = [...new Set([
+        ...Object.keys(liveOdds),
+        ...Object.keys(dino || {}).filter(key => MODEL_MARKET_PATTERN.test(key))
+    ])];
+    const activeScanId = scanId || `scan-${Date.now()}`;
+    const activeCapturedAt = capturedAt || new Date().toISOString();
 
-    for (const [market, oddsData] of markets) {
-        const piyasaOrani = typeof oddsData === 'object'
+    for (const market of marketNames) {
+        const oddsData = liveOdds[market];
+        const piyasaOrani = oddsData && typeof oddsData === 'object'
             ? Number(oddsData.oran)
             : Number(oddsData);
-
-        if (!Number.isFinite(piyasaOrani) || piyasaOrani <= 1) continue;
-
         const dinoYuzde = Number(dino[market]);
         if (!Number.isFinite(dinoYuzde)) continue;
 
-        const piyasaYuzde = (1 / piyasaOrani) * 100;
-        const edge = dinoYuzde - piyasaYuzde;
+        const usableOdd = Number.isFinite(piyasaOrani) && piyasaOrani > 1;
+        const piyasaYuzde = usableOdd
+            ? (1 / piyasaOrani) * 100
+            : null;
+        const edge = usableOdd
+            ? dinoYuzde - piyasaYuzde
+            : null;
         const sinyalTuru = sinyalTuruBelirle(mac, dinoYuzde);
         const turEtiketi = sinyalTuru === 'strong'
             ? 'GÜÇLÜ'
             : sinyalTuru === 'surprise'
                 ? 'SÜRPRİZ'
                 : 'SINIF DIŞI';
+
+        const auditRecord = adayDenetimKaydiOlustur({
+            scanId: activeScanId,
+            capturedAt: activeCapturedAt,
+            mac,
+            dino,
+            market,
+            oddsData,
+            piyasaOrani: usableOdd ? piyasaOrani : null,
+            dinoYuzde,
+            piyasaYuzde,
+            edge,
+            sinyalTuru
+        });
+        auditRecords.push(auditRecord);
+
+        if (!usableOdd) {
+            auditRecord.decision = 'live_odds_missing';
+            auditRecord.decisionDetail = 'Model tahmini var fakat bu market için kullanılabilir canlı oran yok.';
+            continue;
+        }
 
         const scoreOnlyRedNedeni = scoreOnlyGuvenlikNedeni(
             mac,
@@ -2099,7 +2176,18 @@ function valueAnalizleriYap(mac, dino) {
             `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
         );
 
+        if (toplamGolMarketiSkoraGoreSonuclanmisMi(market, mac.skor)) {
+            auditRecord.decision = 'market_already_decided';
+            auditRecord.decisionDetail = `Mevcut skor ${mac.skor}, ${market} çizgisini zaten sonuçlandırdı.`;
+            addSystemLog(
+                `> 🚫 ${mac.mac_isim} | ${market}: mevcut skor ${mac.skor} nedeniyle market zaten sonuçlanmış; oran reddedildi.`
+            );
+            continue;
+        }
+
         if (scoreOnlyRedNedeni) {
+            auditRecord.decision = 'fallback_security';
+            auditRecord.decisionDetail = scoreOnlyRedNedeni;
             if (edge >= minimumEdge) {
                 addSystemLog(
                     `> 🛡️ ${mac.mac_isim} | ${market}: fallback güvenlik filtresi reddetti (${scoreOnlyRedNedeni}).`
@@ -2108,7 +2196,26 @@ function valueAnalizleriYap(mac, dino) {
             continue;
         }
 
-        if (!sinyalTuru || edge < minimumEdge) continue;
+        if (!sinyalTuru) {
+            auditRecord.decision = 'class_outside';
+            auditRecord.decisionDetail = 'Dino ihtimali ve dakika, sürpriz/güçlü sınıfına uymadı.';
+            continue;
+        }
+
+        if (piyasaOrani < MIN_SIGNAL_ODD) {
+            auditRecord.decision = 'odds_below_minimum';
+            auditRecord.decisionDetail = `Canlı oran ${piyasaOrani}, minimum ${MIN_SIGNAL_ODD.toFixed(2)} altında.`;
+            continue;
+        }
+
+        if (edge < minimumEdge) {
+            auditRecord.decision = 'edge_below_minimum';
+            auditRecord.decisionDetail = `EDGE %${edge.toFixed(1)}, minimum %${minimumEdge} altında.`;
+            continue;
+        }
+
+        auditRecord.decision = 'eligible_not_selected';
+        auditRecord.decisionDetail = 'Bütün temel filtreleri geçti; sınıf içi seçim bekliyor.';
 
         const aday = {
             market,
@@ -2120,7 +2227,8 @@ function valueAnalizleriYap(mac, dino) {
             bookmaker: typeof oddsData === 'object'
                 ? oddsData.bookmaker
                 : 'Bilinmiyor',
-            model_varyanti: dino?.MODEL_VARYANTI || 'live_only'
+            model_varyanti: dino?.MODEL_VARYANTI || 'live_only',
+            auditRecord
         };
 
         // Bir sınıfta birden fazla market uygunsa doğruluk önceliğiyle Dino
@@ -2130,9 +2238,17 @@ function valueAnalizleriYap(mac, dino) {
         }
     }
 
+    for (const selected of Object.values(secilenler).filter(Boolean)) {
+        selected.auditRecord.decision = 'selected_for_class';
+        selected.auditRecord.decisionDetail = 'Sınıfındaki en yüksek Dino ihtimalli uygun market.';
+    }
+
     // Aynı maçta iki tür de aynı taramada çıkabilir. Güçlü sinyali önce
     // gönder, ardından risk almak isteyenler için sürpriz sinyali gönder.
-    return [secilenler.strong, secilenler.surprise].filter(Boolean);
+    return {
+        selections: [secilenler.strong, secilenler.surprise].filter(Boolean),
+        auditRecords
+    };
 }
 
 
@@ -2591,6 +2707,9 @@ async function telegramSinyaliGonder(
 async function botuCalistir() {
     if (isScanning) return;
     isScanning = true;
+    const scanId = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const scanCapturedAt = new Date().toISOString();
+    const candidateAuditRows = [];
 
     try {
         addSystemLog('> 🔍 ML taraması başlatıldı...');
@@ -2650,6 +2769,26 @@ async function botuCalistir() {
                 addSystemLog(
                     `> ⚠️ ${mac.mac_isim}: model sonucu geçersiz${dino?.HATA ? ` (${dino.HATA})` : ''}.`
                 );
+                candidateAuditRows.push({
+                    recordId: `${scanId}-${Number(mac.fixture_id)}-MODEL`,
+                    scanId,
+                    capturedAt: scanCapturedAt,
+                    fixtureId: Number(mac.fixture_id),
+                    match: mac.mac_isim,
+                    league: mac.lig,
+                    minute: Number(mac.dakika),
+                    score: mac.skor,
+                    market: null,
+                    signalClass: null,
+                    statsSource: mac.stats_source || null,
+                    statsComplete: temelStatsTam(mac),
+                    liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
+                    modelVariant: dino?.MODEL_VARYANTI || null,
+                    minimumEdgeAtEvaluation: Number(state.globalMinEdge),
+                    minimumOddAtEvaluation: MIN_SIGNAL_ODD,
+                    decision: 'model_error',
+                    decisionDetail: dino?.HATA || 'Model sonucu boş veya geçersiz.'
+                });
                 continue;
             }
 
@@ -2657,7 +2796,16 @@ async function botuCalistir() {
                 `> 🩺 ML (${mac.mac_isim}) | Varyant: ${dino.MODEL_VARYANTI || 'live_only'} | ${JSON.stringify(dino)}`
             );
 
-            const firsatlar = valueAnalizleriYap(mac, dino);
+            const degerlendirme = valueAnalizleriYap(
+                mac,
+                dino,
+                {
+                    scanId,
+                    capturedAt: scanCapturedAt
+                }
+            );
+            candidateAuditRows.push(...degerlendirme.auditRecords);
+            const firsatlar = degerlendirme.selections;
             if (!Array.isArray(firsatlar) || firsatlar.length === 0) {
                 addSystemLog(
                     `> ❌ ${mac.mac_isim} pas geçildi (olasılık sınıfı, EDGE veya güvenlik filtresini geçemedi).`
@@ -2666,6 +2814,10 @@ async function botuCalistir() {
             }
 
             if (dino.MODEL_VARYANTI === 'score_only') {
+                for (const firsat of firsatlar) {
+                    firsat.auditRecord.decision = 'score_only_blocked';
+                    firsat.auditRecord.decisionDetail = 'Canlı tarama hattı score_only modelini kabul etmez.';
+                }
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: Python beklenmedik şekilde score_only döndürdü; sinyal engellendi.`
                 );
@@ -2681,6 +2833,8 @@ async function botuCalistir() {
                 );
 
                 if (oncekiGonderim) {
+                    firsat.auditRecord.decision = 'already_sent';
+                    firsat.auditRecord.decisionDetail = 'Bu fixture ve sinyal sınıfı daha önce Telegram\'a gönderildi.';
                     const sentAt = Number(oncekiGonderim.sentAt);
                     const oncekiSaat = Number.isFinite(sentAt)
                         ? new Date(sentAt).toLocaleString(
@@ -2697,6 +2851,8 @@ async function botuCalistir() {
                     continue;
                 }
 
+                firsat.auditRecord.decision = 'telegram_candidate';
+                firsat.auditRecord.decisionDetail = 'Telegram açıklaması ve son canlılık kontrolü sırasında.';
                 gonderilecekFirsatlar.push(firsat);
             }
 
@@ -2721,7 +2877,13 @@ async function botuCalistir() {
 
             // İki sinyal de aynı veri anına ait olduğundan canlılık/skor bir kez
             // doğrulanır ve ardından bekleme süresi olmadan arka arkaya gönderilir.
-            if (!await sinyalOncesiCanlilikDogrula(mac)) continue;
+            if (!await sinyalOncesiCanlilikDogrula(mac)) {
+                for (const firsat of gonderilecekFirsatlar) {
+                    firsat.auditRecord.decision = 'live_revalidation_failed';
+                    firsat.auditRecord.decisionDetail = 'Telegram öncesi dakika/skor/canlılık kontrolü başarısız.';
+                }
+                continue;
+            }
 
             for (let firsatIndex = 0; firsatIndex < gonderilecekFirsatlar.length; firsatIndex++) {
                 const firsat = gonderilecekFirsatlar[firsatIndex];
@@ -2729,6 +2891,8 @@ async function botuCalistir() {
                 const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
 
                 if (gonderildi) {
+                    firsat.auditRecord.decision = 'sent';
+                    firsat.auditRecord.decisionDetail = 'Telegram API gönderimi başarılı ve sinyal geçmişine kaydedildi.';
                     onaylanan++;
                     const turEtiketi = firsat.sinyal_turu === 'strong'
                         ? 'GÜÇLÜ'
@@ -2736,6 +2900,9 @@ async function botuCalistir() {
                     addSystemLog(
                         `> ✅ ${turEtiketi} ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
                     );
+                } else {
+                    firsat.auditRecord.decision = 'telegram_failed';
+                    firsat.auditRecord.decisionDetail = 'Telegram gönderimi başarısız.';
                 }
             }
         }
@@ -2748,6 +2915,16 @@ async function botuCalistir() {
     } catch (error) {
         addSystemLog(`> ❌ ANA TARAMA HATASI: ${error.message}`);
     } finally {
+        try {
+            const added = candidateTracker.recordBatch(candidateAuditRows);
+            if (added > 0) {
+                addSystemLog(
+                    `> 🧪 Tam-stat aday denetimi: bu taramadan ${added} market anı kalıcı kaydedildi.`
+                );
+            }
+        } catch (error) {
+            addSystemLog(`> ⚠️ Aday denetim geçmişi yazılamadı: ${error.message}`);
+        }
         isScanning = false;
     }
 }
@@ -2919,19 +3096,26 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
         };
     }
 
-    const fixtureIDs = signalTracker.unresolvedFixtureIds();
+    const signalFixtureIDs = signalTracker.unresolvedFixtureIds();
+    const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
+    const fixtureIDs = [...new Set([
+        ...signalFixtureIDs,
+        ...candidateFixtureIDs
+    ])];
     if (fixtureIDs.length === 0) {
         return {
             success: true,
             checkedFixtures: 0,
             resolvedSignals: 0,
-            message: 'Bekleyen paylaşılan sinyal yok.'
+            resolvedCandidates: 0,
+            message: 'Bekleyen paylaşılan sinyal veya aday kaydı yok.'
         };
     }
 
     isSignalResultRefreshing = true;
     let checkedFixtures = 0;
     let resolvedSignals = 0;
+    let resolvedCandidates = 0;
 
     try {
         for (
@@ -2953,12 +3137,13 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures += batch.length;
             for (const fixture of fixtures) {
                 resolvedSignals += signalTracker.settleFixture(fixture);
+                resolvedCandidates += candidateTracker.settleFixture(fixture);
             }
         }
 
-        if (resolvedSignals > 0 || manuel) {
+        if (resolvedSignals > 0 || resolvedCandidates > 0 || manuel) {
             addSystemLog(
-                `> 🧾 Paylaşılan sinyal sonuç kontrolü: ${checkedFixtures} maç incelendi, ${resolvedSignals} sinyal sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram sinyali | ${resolvedCandidates} aday market sonuçlandı.`
             );
         }
 
@@ -2966,8 +3151,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             success: true,
             checkedFixtures,
             resolvedSignals,
-            message: resolvedSignals > 0
-                ? `${resolvedSignals} sinyalin sonucu güncellendi.`
+            resolvedCandidates,
+            message: resolvedSignals > 0 || resolvedCandidates > 0
+                ? `${resolvedSignals} sinyal ve ${resolvedCandidates} aday market sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -2978,6 +3164,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             success: false,
             checkedFixtures,
             resolvedSignals,
+            resolvedCandidates,
             message: error.message
         };
     } finally {
@@ -3082,6 +3269,90 @@ app.get(
             `attachment; filename="dino-paylasilan-sinyaller-${gun}.csv"`
         );
         res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(signalTracker.list(100000))}`);
+    }
+);
+
+
+function adayGecmisiCsvOlustur(records) {
+    const headers = [
+        'record_id', 'scan_id', 'captured_at', 'fixture_id', 'match', 'league',
+        'minute', 'score', 'market', 'signal_class', 'dino_probability', 'edge',
+        'odds', 'market_probability', 'bookmaker', 'decision', 'decision_detail',
+        'minimum_edge', 'minimum_odd', 'model_variant', 'stats_source',
+        'home_shots', 'home_shots_on_goal', 'home_corners', 'home_possession',
+        'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
+        'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
+        'away_yellow', 'away_red', 'away_fouls', 'away_offsides', 'away_saves', 'away_xg',
+        'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
+    ];
+
+    const rows = records.map(record => {
+        const home = record?.liveStats?.home || {};
+        const away = record?.liveStats?.away || {};
+        const settlement = record?.settlement || {};
+        return [
+            record.recordId, record.scanId, record.capturedAt, record.fixtureId,
+            record.match, record.league, record.minute, record.score, record.market,
+            record.signalClass, record.dinoProbability, record.edge, record.odds,
+            record.marketProbability, record.bookmaker, record.decision,
+            record.decisionDetail, record.minimumEdgeAtEvaluation,
+            record.minimumOddAtEvaluation, record.modelVariant, record.statsSource,
+            home.shots, home.shotsOnGoal, home.corners, home.possession,
+            home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
+            away.shots, away.shotsOnGoal, away.corners, away.possession,
+            away.yellowCards, away.redCards, away.fouls, away.offsides, away.saves, away.xg,
+            settlement.result, settlement.profit, settlement.finalScore,
+            settlement.fixtureStatus, settlement.resolvedAt
+        ].map(csvHucre).join(',');
+    });
+
+    return [headers.map(csvHucre).join(','), ...rows].join('\n');
+}
+
+
+app.get(
+    '/api/candidate-history',
+    (req, res) => {
+        const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 5000));
+        res.json({
+            summary: candidateTracker.summary(),
+            records: candidateTracker.list(limit)
+        });
+    }
+);
+
+
+app.get(
+    '/api/candidate-history/export',
+    (req, res) => {
+        const gun = new Date().toISOString().slice(0, 10);
+        const payload = candidateTracker.exportPayload({
+            buildVersion: BUILD_VERSION,
+            rules: SIGNAL_RULES,
+            currentMinimumEdge: state.globalMinEdge,
+            minimumSignalOdd: MIN_SIGNAL_ODD,
+            note: 'Tam istatistikli maçlarda modelin gördüğü tüm canlı market anları; Telegram\'a gönderilmeyenler dahil.'
+        });
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-tam-stat-adaylar-${gun}.json"`
+        );
+        res.send(JSON.stringify(payload, null, 2));
+    }
+);
+
+
+app.get(
+    '/api/candidate-history/export.csv',
+    (req, res) => {
+        const gun = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-tam-stat-adaylar-${gun}.csv"`
+        );
+        res.send(`\uFEFF${adayGecmisiCsvOlustur(candidateTracker.list(100000))}`);
     }
 );
 
@@ -3497,6 +3768,9 @@ app.get(
             minEdge:
                 state.globalMinEdge,
 
+            minimumSignalOdd:
+                MIN_SIGNAL_ODD,
+
             statisticsCoverage: {
                 updatedAt: statisticsCoverageSnapshot.updatedAt,
                 totalCandidates: statisticsCoverageSnapshot.totalCandidates,
@@ -3521,6 +3795,10 @@ app.get(
                 summary: signalTracker.summary()
             },
 
+            candidateTracking: {
+                summary: candidateTracker.summary()
+            },
+
             nextRunTime:
                 nextRunTime,
 
@@ -3540,6 +3818,8 @@ app.get(
 loadData();
 
 signalTracker.load();
+
+candidateTracker.load();
 
 
 const PORT =
@@ -3565,6 +3845,10 @@ app.listen(
             `> 🎯 Minimum EDGE: %${state.globalMinEdge}`
         );
 
+        addSystemLog(
+            `> 💵 Minimum canlı oran: ${MIN_SIGNAL_ODD.toFixed(2)}`
+        );
+
 
         addSystemLog(
             `> 🔄 Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Döngü: 10 dakika | Maç aralığı: 25-80. dakika.`
@@ -3581,11 +3865,15 @@ app.listen(
         );
 
         addSystemLog(
-            "> 🟡 Sürpriz: Dino %55–74.9 ve 41–80. dakika | 🟢 Güçlü: Dino %75+ ve 25–80. dakika."
+            "> 🟡 Sürpriz: Dino %60–74.9 ve 41–80. dakika | 🟢 Güçlü: Dino %75+ ve 25–80. dakika."
         );
 
         addSystemLog(
             "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
+        );
+
+        addSystemLog(
+            "> 🧪 Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir."
         );
 
 
