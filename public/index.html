@@ -538,7 +538,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Tam-Stat Aday Denetimi</h3>
-                    <p class="muted" id="candidate-history-updated" style="margin-top:4px;">Telegram'a gitmeyenler dahil modelin gördüğü bütün tam-stat market anları tutulur.</p>
+                    <p class="muted" id="candidate-history-updated" style="margin-top:4px;">%60–69 gölge sinyaller ve pre-match filtreleri dahil bütün tam-stat market anları tutulur.</p>
                 </div>
                 <div class="tracker-actions">
                     <button type="button" style="background:var(--info);" onclick="downloadCandidateExport('json')">ADAY JSON</button>
@@ -571,6 +571,18 @@
                     <span class="metric-label">Hatalı/bitmiş market</span>
                     <span class="metric-value" id="candidate-invalid">0</span>
                 </div>
+                <div class="metric warning">
+                    <span class="metric-label">Gölge sinyal</span>
+                    <span class="metric-value" id="candidate-shadow">0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Pre-match engeli</span>
+                    <span class="metric-value" id="candidate-prematch-blocked">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Karma model anı</span>
+                    <span class="metric-value" id="candidate-prematch-model">0</span>
+                </div>
             </div>
 
             <p class="muted" style="margin-bottom:10px;">Her satır bir taramadaki market anıdır. Aynı maç ve market ilerleyen dakikalarda yeniden kaydedilebilir; böylece kararın nasıl değiştiği görülür.</p>
@@ -584,6 +596,8 @@
                             <th>Market</th>
                             <th>Sınıf</th>
                             <th>Dino</th>
+                            <th>Model</th>
+                            <th>Pre Destek</th>
                             <th>EDGE</th>
                             <th>Oran</th>
                             <th>Karar</th>
@@ -591,7 +605,7 @@
                         </tr>
                     </thead>
                     <tbody id="candidate-history-rows">
-                        <tr><td colspan="9" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
+                        <tr><td colspan="11" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -737,11 +751,12 @@
                             <th>Dk.</th>
                             <th>Lig kapsamı</th>
                             <th>Gerçek veri</th>
+                            <th>Pre-Match</th>
                             <th>API takım</th>
                         </tr>
                     </thead>
                     <tbody id="coverage-rows">
-                        <tr><td colspan="6" class="empty-row">Henüz tarama sonucu yok.</td></tr>
+                        <tr><td colspan="7" class="empty-row">Henüz tarama sonucu yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -750,8 +765,8 @@
         <div class="card">
             <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
             <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
-            <input type="number" min="0" max="100" step="0.5" id="min-edge" value="15" placeholder="Örn: 15">
-            <p class="muted">Yalnızca bu eşiğe ulaşan ve güvenlik filtrelerini geçen ML sinyalleri gönderilir. Sabit minimum canlı oran: <strong>1.40</strong>.</p>
+            <input type="number" min="0" max="100" step="0.5" id="min-edge" value="3" placeholder="Örn: 3">
+            <p class="muted">Telegram için Dino en az <strong>%70</strong>, canlı oran en az <strong>1.40</strong> ve pre-match zorunludur. %60–69 yalnız gölge geçmişine yazılır.</p>
             <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
         </div>
 
@@ -926,7 +941,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "Gün boyu yalnızca 25–80. dakikadaki canlı maçları 10 dakikada bir tarar."
+                ? "25–80. dakikadaki tam-stat maçları 10 dakikada bir tarar; Telegram için %70+ ve pre-match zorunludur."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -1089,8 +1104,10 @@
                 : "-";
 
             document.getElementById("ml-note").textContent = output.variant === "score_only"
-                ? "Uyarı: Skor fallback sonucu oluşmuş. Son backend bu sinyalin Telegram'a gönderilmesini engeller."
-                : "Bu olasılık Python modelinden gelir. Gemini yalnızca seçilen sonucu metin olarak açıklar.";
+                ? "Uyarı: Skor fallback sonucu oluşmuş. Backend bu sinyalin Telegram'a gönderilmesini engeller."
+                : output.variant === "live_plus_prematch"
+                    ? "Canlı istatistik ile pre-match takım gücü birlikte hesaplandı. Gemini yalnızca sonucu açıklar."
+                    : "Live-only sonuç yalnız gölge denetimde kalabilir; Telegram precision modu pre-match ister.";
         }
 
         async function toggleBot() {
@@ -1396,6 +1413,10 @@
                 eligible_not_selected: ["↔️ Daha güçlü market seçildi", "neutral"],
                 edge_below_minimum: ["📉 EDGE altı", "loss"],
                 odds_below_minimum: ["💸 Oran 1.40 altı", "loss"],
+                shadow_probability: ["👁️ Gölge %60–69", "neutral"],
+                prematch_missing: ["🧭 Pre-match yok", "loss"],
+                prematch_total_missing: ["🧩 Pre toplam yok", "loss"],
+                prematch_total_conflict: ["⚖️ Pre toplam karşı", "loss"],
                 live_odds_missing: ["💭 Canlı oran yok", "neutral"],
                 class_outside: ["⚪ Sınıf dışı", "neutral"],
                 market_already_decided: ["🚫 Bitmiş/hatalı market", "loss"],
@@ -1418,6 +1439,9 @@
             document.getElementById("candidate-sent").textContent = summary.sent ?? 0;
             document.getElementById("candidate-missed").textContent = summary.unsentWinners ?? 0;
             document.getElementById("candidate-invalid").textContent = summary.invalidMarket ?? 0;
+            document.getElementById("candidate-shadow").textContent = summary.shadowSignals ?? 0;
+            document.getElementById("candidate-prematch-blocked").textContent = summary.prematchBlocked ?? 0;
+            document.getElementById("candidate-prematch-model").textContent = summary.livePlusPrematch ?? 0;
             document.getElementById("candidate-history-updated").textContent = summary.updatedAt
                 ? `Son kayıt: ${formatDateTime(summary.updatedAt)} · Telegram'a gitmeyenler dahil`
                 : "Telegram'a gitmeyenler dahil modelin gördüğü bütün tam-stat market anları tutulur.";
@@ -1428,7 +1452,7 @@
             if (records.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 9;
+                cell.colSpan = 11;
                 cell.className = "empty-row";
                 cell.textContent = "Henüz tam-stat aday kaydı yok.";
                 row.appendChild(cell);
@@ -1444,6 +1468,8 @@
                     ? "🟢 Güçlü"
                     : record.signalClass === "surprise"
                         ? "🟡 Sürpriz"
+                        : record.signalClass === "shadow"
+                            ? "👁️ Gölge"
                         : "⚪ Dışı";
                 const plainValues = [
                     record.match || "-",
@@ -1452,6 +1478,12 @@
                     signalClass,
                     record.dinoProbability !== null && record.dinoProbability !== undefined
                         ? `%${record.dinoProbability}`
+                        : "-",
+                    record.modelVariant === "live_plus_prematch"
+                        ? "🧭 Karma"
+                        : "📡 Canlı",
+                    record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined
+                        ? `%${record.prematchMarketSupport}`
                         : "-",
                     record.edge !== null && record.edge !== undefined
                         ? `%${record.edge}`
@@ -1561,7 +1593,7 @@
             if (rows.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.className = "empty-row";
                 cell.textContent = coverageMatches.length === 0
                     ? "Henüz tarama sonucu yok."
@@ -1581,6 +1613,11 @@
                     match.minute === null || match.minute === undefined ? "-" : `${match.minute}'`,
                     coverage.text,
                     actual.text,
+                    match.prematchAvailable === true
+                        ? "🧭 Hazır"
+                        : match.prematchAvailable === false
+                            ? "❌ Yok"
+                            : "⏳ Bekliyor",
                     match.statsTeamCount ?? "-"
                 ];
 
@@ -1589,6 +1626,14 @@
                     cell.textContent = String(value);
                     if (index === 3) cell.className = coverage.className;
                     if (index === 4) cell.className = actual.className;
+                    if (index === 5) {
+                        cell.className = match.prematchAvailable === true
+                            ? "positive"
+                            : match.prematchAvailable === false
+                                ? "warning-text"
+                                : "muted";
+                        cell.title = match.prematchSource || "";
+                    }
                     row.appendChild(cell);
                 });
                 body.appendChild(row);
