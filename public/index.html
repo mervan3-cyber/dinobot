@@ -537,6 +537,69 @@
         <div class="card">
             <div class="section-title">
                 <div>
+                    <h3>🧪 Tam-Stat Aday Denetimi</h3>
+                    <p class="muted" id="candidate-history-updated" style="margin-top:4px;">Telegram'a gitmeyenler dahil modelin gördüğü bütün tam-stat market anları tutulur.</p>
+                </div>
+                <div class="tracker-actions">
+                    <button type="button" style="background:var(--info);" onclick="downloadCandidateExport('json')">ADAY JSON</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadCandidateExport('csv')">ADAY CSV</button>
+                </div>
+            </div>
+
+            <div class="metrics signal-metrics">
+                <div class="metric info">
+                    <span class="metric-label">Market anı</span>
+                    <span class="metric-value" id="candidate-total">0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Farklı maç</span>
+                    <span class="metric-value" id="candidate-fixtures">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Sonuç bekleyen</span>
+                    <span class="metric-value" id="candidate-pending">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Telegram'a giden</span>
+                    <span class="metric-value" id="candidate-sent">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Gönderilmeyen kazanan</span>
+                    <span class="metric-value" id="candidate-missed">0</span>
+                </div>
+                <div class="metric danger">
+                    <span class="metric-label">Hatalı/bitmiş market</span>
+                    <span class="metric-value" id="candidate-invalid">0</span>
+                </div>
+            </div>
+
+            <p class="muted" style="margin-bottom:10px;">Her satır bir taramadaki market anıdır. Aynı maç ve market ilerleyen dakikalarda yeniden kaydedilebilir; böylece kararın nasıl değiştiği görülür.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Maç</th>
+                            <th>Dk.</th>
+                            <th>Market</th>
+                            <th>Sınıf</th>
+                            <th>Dino</th>
+                            <th>EDGE</th>
+                            <th>Oran</th>
+                            <th>Karar</th>
+                            <th>Sonuç</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidate-history-rows">
+                        <tr><td colspan="9" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <div>
                     <h3>🧠 Son Makine Kararı</h3>
                     <p class="muted" style="margin-top:4px;">Python modelinin son çıktısı; Gemini yorumundan ayrıdır.</p>
                 </div>
@@ -688,7 +751,7 @@
             <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
             <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
             <input type="number" min="0" max="100" step="0.5" id="min-edge" value="15" placeholder="Örn: 15">
-            <p class="muted">Yalnızca bu eşiğe ulaşan ve güvenlik filtrelerini geçen ML sinyalleri gönderilir.</p>
+            <p class="muted">Yalnızca bu eşiğe ulaşan ve güvenlik filtrelerini geçen ML sinyalleri gönderilir. Sabit minimum canlı oran: <strong>1.40</strong>.</p>
             <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
         </div>
 
@@ -808,6 +871,7 @@
                 setInterval(checkStatus, 5000);
                 setInterval(fetchCoverage, 7500);
                 setInterval(fetchSignalHistory, 10000);
+                setInterval(fetchCandidateHistory, 15000);
             }
         }
 
@@ -817,6 +881,7 @@
                 fetchSettings(),
                 fetchCoverage(),
                 fetchSignalHistory(),
+                fetchCandidateHistory(),
                 fetchLogs()
             ]);
         }
@@ -1298,7 +1363,11 @@
                     throw new Error(result.message || "Sonuçlar güncellenemedi.");
                 }
                 showToast(result.message || "Sonuç kontrolü tamamlandı.");
-                await Promise.allSettled([fetchSignalHistory(), fetchLogs()]);
+                await Promise.allSettled([
+                    fetchSignalHistory(),
+                    fetchCandidateHistory(),
+                    fetchLogs()
+                ]);
             } catch (error) {
                 showToast(error.message, true);
             } finally {
@@ -1311,6 +1380,124 @@
             const suffix = format === "csv" ? "/export.csv" : "/export";
             const link = document.createElement("a");
             link.href = `${BACKEND_URL}/api/signal-history${suffix}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function candidateDecisionInfo(decision) {
+            const labels = {
+                sent: ["✅ Gönderildi", "win"],
+                already_sent: ["🔁 Önceden gönderildi", "neutral"],
+                telegram_candidate: ["⏳ Gönderim adayı", "pending"],
+                selected_for_class: ["🎯 Sınıf birincisi", "pending"],
+                eligible_not_selected: ["↔️ Daha güçlü market seçildi", "neutral"],
+                edge_below_minimum: ["📉 EDGE altı", "loss"],
+                odds_below_minimum: ["💸 Oran 1.40 altı", "loss"],
+                live_odds_missing: ["💭 Canlı oran yok", "neutral"],
+                class_outside: ["⚪ Sınıf dışı", "neutral"],
+                market_already_decided: ["🚫 Bitmiş/hatalı market", "loss"],
+                fallback_security: ["🛡️ Güvenlik filtresi", "loss"],
+                score_only_blocked: ["🛡️ Score-only engeli", "loss"],
+                live_revalidation_failed: ["⏱️ Canlılık değişti", "loss"],
+                telegram_failed: ["❌ Telegram hatası", "loss"],
+                model_error: ["❌ Model hatası", "loss"]
+            };
+            const selected = labels[decision] || [decision || "Bilinmiyor", "neutral"];
+            return { text: selected[0], className: selected[1] };
+        }
+
+        function renderCandidateHistory(data) {
+            const summary = data?.summary || {};
+            const overall = summary.overall || {};
+            document.getElementById("candidate-total").textContent = summary.totalRecords ?? 0;
+            document.getElementById("candidate-fixtures").textContent = summary.uniqueFixtures ?? 0;
+            document.getElementById("candidate-pending").textContent = overall.pending ?? 0;
+            document.getElementById("candidate-sent").textContent = summary.sent ?? 0;
+            document.getElementById("candidate-missed").textContent = summary.unsentWinners ?? 0;
+            document.getElementById("candidate-invalid").textContent = summary.invalidMarket ?? 0;
+            document.getElementById("candidate-history-updated").textContent = summary.updatedAt
+                ? `Son kayıt: ${formatDateTime(summary.updatedAt)} · Telegram'a gitmeyenler dahil`
+                : "Telegram'a gitmeyenler dahil modelin gördüğü bütün tam-stat market anları tutulur.";
+
+            const body = document.getElementById("candidate-history-rows");
+            body.replaceChildren();
+            const records = Array.isArray(data?.records) ? data.records : [];
+            if (records.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 9;
+                cell.className = "empty-row";
+                cell.textContent = "Henüz tam-stat aday kaydı yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const record of records) {
+                const row = document.createElement("tr");
+                const decisionInfo = candidateDecisionInfo(record.decision);
+                const resultInfo = signalResultInfo(record?.settlement?.result);
+                const signalClass = record.signalClass === "strong"
+                    ? "🟢 Güçlü"
+                    : record.signalClass === "surprise"
+                        ? "🟡 Sürpriz"
+                        : "⚪ Dışı";
+                const plainValues = [
+                    record.match || "-",
+                    record.minute ?? "-",
+                    record.market || "-",
+                    signalClass,
+                    record.dinoProbability !== null && record.dinoProbability !== undefined
+                        ? `%${record.dinoProbability}`
+                        : "-",
+                    record.edge !== null && record.edge !== undefined
+                        ? `%${record.edge}`
+                        : "-",
+                    record.odds ?? "-"
+                ];
+
+                for (const value of plainValues) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                }
+
+                const decisionCell = document.createElement("td");
+                const decisionBadge = document.createElement("span");
+                decisionBadge.className = `result-label ${decisionInfo.className}`;
+                decisionBadge.textContent = decisionInfo.text;
+                decisionBadge.title = record.decisionDetail || "";
+                decisionCell.appendChild(decisionBadge);
+                row.appendChild(decisionCell);
+
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = record?.settlement?.finalScore
+                    ? `${resultInfo.text} (${record.settlement.finalScore})`
+                    : resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+                body.appendChild(row);
+            }
+        }
+
+        async function fetchCandidateHistory() {
+            try {
+                const data = await apiFetch("/api/candidate-history?limit=200");
+                renderCandidateHistory(data || {});
+            } catch (_) {
+                // Aday geçmişi geçici olarak okunamazsa ana panel çalışmaya devam eder.
+            }
+        }
+
+        function downloadCandidateExport(format) {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const link = document.createElement("a");
+            link.href = `${BACKEND_URL}/api/candidate-history${suffix}`;
             link.target = "_blank";
             link.rel = "noopener";
             document.body.appendChild(link);
