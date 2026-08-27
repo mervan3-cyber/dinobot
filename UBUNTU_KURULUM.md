@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino v15 Precision Prematch
+# Ubuntu Kurulumu — Dino v15.1 Precision Prematch + Tarih Filtresi
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. Mevcut .env
 dosyanızı silmeyin veya paylaşmayın. node_modules klasörünü yeniden kopyalamanız
@@ -63,7 +63,7 @@ PM2 kullanıyorsanız:
 
 Başlangıç logunda şu sürüm görünmelidir:
 
-    ml-prematch-precision-ubuntu-v15-2026-08-27
+    ml-prematch-precision-history-filter-ubuntu-v15.1-2026-08-27
 
 Ayrıca şu iki satır görünür:
 
@@ -121,6 +121,14 @@ isteğinde kontrol edilir; böylece gereksiz ayrı sonuç istekleri oluşturulma
 Panelden aday geçmişi JSON veya CSV olarak indirilebilir. Aynı fixture ve market
 farklı tarama dakikalarında ayrı kayıt olarak tutulur. Bu sayede EDGE, oran, dakika,
 sınıf ve tekrar kilidi nedeniyle kaçırılan seçimler sonradan karşılaştırılabilir.
+
+## Türkiye saati tarih görünümü
+
+Panelde hem Tam-Stat Aday Denetimi hem de Paylaşılan Sinyal Takibi bölümünde tarih
+seçimi bulunur. `Tüm Veriler` seçeneği bütün geçmişin sayaçlarını gösterir. Bir gün
+seçildiğinde gün sınırları `Europe/Istanbul` saat dilimine göre hesaplanır; sayaçlar,
+tablo, JSON ve CSV indirmeleri aynı seçili güne göre filtrelenir. Tablolardaki
+`Tarih (TSİ)` sütunu kayıt saatini Türkiye saatiyle gösterir.
 
 API istek kuyruğu timeout sonrası otomatik toparlanır. Timeout ve geçici 5xx/429
 hatalarında endpoint adı loga yazılır ve en fazla üç kontrollü deneme yapılır.

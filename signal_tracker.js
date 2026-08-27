@@ -261,7 +261,10 @@ class SignalTracker {
         return changed;
     }
 
-    summary() {
+    summary(signals = this.data.signals) {
+        const selectedSignals = Array.isArray(signals)
+            ? signals
+            : this.data.signals;
         const overall = emptyBucket();
         const byType = {
             surprise: emptyBucket(),
@@ -270,7 +273,7 @@ class SignalTracker {
         const byMarket = {};
         const uniqueFixtures = new Set();
 
-        for (const signal of this.data.signals) {
+        for (const signal of selectedSignals) {
             uniqueFixtures.add(Number(signal.fixtureId));
             addToBucket(overall, signal);
 
@@ -296,21 +299,27 @@ class SignalTracker {
         };
     }
 
-    list(limit = 100) {
+    list(limit = 100, signals = this.data.signals) {
         const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 100000));
-        return [...this.data.signals]
+        const selectedSignals = Array.isArray(signals)
+            ? signals
+            : this.data.signals;
+        return [...selectedSignals]
             .sort((left, right) => new Date(right.sentAt) - new Date(left.sentAt))
             .slice(0, safeLimit);
     }
 
-    exportPayload(meta = {}) {
+    exportPayload(meta = {}, signals = this.data.signals) {
+        const selectedSignals = Array.isArray(signals)
+            ? signals
+            : this.data.signals;
         return {
             format: 'dino-shared-signals',
             version: HISTORY_VERSION,
             exportedAt: new Date().toISOString(),
             ...meta,
-            summary: this.summary(),
-            signals: this.list(100000)
+            summary: this.summary(selectedSignals),
+            signals: this.list(100000, selectedSignals)
         };
     }
 }

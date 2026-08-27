@@ -26,7 +26,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-prematch-precision-ubuntu-v15-2026-08-27';
+const BUILD_VERSION = 'ml-prematch-precision-history-filter-ubuntu-v15.1-2026-08-27';
 
 app.use(cors());
 app.use(express.json());
@@ -3562,6 +3562,102 @@ function csvHucre(value) {
 }
 
 
+const HISTORY_TIME_ZONE = 'Europe/Istanbul';
+const HISTORY_DATE_FORMATTER = new Intl.DateTimeFormat(
+    'en',
+    {
+        timeZone: HISTORY_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }
+);
+
+
+function turkiyeTarihAnahtari(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    const parts = Object.fromEntries(
+        HISTORY_DATE_FORMATTER
+            .formatToParts(date)
+            .filter(part => part.type !== 'literal')
+            .map(part => [part.type, part.value])
+    );
+
+    if (!parts.year || !parts.month || !parts.day) return null;
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+
+function gecmisTarihFiltresiniDogrula(value) {
+    if (value === null || value === undefined || value === '' || value === 'all') {
+        return null;
+    }
+
+    const text = String(value).trim();
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return undefined;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return undefined;
+    }
+
+    return text;
+}
+
+
+function gecmisSeciminiHazirla(req, res, items, timestampField) {
+    const date = gecmisTarihFiltresiniDogrula(req.query.date);
+    if (date === undefined) {
+        res.status(400).json({
+            success: false,
+            message: 'Tarih YYYY-MM-DD biçiminde olmalıdır.'
+        });
+        return null;
+    }
+
+    const allItems = Array.isArray(items) ? items : [];
+    const availableDates = [...new Set(
+        allItems
+            .map(item => turkiyeTarihAnahtari(item?.[timestampField]))
+            .filter(Boolean)
+    )].sort((left, right) => right.localeCompare(left));
+    const selectedItems = date
+        ? allItems.filter(
+            item => turkiyeTarihAnahtari(item?.[timestampField]) === date
+        )
+        : allItems;
+
+    return {
+        date,
+        items: selectedItems,
+        filter: {
+            mode: date ? 'date' : 'all',
+            date,
+            timezone: HISTORY_TIME_ZONE,
+            availableDates,
+            totalAvailableRecords: allItems.length,
+            selectedRecords: selectedItems.length
+        }
+    };
+}
+
+
+function gecmisDosyaEtiketi(selection) {
+    const today = turkiyeTarihAnahtari(new Date()) || new Date().toISOString().slice(0, 10);
+    return selection?.date || `tum-veriler-${today}`;
+}
+
+
 function paylasilanSinyallerCsvOlustur(signals) {
     const headers = [
         'signal_id', 'fixture_id', 'signal_type', 'sent_at', 'match', 'league',
@@ -3604,9 +3700,19 @@ function paylasilanSinyallerCsvOlustur(signals) {
 app.get(
     '/api/signal-history',
     (req, res) => {
+        const allSignals = signalTracker.list(100000);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            allSignals,
+            'sentAt'
+        );
+        if (!selection) return;
+
         res.json({
-            summary: signalTracker.summary(),
-            signals: signalTracker.list(req.query.limit)
+            filter: selection.filter,
+            summary: signalTracker.summary(selection.items),
+            signals: signalTracker.list(req.query.limit, selection.items)
         });
     }
 );
@@ -3627,20 +3733,28 @@ app.post(
 app.get(
     '/api/signal-history/export',
     (req, res) => {
-        const gun = new Date().toISOString().slice(0, 10);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            signalTracker.list(100000),
+            'sentAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
         const payload = signalTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
             minimumSignalOdd: MIN_SIGNAL_ODD,
             currentMinimumEdge: state.globalMinEdge,
             precisionMode: PRECISION_MODE,
+            historyFilter: selection.filter,
             note: 'Bu dosya yalnızca Telegram API\'sine başarıyla gönderilen sinyalleri içerir.'
-        });
+        }, selection.items);
 
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="dino-paylasilan-sinyaller-${gun}.json"`
+            `attachment; filename="dino-paylasilan-sinyaller-${dosyaEtiketi}.json"`
         );
         res.send(JSON.stringify(payload, null, 2));
     }
@@ -3650,13 +3764,20 @@ app.get(
 app.get(
     '/api/signal-history/export.csv',
     (req, res) => {
-        const gun = new Date().toISOString().slice(0, 10);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            signalTracker.list(100000),
+            'sentAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="dino-paylasilan-sinyaller-${gun}.csv"`
+            `attachment; filename="dino-paylasilan-sinyaller-${dosyaEtiketi}.csv"`
         );
-        res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(signalTracker.list(100000))}`);
+        res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(selection.items)}`);
     }
 );
 
@@ -3710,9 +3831,19 @@ app.get(
     '/api/candidate-history',
     (req, res) => {
         const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 5000));
+        const allRecords = candidateTracker.list(100000);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            allRecords,
+            'capturedAt'
+        );
+        if (!selection) return;
+
         res.json({
-            summary: candidateTracker.summary(),
-            records: candidateTracker.list(limit)
+            filter: selection.filter,
+            summary: candidateTracker.summary(selection.items),
+            records: candidateTracker.list(limit, selection.items)
         });
     }
 );
@@ -3721,19 +3852,27 @@ app.get(
 app.get(
     '/api/candidate-history/export',
     (req, res) => {
-        const gun = new Date().toISOString().slice(0, 10);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            candidateTracker.list(100000),
+            'capturedAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
         const payload = candidateTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
             currentMinimumEdge: state.globalMinEdge,
             minimumSignalOdd: MIN_SIGNAL_ODD,
             precisionMode: PRECISION_MODE,
+            historyFilter: selection.filter,
             note: 'Tam istatistikli maçlarda modelin gördüğü tüm canlı market anları; Telegram\'a gönderilmeyenler dahil.'
-        });
+        }, selection.items);
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="dino-tam-stat-adaylar-${gun}.json"`
+            `attachment; filename="dino-tam-stat-adaylar-${dosyaEtiketi}.json"`
         );
         res.send(JSON.stringify(payload, null, 2));
     }
@@ -3743,13 +3882,20 @@ app.get(
 app.get(
     '/api/candidate-history/export.csv',
     (req, res) => {
-        const gun = new Date().toISOString().slice(0, 10);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            candidateTracker.list(100000),
+            'capturedAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename="dino-tam-stat-adaylar-${gun}.csv"`
+            `attachment; filename="dino-tam-stat-adaylar-${dosyaEtiketi}.csv"`
         );
-        res.send(`\uFEFF${adayGecmisiCsvOlustur(candidateTracker.list(100000))}`);
+        res.send(`\uFEFF${adayGecmisiCsvOlustur(selection.items)}`);
     }
 );
 

@@ -246,7 +246,10 @@ class CandidateTracker {
     }
 
 
-    summary() {
+    summary(records = this.data.records) {
+        const selectedRecords = Array.isArray(records)
+            ? records
+            : this.data.records;
         const overall = emptyResultBucket();
         const byDecision = {};
         const byClass = {};
@@ -258,7 +261,7 @@ class CandidateTracker {
         let prematchBlocked = 0;
         let livePlusPrematch = 0;
 
-        for (const record of this.data.records) {
+        for (const record of selectedRecords) {
             uniqueFixtures.add(Number(record.fixtureId));
             addToResultBucket(overall, record);
 
@@ -287,7 +290,7 @@ class CandidateTracker {
         finalizeResultBucket(overall);
         return {
             updatedAt: this.data.updatedAt,
-            totalRecords: this.data.records.length,
+            totalRecords: selectedRecords.length,
             uniqueFixtures: uniqueFixtures.size,
             sent,
             invalidMarket,
@@ -302,22 +305,28 @@ class CandidateTracker {
     }
 
 
-    list(limit = 200) {
+    list(limit = 200, records = this.data.records) {
         const safeLimit = Math.max(1, Math.min(Number(limit) || 200, 100000));
-        return [...this.data.records]
+        const selectedRecords = Array.isArray(records)
+            ? records
+            : this.data.records;
+        return [...selectedRecords]
             .sort((left, right) => new Date(right.capturedAt) - new Date(left.capturedAt))
             .slice(0, safeLimit);
     }
 
 
-    exportPayload(meta = {}) {
+    exportPayload(meta = {}, records = this.data.records) {
+        const selectedRecords = Array.isArray(records)
+            ? records
+            : this.data.records;
         return {
             format: 'dino-full-stats-candidates',
             version: HISTORY_VERSION,
             exportedAt: new Date().toISOString(),
             ...meta,
-            summary: this.summary(),
-            records: this.list(100000)
+            summary: this.summary(selectedRecords),
+            records: this.list(100000, selectedRecords)
         };
     }
 }
