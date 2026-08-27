@@ -624,6 +624,34 @@
                 </div>
             </div>
 
+            <div class="card" style="margin:12px 0; background:#151d22; border-color:#32789b;">
+                <div class="section-title" style="margin-bottom:10px;">
+                    <div>
+                        <h3 style="color:#64b5f6;">🧪 API Güç Gölge Testi</h3>
+                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu ve API tahmini yalnızca karşılaştırma için kaydedilir.</p>
+                    </div>
+                    <span class="mini-badge bg-info">KARARA ETKİ YOK</span>
+                </div>
+                <div class="metrics signal-metrics">
+                    <div class="metric info">
+                        <span class="metric-label">Bağlam anı</span>
+                        <span class="metric-value" id="candidate-shadow-context">0</span>
+                    </div>
+                    <div class="metric success">
+                        <span class="metric-label">Takım gücü tam</span>
+                        <span class="metric-value" id="candidate-shadow-team">0</span>
+                    </div>
+                    <div class="metric success">
+                        <span class="metric-label">Puan durumu tam</span>
+                        <span class="metric-value" id="candidate-shadow-standings">0</span>
+                    </div>
+                    <div class="metric info">
+                        <span class="metric-label">API tahmini var</span>
+                        <span class="metric-value" id="candidate-shadow-predictions">0</span>
+                    </div>
+                </div>
+            </div>
+
             <p class="muted" style="margin-bottom:10px;">Her satır bir taramadaki market anıdır. Aynı maç ve market ilerleyen dakikalarda yeniden kaydedilebilir; böylece kararın nasıl değiştiği görülür.</p>
 
             <div class="table-wrap">
@@ -638,6 +666,7 @@
                             <th>Dino</th>
                             <th>Model</th>
                             <th>Pre Destek</th>
+                            <th>Gölge Test</th>
                             <th>EDGE</th>
                             <th>Oran</th>
                             <th>Karar</th>
@@ -645,7 +674,7 @@
                         </tr>
                     </thead>
                     <tbody id="candidate-history-rows">
-                        <tr><td colspan="12" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
+                        <tr><td colspan="13" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1561,6 +1590,22 @@
             return { text: selected[0], className: selected[1] };
         }
 
+        function candidateShadowInfo(record) {
+            const context = record?.shadowContext;
+            if (!context) return "-";
+
+            const strengthLabels = {
+                HOME: "Ev",
+                AWAY: "Dep",
+                BALANCED: "Dengeli"
+            };
+            const strength = strengthLabels[context?.strength?.lean] || "-";
+            const prediction = context?.prediction?.marketLean ||
+                context?.prediction?.underOver ||
+                "-";
+            return `Güç:${strength} · API:${prediction}`;
+        }
+
         function renderCandidateHistory(data) {
             const summary = data?.summary || {};
             const overall = summary.overall || {};
@@ -1573,6 +1618,11 @@
             document.getElementById("candidate-shadow").textContent = summary.shadowSignals ?? 0;
             document.getElementById("candidate-prematch-blocked").textContent = summary.prematchBlocked ?? 0;
             document.getElementById("candidate-prematch-model").textContent = summary.livePlusPrematch ?? 0;
+            const shadowPower = summary.shadowPower || {};
+            document.getElementById("candidate-shadow-context").textContent = shadowPower.contextMoments ?? 0;
+            document.getElementById("candidate-shadow-team").textContent = shadowPower.teamStatsComplete ?? 0;
+            document.getElementById("candidate-shadow-standings").textContent = shadowPower.standingsComplete ?? 0;
+            document.getElementById("candidate-shadow-predictions").textContent = shadowPower.predictionsAvailable ?? 0;
             const selectedDate = data?.filter?.date || "";
             const viewLabel = selectedDate
                 ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
@@ -1592,7 +1642,7 @@
             if (records.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 12;
+                cell.colSpan = 13;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
                     ? `${formatHistoryDateLabel(selectedDate)} tarihinde tam-stat aday kaydı yok.`
@@ -1628,6 +1678,7 @@
                     record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined
                         ? `%${record.prematchMarketSupport}`
                         : "-",
+                    candidateShadowInfo(record),
                     record.edge !== null && record.edge !== undefined
                         ? `%${record.edge}`
                         : "-",
