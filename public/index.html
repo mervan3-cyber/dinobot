@@ -68,6 +68,7 @@
         input[type="password"],
         input[type="number"],
         input[type="time"],
+        input[type="date"],
         select {
             width: 100%;
             padding: 11px;
@@ -289,6 +290,32 @@
             font-size: 0.75rem;
         }
 
+        .history-filter {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 2px 0 12px;
+            border: 1px solid #3a4249;
+            border-radius: 8px;
+            background: #181c1f;
+        }
+
+        .history-filter-copy strong {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.8rem;
+        }
+
+        .history-date-select {
+            width: auto;
+            min-width: 215px;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.78rem;
+        }
+
         .signal-type-label,
         .result-label {
             display: inline-flex;
@@ -469,6 +496,8 @@
             .ml-main { grid-column: auto; }
             .status-action { flex-direction: column; align-items: stretch; }
             .status-action button { width: 100% !important; }
+            .history-filter { align-items: stretch; flex-direction: column; }
+            .history-date-select { width: 100%; }
         }
     </style>
 </head>
@@ -546,6 +575,16 @@
                 </div>
             </div>
 
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>📅 Aday görünümü</strong>
+                    <span class="muted">Gün sınırları Türkiye saatine göre hesaplanır.</span>
+                </div>
+                <select id="candidate-history-date" class="history-date-select" aria-label="Tam-stat aday tarihi" onchange="changeCandidateHistoryDate(this.value)">
+                    <option value="">🗂️ Tüm Veriler</option>
+                </select>
+            </div>
+
             <div class="metrics signal-metrics">
                 <div class="metric info">
                     <span class="metric-label">Market anı</span>
@@ -591,6 +630,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>Tarih (TSİ)</th>
                             <th>Maç</th>
                             <th>Dk.</th>
                             <th>Market</th>
@@ -605,7 +645,7 @@
                         </tr>
                     </thead>
                     <tbody id="candidate-history-rows">
-                        <tr><td colspan="11" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
+                        <tr><td colspan="12" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -653,6 +693,16 @@
                 </div>
             </div>
 
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>📅 Sinyal görünümü</strong>
+                    <span class="muted">Paylaşımlar Türkiye saatine göre günlere ayrılır.</span>
+                </div>
+                <select id="signal-history-date" class="history-date-select" aria-label="Paylaşılan sinyal tarihi" onchange="changeSignalHistoryDate(this.value)">
+                    <option value="">🗂️ Tüm Veriler</option>
+                </select>
+            </div>
+
             <div class="metrics signal-metrics">
                 <div class="metric info">
                     <span class="metric-label">Paylaşılan</span>
@@ -687,6 +737,7 @@
                     <thead>
                         <tr>
                             <th>Tür</th>
+                            <th>Tarih (TSİ)</th>
                             <th>Maç</th>
                             <th>Dk.</th>
                             <th>Market</th>
@@ -697,7 +748,7 @@
                         </tr>
                     </thead>
                     <tbody id="signal-history-rows">
-                        <tr><td colspan="8" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
+                        <tr><td colspan="9" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -829,6 +880,8 @@
         let autoScroll = true;
         let coverageMatches = [];
         let coverageFilter = "all";
+        let signalHistoryDate = "";
+        let candidateHistoryDate = "";
         let pollingStarted = false;
 
         const logBox = document.getElementById("log-box");
@@ -913,6 +966,62 @@
             return Number.isNaN(date.getTime())
                 ? "-"
                 : date.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
+        }
+
+        function formatHistoryDateLabel(dateKey) {
+            const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!match) return "Tüm Veriler";
+            const date = new Date(Date.UTC(
+                Number(match[1]),
+                Number(match[2]) - 1,
+                Number(match[3]),
+                12
+            ));
+            return date.toLocaleDateString("tr-TR", {
+                timeZone: "Europe/Istanbul",
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            });
+        }
+
+        function syncHistoryDateOptions(selectId, filter, selectedDate) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+
+            const availableDates = Array.isArray(filter?.availableDates)
+                ? filter.availableDates
+                : [];
+            const dates = selectedDate && !availableDates.includes(selectedDate)
+                ? [selectedDate, ...availableDates]
+                : availableDates;
+
+            select.replaceChildren();
+            const allOption = document.createElement("option");
+            allOption.value = "";
+            allOption.textContent = "🗂️ Tüm Veriler";
+            select.appendChild(allOption);
+
+            for (const date of dates) {
+                const option = document.createElement("option");
+                option.value = date;
+                option.textContent = `📅 ${formatHistoryDateLabel(date)}`;
+                select.appendChild(option);
+            }
+
+            select.value = selectedDate || "";
+        }
+
+        function historyApiPath(basePath, limit, selectedDate) {
+            const params = new URLSearchParams({ limit: String(limit) });
+            if (selectedDate) params.set("date", selectedDate);
+            return `${basePath}?${params.toString()}`;
+        }
+
+        function historyExportQuery(selectedDate) {
+            return selectedDate
+                ? `?date=${encodeURIComponent(selectedDate)}`
+                : "";
         }
 
         function renderBotState() {
@@ -1302,9 +1411,18 @@
             document.getElementById("signal-strong-rate").textContent = formatPercent(strong.hitRate);
             document.getElementById("signal-win-loss").textContent = `${overall.wins ?? 0} / ${overall.losses ?? 0}`;
             document.getElementById("signal-roi").textContent = formatPercent(overall.roi);
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate
+                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
+                : "Tüm Veriler";
             document.getElementById("signal-history-updated").textContent = summary.updatedAt
-                ? `Son kayıt güncellemesi: ${formatDateTime(summary.updatedAt)} · Yalnızca Telegram paylaşımları`
-                : "Yalnızca Telegram'da başarıyla paylaşılan sinyaller burada tutulur.";
+                ? `Görünüm: ${viewLabel} · Son güncelleme: ${formatDateTime(summary.updatedAt)}`
+                : `Görünüm: ${viewLabel} · Yalnızca Telegram paylaşımları`;
+            syncHistoryDateOptions(
+                "signal-history-date",
+                data?.filter,
+                selectedDate
+            );
 
             const body = document.getElementById("signal-history-rows");
             body.replaceChildren();
@@ -1313,9 +1431,11 @@
             if (signals.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 8;
+                cell.colSpan = 9;
                 cell.className = "empty-row";
-                cell.textContent = "Henüz paylaşılan sinyal yok.";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde paylaşılan sinyal yok.`
+                    : "Henüz paylaşılan sinyal yok.";
                 row.appendChild(cell);
                 body.appendChild(row);
                 return;
@@ -1332,6 +1452,10 @@
                 typeBadge.textContent = typeInfo.text;
                 typeCell.appendChild(typeBadge);
                 row.appendChild(typeCell);
+
+                const dateCell = document.createElement("td");
+                dateCell.textContent = formatDateTime(signal.sentAt);
+                row.appendChild(dateCell);
 
                 const plainValues = [
                     signal.match || "-",
@@ -1362,12 +1486,19 @@
 
         async function fetchSignalHistory() {
             try {
-                const data = await apiFetch("/api/signal-history?limit=100");
+                const data = await apiFetch(
+                    historyApiPath("/api/signal-history", 100, signalHistoryDate)
+                );
                 renderSignalHistory(data || {});
             } catch (_) {
                 // Takip uç noktası geçici olarak cevap vermezse diğer panel
                 // kontrolleri çalışmaya devam etsin.
             }
+        }
+
+        async function changeSignalHistoryDate(value) {
+            signalHistoryDate = value || "";
+            await fetchSignalHistory();
         }
 
         async function refreshSignalResults() {
@@ -1396,7 +1527,7 @@
         function downloadSignalExport(format) {
             const suffix = format === "csv" ? "/export.csv" : "/export";
             const link = document.createElement("a");
-            link.href = `${BACKEND_URL}/api/signal-history${suffix}`;
+            link.href = `${BACKEND_URL}/api/signal-history${suffix}${historyExportQuery(signalHistoryDate)}`;
             link.target = "_blank";
             link.rel = "noopener";
             document.body.appendChild(link);
@@ -1442,9 +1573,18 @@
             document.getElementById("candidate-shadow").textContent = summary.shadowSignals ?? 0;
             document.getElementById("candidate-prematch-blocked").textContent = summary.prematchBlocked ?? 0;
             document.getElementById("candidate-prematch-model").textContent = summary.livePlusPrematch ?? 0;
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate
+                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
+                : "Tüm Veriler";
             document.getElementById("candidate-history-updated").textContent = summary.updatedAt
-                ? `Son kayıt: ${formatDateTime(summary.updatedAt)} · Telegram'a gitmeyenler dahil`
-                : "Telegram'a gitmeyenler dahil modelin gördüğü bütün tam-stat market anları tutulur.";
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(summary.updatedAt)}`
+                : `Görünüm: ${viewLabel} · Telegram'a gitmeyenler dahil`;
+            syncHistoryDateOptions(
+                "candidate-history-date",
+                data?.filter,
+                selectedDate
+            );
 
             const body = document.getElementById("candidate-history-rows");
             body.replaceChildren();
@@ -1452,9 +1592,11 @@
             if (records.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 11;
+                cell.colSpan = 12;
                 cell.className = "empty-row";
-                cell.textContent = "Henüz tam-stat aday kaydı yok.";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde tam-stat aday kaydı yok.`
+                    : "Henüz tam-stat aday kaydı yok.";
                 row.appendChild(cell);
                 body.appendChild(row);
                 return;
@@ -1472,6 +1614,7 @@
                             ? "👁️ Gölge"
                         : "⚪ Dışı";
                 const plainValues = [
+                    formatDateTime(record.capturedAt),
                     record.match || "-",
                     record.minute ?? "-",
                     record.market || "-",
@@ -1519,17 +1662,24 @@
 
         async function fetchCandidateHistory() {
             try {
-                const data = await apiFetch("/api/candidate-history?limit=200");
+                const data = await apiFetch(
+                    historyApiPath("/api/candidate-history", 200, candidateHistoryDate)
+                );
                 renderCandidateHistory(data || {});
             } catch (_) {
                 // Aday geçmişi geçici olarak okunamazsa ana panel çalışmaya devam eder.
             }
         }
 
+        async function changeCandidateHistoryDate(value) {
+            candidateHistoryDate = value || "";
+            await fetchCandidateHistory();
+        }
+
         function downloadCandidateExport(format) {
             const suffix = format === "csv" ? "/export.csv" : "/export";
             const link = document.createElement("a");
-            link.href = `${BACKEND_URL}/api/candidate-history${suffix}`;
+            link.href = `${BACKEND_URL}/api/candidate-history${suffix}${historyExportQuery(candidateHistoryDate)}`;
             link.target = "_blank";
             link.rel = "noopener";
             document.body.appendChild(link);
