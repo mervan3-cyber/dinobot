@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const HISTORY_VERSION = 1;
+const HISTORY_VERSION = 2;
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
 const VOID_STATUSES = new Set(['CANC', 'ABD', 'AWD', 'WO']);
 
@@ -182,6 +182,8 @@ class SignalTracker {
             prematchMarketSource: payload.prematchMarketSource || null,
             statsSource: payload.statsSource || null,
             liveStats: payload.liveStats || {},
+            shadowContext: payload.shadowContext || null,
+            shadowAssessment: payload.shadowAssessment || null,
             analysis: payload.analysis || null,
             settlement: {
                 result: null,
@@ -197,6 +199,24 @@ class SignalTracker {
         this.data.signals.push(record);
         this.save();
         return record;
+    }
+
+    attachShadowContext(fixtureId, shadowContext, assessmentByMarket = {}) {
+        const fixture = Number(fixtureId);
+        if (!Number.isFinite(fixture) || !shadowContext) return 0;
+
+        let changed = 0;
+        for (const signal of this.data.signals) {
+            if (Number(signal.fixtureId) !== fixture) continue;
+            signal.shadowContext = shadowContext;
+            signal.shadowAssessment = signal.market
+                ? assessmentByMarket?.[signal.market] || null
+                : null;
+            changed++;
+        }
+
+        if (changed > 0) this.save();
+        return changed;
     }
 
     unresolvedFixtureIds() {

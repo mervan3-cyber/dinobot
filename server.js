@@ -17,6 +17,15 @@ const {
     parsePrematchOddsPayload,
     PrematchOddsCache
 } = require('./prematch_odds');
+const {
+    ShadowPowerCache,
+    parseTeamStatisticsPayload,
+    parseStandingsPayload,
+    parsePredictionsPayload,
+    standingByTeam,
+    deriveStrengthSnapshot,
+    buildMarketShadowAssessment
+} = require('./shadow_power');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -26,7 +35,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-prematch-precision-history-filter-ubuntu-v15.1-2026-08-27';
+const BUILD_VERSION = 'ml-shadow-power-observer-ubuntu-v15.2-2026-08-28';
 
 app.use(cors());
 app.use(express.json());
@@ -171,6 +180,12 @@ const PREMATCH_CACHE_FILE =
         'dino_prematch_cache.json'
     );
 
+const SHADOW_POWER_CACHE_FILE =
+    path.join(
+        __dirname,
+        'dino_shadow_power_cache.json'
+    );
+
 const SIGNAL_RULES = Object.freeze({
     shadow: Object.freeze({
         minProbability: 60,
@@ -209,6 +224,19 @@ let preferredPrematchBookmakerId =
 
 const PREMATCH_SUCCESS_TTL_MS = 8 * 24 * 60 * 60 * 1000;
 const PREMATCH_MISS_TTL_MS = 60 * 60 * 1000;
+
+// Bu kaynaklar yalnızca test verisi toplar. Hiçbiri Python ihtimalini,
+// value seçimini, EDGE filtresini veya Telegram kararını değiştirmez.
+const SHADOW_POWER_ENABLED = true;
+const SHADOW_TEAM_STATS_TTL_MS = 12 * 60 * 60 * 1000;
+const SHADOW_STANDINGS_TTL_MS = 60 * 60 * 1000;
+const SHADOW_PREDICTION_TTL_MS = 36 * 60 * 60 * 1000;
+const SHADOW_MISS_TTL_MS = 30 * 60 * 1000;
+const SHADOW_ERROR_TTL_MS = 15 * 60 * 1000;
+const SHADOW_MIN_QUOTA_REMAINING = Math.max(
+    250,
+    Number(process.env.SHADOW_MIN_QUOTA_REMAINING) || 1500
+);
 
 const SIGNAL_RESULT_REFRESH_MS =
     10 * 60 * 1000;
@@ -267,6 +295,24 @@ const prematchOddsCache = new PrematchOddsCache({
     logger: message => addSystemLog(message)
 });
 
+const shadowPowerCache = new ShadowPowerCache({
+    filePath: SHADOW_POWER_CACHE_FILE,
+    logger: message => addSystemLog(message)
+});
+
+let shadowPowerSnapshot = {
+    enabled: SHADOW_POWER_ENABLED,
+    decisionImpact: false,
+    updatedAt: null,
+    requestedMatches: 0,
+    collectedMatches: 0,
+    teamStatsComplete: 0,
+    standingsComplete: 0,
+    predictionsAvailable: 0,
+    skippedForQuota: false,
+    cache: null
+};
+
 
 // =========================================================
 // API RATE LIMITER
@@ -318,10 +364,16 @@ function sleep(ms) {
 
 
 async function apiGet(url, config = {}) {
+    const requestedAttempts = Number(config?.dinoMaxAttempts);
+    const maximumAttempts = Number.isFinite(requestedAttempts)
+        ? Math.max(1, Math.min(Math.floor(requestedAttempts), 3))
+        : 3;
+    const requestConfig = { ...config };
+    delete requestConfig.dinoMaxAttempts;
+
     const queuedRequest = apiQueue
         .catch(() => undefined)
         .then(async () => {
-            const maximumAttempts = 3;
             let lastError = null;
 
             for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
@@ -335,7 +387,7 @@ async function apiGet(url, config = {}) {
                 lastApiRequestTime = Date.now();
 
                 try {
-                    const result = await apiClient.get(url, config);
+                    const result = await apiClient.get(url, requestConfig);
                     const remaining = result.headers[
                         'x-ratelimit-requests-remaining'
                     ];
@@ -1331,6 +1383,300 @@ function prematchMarketKaynagi(mac, market) {
     return mac?.prematch_source || null;
 }
 
+
+// =========================================================
+// KARARA KAPALI API GÜÇ GÖLGE TESTİ
+// =========================================================
+
+function golgeCacheAnahtari(...parts) {
+    const normalized = parts.map(Number);
+    return normalized.every(Number.isFinite)
+        ? normalized.join(':')
+        : null;
+}
+
+
+async function cacheliGolgeApiGetir({
+    bucket,
+    key,
+    url,
+    parser,
+    successTtlMs
+}) {
+    if (!key) {
+        return {
+            status: 'invalid_key',
+            fetchedAt: null,
+            fromCache: false,
+            result: { available: false }
+        };
+    }
+
+    const cached = shadowPowerCache.get(bucket, key);
+    if (cached) {
+        return {
+            status: cached.status,
+            fetchedAt: cached.fetchedAt,
+            fromCache: true,
+            result: cached.result || { available: false }
+        };
+    }
+
+    try {
+        const response = await apiGet(url, {
+            timeout: 10000,
+            dinoMaxAttempts: 1
+        });
+        const parsed = parser(response.data || {});
+        const available = parsed?.available === true;
+        const status = available ? 'ok' : 'missing';
+        shadowPowerCache.set(bucket, key, parsed, {
+            status,
+            ttlMs: available ? successTtlMs : SHADOW_MISS_TTL_MS
+        });
+        const saved = shadowPowerCache.get(bucket, key);
+        return {
+            status,
+            fetchedAt: saved?.fetchedAt || new Date().toISOString(),
+            fromCache: false,
+            result: parsed
+        };
+    } catch (error) {
+        const result = {
+            available: false,
+            error: error.message
+        };
+        shadowPowerCache.set(bucket, key, result, {
+            status: 'error',
+            ttlMs: SHADOW_ERROR_TTL_MS
+        });
+        return {
+            status: 'error',
+            fetchedAt: new Date().toISOString(),
+            fromCache: false,
+            result
+        };
+    }
+}
+
+
+function golgeKaynakOzeti(entry) {
+    return {
+        status: entry?.status || 'missing',
+        fetchedAt: entry?.fetchedAt || null,
+        fromCache: entry?.fromCache === true
+    };
+}
+
+
+async function golgeGucBaglamiGetir(mac) {
+    const fixtureId = Number(mac?.fixture_id);
+    const leagueId = Number(mac?.league_id);
+    const season = Number(mac?.season);
+    const homeTeamId = Number(mac?.home_team_id);
+    const awayTeamId = Number(mac?.away_team_id);
+
+    if (
+        ![fixtureId, leagueId, season, homeTeamId, awayTeamId]
+            .every(value => Number.isFinite(value) && value > 0)
+    ) {
+        return {
+            enabled: true,
+            decisionImpact: false,
+            available: false,
+            capturedAt: new Date().toISOString(),
+            reason: 'fixture_league_season_or_team_id_missing'
+        };
+    }
+
+    const standingsKey = golgeCacheAnahtari(leagueId, season);
+    const homeStatsKey = golgeCacheAnahtari(leagueId, season, homeTeamId);
+    const awayStatsKey = golgeCacheAnahtari(leagueId, season, awayTeamId);
+
+    // Bu katman Telegram işlemlerinden sonra çağrıldığı için API yanıtı canlı
+    // sinyali geciktiremez. Lig tablosu ve takım verileri diskte cache'lenir.
+    const standingsEntry = await cacheliGolgeApiGetir({
+        bucket: 'standings',
+        key: standingsKey,
+        url: `/standings?league=${leagueId}&season=${season}`,
+        parser: parseStandingsPayload,
+        successTtlMs: SHADOW_STANDINGS_TTL_MS
+    });
+    const homeStatsEntry = await cacheliGolgeApiGetir({
+        bucket: 'teamStats',
+        key: homeStatsKey,
+        url: `/teams/statistics?league=${leagueId}&season=${season}&team=${homeTeamId}`,
+        parser: payload => parseTeamStatisticsPayload(payload, homeTeamId),
+        successTtlMs: SHADOW_TEAM_STATS_TTL_MS
+    });
+    const awayStatsEntry = await cacheliGolgeApiGetir({
+        bucket: 'teamStats',
+        key: awayStatsKey,
+        url: `/teams/statistics?league=${leagueId}&season=${season}&team=${awayTeamId}`,
+        parser: payload => parseTeamStatisticsPayload(payload, awayTeamId),
+        successTtlMs: SHADOW_TEAM_STATS_TTL_MS
+    });
+    const predictionEntry = await cacheliGolgeApiGetir({
+        bucket: 'predictions',
+        key: String(fixtureId),
+        url: `/predictions?fixture=${fixtureId}`,
+        parser: parsePredictionsPayload,
+        successTtlMs: SHADOW_PREDICTION_TTL_MS
+    });
+
+    const standings = standingsEntry.result || { available: false };
+    const homeStanding = standingByTeam(standings, homeTeamId);
+    const awayStanding = standingByTeam(standings, awayTeamId);
+    const homeStats = homeStatsEntry.result || { available: false };
+    const awayStats = awayStatsEntry.result || { available: false };
+    const prediction = predictionEntry.result || { available: false };
+    const strength = deriveStrengthSnapshot(
+        homeStats,
+        awayStats,
+        homeStanding,
+        awayStanding
+    );
+
+    const teamStatsComplete =
+        homeStats.available === true &&
+        awayStats.available === true;
+    const standingsComplete = Boolean(homeStanding && awayStanding);
+    const predictionsAvailable = prediction.available === true;
+
+    return {
+        enabled: true,
+        decisionImpact: false,
+        available:
+            teamStatsComplete ||
+            standingsComplete ||
+            predictionsAvailable,
+        capturedAt: new Date().toISOString(),
+        fixtureId,
+        leagueId,
+        season,
+        teams: {
+            home: {
+                id: homeTeamId,
+                name: mac?.home_team_name || null
+            },
+            away: {
+                id: awayTeamId,
+                name: mac?.away_team_name || null
+            }
+        },
+        coverage: {
+            teamStatsComplete,
+            standingsComplete,
+            predictionsAvailable
+        },
+        teamStats: {
+            home: homeStats,
+            away: awayStats
+        },
+        standings: {
+            home: homeStanding,
+            away: awayStanding
+        },
+        prediction,
+        strength,
+        sources: {
+            standings: golgeKaynakOzeti(standingsEntry),
+            homeTeamStats: golgeKaynakOzeti(homeStatsEntry),
+            awayTeamStats: golgeKaynakOzeti(awayStatsEntry),
+            prediction: golgeKaynakOzeti(predictionEntry)
+        },
+        note: 'Gölge test verisidir; Python, EDGE, filtre ve Telegram kararına etkisi yoktur.'
+    };
+}
+
+
+async function golgeGucBaglamlariniTopla(maclar) {
+    const matches = Array.isArray(maclar) ? maclar : [];
+    const contexts = new Map();
+    const quotaLow =
+        quotaRemaining !== null &&
+        Number(quotaRemaining) <= SHADOW_MIN_QUOTA_REMAINING;
+
+    if (!SHADOW_POWER_ENABLED || matches.length === 0 || quotaLow) {
+        shadowPowerSnapshot = {
+            enabled: SHADOW_POWER_ENABLED,
+            decisionImpact: false,
+            updatedAt: new Date().toISOString(),
+            requestedMatches: matches.length,
+            collectedMatches: 0,
+            teamStatsComplete: 0,
+            standingsComplete: 0,
+            predictionsAvailable: 0,
+            skippedForQuota: quotaLow,
+            cache: shadowPowerCache.summary()
+        };
+        if (quotaLow) {
+            addSystemLog(
+                `> 🧪 Gölge güç testi kota korumasıyla atlandı: kalan ${quotaRemaining}, koruma sınırı ${SHADOW_MIN_QUOTA_REMAINING}.`
+            );
+        }
+        return contexts;
+    }
+
+    addSystemLog(
+        `> 🧪 Karara kapalı güç testi başlıyor: ${matches.length} tam-stat maç. Telegram seçimleri tamamlandı; sonuçlara etkisi yok.`
+    );
+
+    for (const mac of matches) {
+        const context = await golgeGucBaglamiGetir(mac);
+        contexts.set(Number(mac.fixture_id), context);
+        const coverage = context?.coverage || {};
+        addSystemLog(
+            `> 🧪 ${mac.mac_isim}: takım=${coverage.teamStatsComplete ? 'TAM' : 'YOK'} | tablo=${coverage.standingsComplete ? 'TAM' : 'YOK'} | prediction=${coverage.predictionsAvailable ? 'VAR' : 'YOK'} | KARARA ETKİ YOK.`
+        );
+
+        const sourceStatuses = Object.values(context?.sources || {})
+            .map(source => source?.status);
+        if (sourceStatuses.filter(status => status === 'error').length >= 3) {
+            addSystemLog(
+                '> ⚠️ Gölge endpointlerde yaygın bağlantı hatası görüldü; ana taramayı uzatmamak için kalan gölge çağrıları bu turda atlandı.'
+            );
+            break;
+        }
+    }
+
+    const values = [...contexts.values()];
+    shadowPowerSnapshot = {
+        enabled: true,
+        decisionImpact: false,
+        updatedAt: new Date().toISOString(),
+        requestedMatches: matches.length,
+        collectedMatches: values.filter(context => context?.available).length,
+        teamStatsComplete: values.filter(
+            context => context?.coverage?.teamStatsComplete
+        ).length,
+        standingsComplete: values.filter(
+            context => context?.coverage?.standingsComplete
+        ).length,
+        predictionsAvailable: values.filter(
+            context => context?.coverage?.predictionsAvailable
+        ).length,
+        skippedForQuota: false,
+        cache: shadowPowerCache.summary()
+    };
+
+    return contexts;
+}
+
+
+function golgeBaglaminiKayitlaraEkle(records, contexts) {
+    if (!Array.isArray(records) || !(contexts instanceof Map)) return;
+
+    for (const record of records) {
+        const context = contexts.get(Number(record?.fixtureId));
+        if (!context) continue;
+        record.shadowContext = context;
+        record.shadowAssessment = record?.market
+            ? buildMarketShadowAssessment(context, record.market)
+            : null;
+    }
+}
+
 // =========================================================
 // FIXTURE STATISTICS
 // =========================================================
@@ -1474,6 +1820,12 @@ function enrichFixturesWithStats(fixtures) {
             fixture_id: Number(fixture.fixture?.id),
             mac_isim: `${fixture.teams?.home?.name || 'Ev Sahibi'} - ${fixture.teams?.away?.name || 'Deplasman'}`,
             lig: fixture.league?.name || 'Bilinmeyen Lig',
+            league_id: Number(fixture.league?.id),
+            season: Number(fixture.league?.season),
+            home_team_id: Number(fixture.teams?.home?.id),
+            home_team_name: fixture.teams?.home?.name || null,
+            away_team_id: Number(fixture.teams?.away?.id),
+            away_team_name: fixture.teams?.away?.name || null,
             dakika: fixture.fixture?.status?.elapsed ?? null,
             status_short: fixture.fixture?.status?.short ?? null,
             status_long: fixture.fixture?.status?.long ?? null,
@@ -3287,6 +3639,40 @@ async function botuCalistir() {
             }
         }
 
+        // Gölge güç verileri bütün Python/Gemini/Telegram kararları bittikten
+        // sonra toplanır. Bu sıralama özellikle korunur: endpoint sonuçları
+        // mevcut sinyali değiştiremez ve canlı gönderimi geciktiremez.
+        try {
+            const shadowContexts = await golgeGucBaglamlariniTopla(macListesi);
+            golgeBaglaminiKayitlaraEkle(candidateAuditRows, shadowContexts);
+
+            for (const [fixtureId, context] of shadowContexts) {
+                const assessmentByMarket = {};
+                for (const record of candidateAuditRows) {
+                    if (
+                        Number(record?.fixtureId) === Number(fixtureId) &&
+                        record?.market &&
+                        !assessmentByMarket[record.market]
+                    ) {
+                        assessmentByMarket[record.market] =
+                            record.shadowAssessment ||
+                            buildMarketShadowAssessment(context, record.market);
+                    }
+                }
+                signalTracker.attachShadowContext(
+                    fixtureId,
+                    context,
+                    assessmentByMarket
+                );
+            }
+        } catch (error) {
+            // Gölge katmanı çökerse ana sistem ve aday kayıtları çalışmaya
+            // devam eder. Bu hata hiçbir seçimin kararını değiştirmez.
+            addSystemLog(
+                `> ⚠️ Gölge güç testi tamamlanamadı; ana karar etkilenmedi: ${error.message}`
+            );
+        }
+
         addSystemLog(`> 🏁 ML taraması bitti. ${onaylanan} maç gönderildi.`);
         if (quotaRemaining !== null) {
             addSystemLog(`> 📦 API kalan günlük istek: ${quotaRemaining}`);
@@ -3658,6 +4044,75 @@ function gecmisDosyaEtiketi(selection) {
 }
 
 
+const SHADOW_CSV_HEADERS = [
+    'shadow_decision_impact', 'shadow_available',
+    'shadow_team_stats_complete', 'shadow_standings_complete',
+    'shadow_prediction_available', 'shadow_strength_lean',
+    'shadow_strength_delta', 'shadow_expected_goals_total',
+    'shadow_prediction_market_lean', 'shadow_prediction_home',
+    'shadow_prediction_draw', 'shadow_prediction_away',
+    'shadow_prediction_under_over', 'shadow_prediction_agrees',
+    'shadow_strength_agrees',
+    'shadow_home_total_played', 'shadow_home_total_win_rate',
+    'shadow_home_home_played', 'shadow_home_home_win_rate',
+    'shadow_home_home_goals_for_avg', 'shadow_home_home_goals_against_avg',
+    'shadow_away_total_played', 'shadow_away_total_win_rate',
+    'shadow_away_away_played', 'shadow_away_away_win_rate',
+    'shadow_away_away_goals_for_avg', 'shadow_away_away_goals_against_avg',
+    'shadow_home_rank', 'shadow_home_points', 'shadow_home_form',
+    'shadow_away_rank', 'shadow_away_points', 'shadow_away_form',
+    'shadow_captured_at'
+];
+
+
+function golgeCsvDegerleri(item) {
+    const context = item?.shadowContext || {};
+    const assessment = item?.shadowAssessment || {};
+    const homeStats = context?.teamStats?.home || {};
+    const awayStats = context?.teamStats?.away || {};
+    const homeStanding = context?.standings?.home || {};
+    const awayStanding = context?.standings?.away || {};
+    const prediction = context?.prediction || {};
+
+    return [
+        context?.decisionImpact ?? false,
+        context?.available ?? false,
+        context?.coverage?.teamStatsComplete ?? false,
+        context?.coverage?.standingsComplete ?? false,
+        context?.coverage?.predictionsAvailable ?? false,
+        context?.strength?.lean,
+        context?.strength?.delta,
+        context?.strength?.expectedGoalsTotal,
+        prediction?.marketLean,
+        prediction?.percent?.home,
+        prediction?.percent?.draw,
+        prediction?.percent?.away,
+        prediction?.underOver,
+        assessment?.predictionAgrees,
+        assessment?.strengthAgrees,
+        homeStats?.total?.played,
+        homeStats?.total?.winRate,
+        homeStats?.home?.played,
+        homeStats?.home?.winRate,
+        homeStats?.home?.goalsForAverage,
+        homeStats?.home?.goalsAgainstAverage,
+        awayStats?.total?.played,
+        awayStats?.total?.winRate,
+        awayStats?.away?.played,
+        awayStats?.away?.winRate,
+        awayStats?.away?.goalsForAverage,
+        awayStats?.away?.goalsAgainstAverage,
+        homeStanding?.rank,
+        homeStanding?.points,
+        homeStanding?.form,
+        awayStanding?.rank,
+        awayStanding?.points,
+        awayStanding?.form,
+        context?.capturedAt
+    ];
+}
+
+
 function paylasilanSinyallerCsvOlustur(signals) {
     const headers = [
         'signal_id', 'fixture_id', 'signal_type', 'sent_at', 'match', 'league',
@@ -3669,6 +4124,7 @@ function paylasilanSinyallerCsvOlustur(signals) {
         'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
         'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
         'away_yellow', 'away_red', 'away_fouls', 'away_offsides', 'away_saves', 'away_xg',
+        ...SHADOW_CSV_HEADERS,
         'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
     ];
 
@@ -3688,6 +4144,7 @@ function paylasilanSinyallerCsvOlustur(signals) {
             home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
             away.shots, away.shotsOnGoal, away.corners, away.possession,
             away.yellowCards, away.redCards, away.fouls, away.offsides, away.saves, away.xg,
+            ...golgeCsvDegerleri(signal),
             settlement.result, settlement.profit, settlement.finalScore,
             settlement.fixtureStatus, settlement.resolvedAt
         ].map(csvHucre).join(',');
@@ -3747,6 +4204,11 @@ app.get(
             minimumSignalOdd: MIN_SIGNAL_ODD,
             currentMinimumEdge: state.globalMinEdge,
             precisionMode: PRECISION_MODE,
+            shadowPowerTest: {
+                enabled: SHADOW_POWER_ENABLED,
+                decisionImpact: false,
+                endpoints: ['teams/statistics', 'standings', 'predictions']
+            },
             historyFilter: selection.filter,
             note: 'Bu dosya yalnızca Telegram API\'sine başarıyla gönderilen sinyalleri içerir.'
         }, selection.items);
@@ -3795,6 +4257,7 @@ function adayGecmisiCsvOlustur(records) {
         'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
         'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
         'away_yellow', 'away_red', 'away_fouls', 'away_offsides', 'away_saves', 'away_xg',
+        ...SHADOW_CSV_HEADERS,
         'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
     ];
 
@@ -3818,6 +4281,7 @@ function adayGecmisiCsvOlustur(records) {
             home.yellowCards, home.redCards, home.fouls, home.offsides, home.saves, home.xg,
             away.shots, away.shotsOnGoal, away.corners, away.possession,
             away.yellowCards, away.redCards, away.fouls, away.offsides, away.saves, away.xg,
+            ...golgeCsvDegerleri(record),
             settlement.result, settlement.profit, settlement.finalScore,
             settlement.fixtureStatus, settlement.resolvedAt
         ].map(csvHucre).join(',');
@@ -3866,6 +4330,11 @@ app.get(
             currentMinimumEdge: state.globalMinEdge,
             minimumSignalOdd: MIN_SIGNAL_ODD,
             precisionMode: PRECISION_MODE,
+            shadowPowerTest: {
+                enabled: SHADOW_POWER_ENABLED,
+                decisionImpact: false,
+                endpoints: ['teams/statistics', 'standings', 'predictions']
+            },
             historyFilter: selection.filter,
             note: 'Tam istatistikli maçlarda modelin gördüğü tüm canlı market anları; Telegram\'a gönderilmeyenler dahil.'
         }, selection.items);
@@ -4329,6 +4798,14 @@ app.get(
                 cache: prematchOddsCache.summary()
             },
 
+            shadowPowerTracking: {
+                ...shadowPowerSnapshot,
+                enabled: SHADOW_POWER_ENABLED,
+                decisionImpact: false,
+                minimumQuotaReserve: SHADOW_MIN_QUOTA_REMAINING,
+                cache: shadowPowerCache.summary()
+            },
+
             statisticsCoverage: {
                 updatedAt: statisticsCoverageSnapshot.updatedAt,
                 totalCandidates: statisticsCoverageSnapshot.totalCandidates,
@@ -4380,6 +4857,8 @@ signalTracker.load();
 candidateTracker.load();
 
 prematchOddsCache.load();
+
+shadowPowerCache.load();
 
 
 const PORT =
@@ -4438,6 +4917,10 @@ app.listen(
 
         addSystemLog(
             "> 🧪 Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir."
+        );
+
+        addSystemLog(
+            `> 🧪 API güç gölge testi AÇIK: teams/statistics + standings + predictions | KARARA ETKİ YOK | Kota koruması: ${SHADOW_MIN_QUOTA_REMAINING}.`
         );
 
 

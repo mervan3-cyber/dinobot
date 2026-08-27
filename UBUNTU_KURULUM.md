@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino v15.1 Precision Prematch + Tarih Filtresi
+# Ubuntu Kurulumu — Dino v15.2 API Güç Gölge Testi
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. Mevcut .env
 dosyanızı silmeyin veya paylaşmayın. node_modules klasörünü yeniden kopyalamanız
@@ -13,6 +13,7 @@ Paketteki dosyaları proje klasörünüze aynı dizin yapısıyla kopyalayın. B
 - signal_tracker.js
 - candidate_tracker.js
 - prematch_odds.js
+- shadow_power.js
 - public/index.html
 - index.html (paneli dosya olarak açan kurulumlar için aynı kopya)
 - tahmin_yap.py
@@ -32,6 +33,10 @@ bu dosyayı da silmeyin.
 oranlarını sakladığı için aynı maçın 10 dakikalık taramalarında gereksiz API
 isteği yapılmaz. Güncellemelerde bu dosyayı da koruyun.
 
+İlk açılışta dino_shadow_power_cache.json otomatik oluşur. Takım gücü, puan
+durumu ve API tahminlerini önbellekler. Bu dosya yalnızca karara kapalı test
+katmanına aittir ve güncellemelerde korunabilir.
+
 ## Ortam değişkenleri
 
 Mevcut .env dosyanızda anahtarlarınız bulunmalıdır. Python için önerilen satır:
@@ -44,6 +49,10 @@ Mevcut .env dosyanızda anahtarlarınız bulunmalıdır. Python için önerilen 
 
 Bookmaker kimliği API'den ada göre çözülür. Kimliği elle sabitlemek isterseniz
 `PREMATCH_BOOKMAKER_ID` ekleyebilirsiniz; normal kurulumda gerekli değildir.
+
+Gölge testinin çalışmayı bırakacağı kota koruma sınırı isteğe bağlıdır:
+
+    SHADOW_MIN_QUOTA_REMAINING=1500
 
 API, Telegram veya Gemini anahtarlarını sohbetlerde ve ekran görüntülerinde
 paylaşmayın.
@@ -63,7 +72,7 @@ PM2 kullanıyorsanız:
 
 Başlangıç logunda şu sürüm görünmelidir:
 
-    ml-prematch-precision-history-filter-ubuntu-v15.1-2026-08-27
+    ml-shadow-power-observer-ubuntu-v15.2-2026-08-28
 
 Ayrıca şu iki satır görünür:
 
@@ -72,6 +81,22 @@ Ayrıca şu iki satır görünür:
     Precision pre-match modu: AÇIK
     Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü.
     Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir.
+    API güç gölge testi AÇIK: teams/statistics + standings + predictions | KARARA ETKİ YOK
+
+## API güç gölge testi
+
+Bu sürüm `/teams/statistics`, `/standings` ve `/predictions` verilerini toplar.
+Gölge test çağrıları Python, Gemini ve Telegram işlemleri tamamlandıktan sonra
+yapılır. Bu alanlar Dino ihtimaline, EDGE hesabına, market filtresine veya
+Telegram seçimine bağlanmamıştır.
+
+- Takım istatistikleri 12 saat önbelleklenir.
+- Puan durumu 1 saat önbelleklenir.
+- API tahmini fixture başına 36 saat önbelleklenir.
+- Kalan günlük kota 1500 veya altındaysa gölge toplama o taramada atlanır.
+- JSON dışa aktarımında tam `shadowContext` ve markete özel
+  `shadowAssessment` bulunur.
+- CSV dışa aktarımında `shadow_` ile başlayan düz eğitim alanları bulunur.
 
 ## Yeni sinyal düzeni
 

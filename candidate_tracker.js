@@ -7,7 +7,7 @@ const {
     profitForResult
 } = require('./signal_tracker');
 
-const HISTORY_VERSION = 1;
+const HISTORY_VERSION = 2;
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
 const VOID_STATUSES = new Set(['CANC', 'ABD', 'AWD', 'WO']);
 
@@ -81,6 +81,7 @@ class CandidateTracker {
         this.data = {
             version: HISTORY_VERSION,
             updatedAt: null,
+            shadowContexts: {},
             records: []
         };
     }
@@ -97,6 +98,9 @@ class CandidateTracker {
             this.data = {
                 version: HISTORY_VERSION,
                 updatedAt: parsed?.updatedAt || null,
+                shadowContexts: parsed?.shadowContexts && typeof parsed.shadowContexts === 'object'
+                    ? parsed.shadowContexts
+                    : {},
                 records: Array.isArray(parsed?.records) ? parsed.records : []
             };
             this.trim();
@@ -108,6 +112,7 @@ class CandidateTracker {
             this.data = {
                 version: HISTORY_VERSION,
                 updatedAt: null,
+                shadowContexts: {},
                 records: []
             };
         }
@@ -127,20 +132,29 @@ class CandidateTracker {
 
 
     trim() {
-        if (this.data.records.length <= this.maxRecords) return;
-
-        const pending = this.data.records.filter(record => !record?.settlement?.result);
-        const settled = this.data.records
-            .filter(record => record?.settlement?.result)
-            .sort((left, right) => new Date(right.capturedAt) - new Date(left.capturedAt));
-        const settledLimit = Math.max(0, this.maxRecords - pending.length);
-        this.data.records = [
-            ...pending,
-            ...settled.slice(0, settledLimit)
-        ].sort((left, right) => new Date(left.capturedAt) - new Date(right.capturedAt));
-
         if (this.data.records.length > this.maxRecords) {
-            this.data.records = this.data.records.slice(-this.maxRecords);
+            const pending = this.data.records.filter(record => !record?.settlement?.result);
+            const settled = this.data.records
+                .filter(record => record?.settlement?.result)
+                .sort((left, right) => new Date(right.capturedAt) - new Date(left.capturedAt));
+            const settledLimit = Math.max(0, this.maxRecords - pending.length);
+            this.data.records = [
+                ...pending,
+                ...settled.slice(0, settledLimit)
+            ].sort((left, right) => new Date(left.capturedAt) - new Date(right.capturedAt));
+
+            if (this.data.records.length > this.maxRecords) {
+                this.data.records = this.data.records.slice(-this.maxRecords);
+            }
+        }
+
+        const usedContexts = new Set(
+            this.data.records
+                .map(record => record?.shadowContextId)
+                .filter(Boolean)
+        );
+        for (const key of Object.keys(this.data.shadowContexts || {})) {
+            if (!usedContexts.has(key)) delete this.data.shadowContexts[key];
         }
     }
 
@@ -157,8 +171,17 @@ class CandidateTracker {
         for (const payload of incoming) {
             if (!payload.recordId || existingIds.has(payload.recordId)) continue;
 
+            const normalized = { ...payload };
+            if (payload.shadowContext) {
+                const contextId = payload.shadowContextId ||
+                    `${payload.scanId || payload.capturedAt}:${Number(payload.fixtureId)}`;
+                this.data.shadowContexts[contextId] = payload.shadowContext;
+                normalized.shadowContextId = contextId;
+                delete normalized.shadowContext;
+            }
+
             this.data.records.push({
-                ...payload,
+                ...normalized,
                 settlement: payload.settlement || {
                     result: null,
                     profit: null,
@@ -179,6 +202,15 @@ class CandidateTracker {
         }
 
         return added;
+    }
+
+
+    shadowContextFor(record) {
+        if (record?.shadowContext) return record.shadowContext;
+        const contextId = record?.shadowContextId;
+        return contextId
+            ? this.data.shadowContexts?.[contextId] || null
+            : null;
     }
 
 
@@ -260,6 +292,7 @@ class CandidateTracker {
         let shadowSignals = 0;
         let prematchBlocked = 0;
         let livePlusPrematch = 0;
+        const shadowPowerMoments = new Map();
 
         for (const record of selectedRecords) {
             uniqueFixtures.add(Number(record.fixtureId));
@@ -278,6 +311,13 @@ class CandidateTracker {
                 prematchBlocked++;
             }
             if (record.modelVariant === 'live_plus_prematch') livePlusPrematch++;
+            const shadowContext = this.shadowContextFor(record);
+            if (shadowContext) {
+                const shadowKey = `${record.scanId || record.capturedAt}:${Number(record.fixtureId)}`;
+                if (!shadowPowerMoments.has(shadowKey)) {
+                    shadowPowerMoments.set(shadowKey, shadowContext);
+                }
+            }
             if (
                 record?.settlement?.result === 'W' &&
                 decision !== 'sent' &&
@@ -288,6 +328,7 @@ class CandidateTracker {
         }
 
         finalizeResultBucket(overall);
+        const shadowContexts = [...shadowPowerMoments.values()];
         return {
             updatedAt: this.data.updatedAt,
             totalRecords: selectedRecords.length,
@@ -298,6 +339,22 @@ class CandidateTracker {
             shadowSignals,
             prematchBlocked,
             livePlusPrematch,
+            shadowPower: {
+                decisionImpact: false,
+                contextMoments: shadowContexts.length,
+                available: shadowContexts.filter(
+                    context => context?.available === true
+                ).length,
+                teamStatsComplete: shadowContexts.filter(
+                    context => context?.coverage?.teamStatsComplete === true
+                ).length,
+                standingsComplete: shadowContexts.filter(
+                    context => context?.coverage?.standingsComplete === true
+                ).length,
+                predictionsAvailable: shadowContexts.filter(
+                    context => context?.coverage?.predictionsAvailable === true
+                ).length
+            },
             overall,
             byDecision,
             byClass
@@ -312,7 +369,13 @@ class CandidateTracker {
             : this.data.records;
         return [...selectedRecords]
             .sort((left, right) => new Date(right.capturedAt) - new Date(left.capturedAt))
-            .slice(0, safeLimit);
+            .slice(0, safeLimit)
+            .map(record => {
+                const context = this.shadowContextFor(record);
+                return context
+                    ? { ...record, shadowContext: context }
+                    : { ...record };
+            });
     }
 
 
