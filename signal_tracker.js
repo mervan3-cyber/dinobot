@@ -181,6 +181,7 @@ class SignalTracker {
             prematchMarketSupport: numberOrNull(payload.prematchMarketSupport),
             prematchMarketSource: payload.prematchMarketSource || null,
             statsSource: payload.statsSource || null,
+            statsValidation: payload.statsValidation || null,
             liveStats: payload.liveStats || {},
             shadowContext: payload.shadowContext || null,
             shadowAssessment: payload.shadowAssessment || null,

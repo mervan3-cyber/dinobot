@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino v15.2 API Güç Gölge Testi
+# Ubuntu Kurulumu — Dino v15.3 Precision 50 + Taze Doğrulama
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. Mevcut .env
 dosyanızı silmeyin veya paylaşmayın. node_modules klasörünü yeniden kopyalamanız
@@ -34,8 +34,8 @@ oranlarını sakladığı için aynı maçın 10 dakikalık taramalarında gerek
 isteği yapılmaz. Güncellemelerde bu dosyayı da koruyun.
 
 İlk açılışta dino_shadow_power_cache.json otomatik oluşur. Takım gücü, puan
-durumu ve API tahminlerini önbellekler. Bu dosya yalnızca karara kapalı test
-katmanına aittir ve güncellemelerde korunabilir.
+durumu ve API tahminlerini önbellekler. v15.3, kimlik doğrulama alanı bulunmayan
+eski gölge önbelleğini güvenli biçimde otomatik yeniler.
 
 ## Ortam değişkenleri
 
@@ -72,16 +72,17 @@ PM2 kullanıyorsanız:
 
 Başlangıç logunda şu sürüm görünmelidir:
 
-    ml-shadow-power-observer-ubuntu-v15.2-2026-08-28
+    ml-precision50-verified-shadow-ubuntu-v15.3-2026-08-28
 
 Ayrıca şu iki satır görünür:
 
     Minimum canlı oran: 1.40
-    Gölge: Dino %60–69.9 | Sürpriz: %70–74.9 | Güçlü: %75+
+    Gölge: Dino %60–69.9 | Sürpriz: %70–74.9 ve 50–80 | Güçlü: %75+ ve 50–80
     Precision pre-match modu: AÇIK
     Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü.
     Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir.
-    API güç gölge testi AÇIK: teams/statistics + standings + predictions | KARARA ETKİ YOK
+    Telegram öncesi taze doğrulama AÇIK: fixture + statistics + live odds + Python tekrar
+    API güç gölge testi AÇIK: kimlik + örneklem + standings + predictions | KARARA ETKİ YOK
 
 ## API güç gölge testi
 
@@ -93,6 +94,11 @@ Telegram seçimine bağlanmamıştır.
 - Takım istatistikleri 12 saat önbelleklenir.
 - Puan durumu 1 saat önbelleklenir.
 - API tahmini fixture başına 36 saat önbelleklenir.
+- Takım, lig, sezon ve fixture kimlikleri cevapla eşleştirilir.
+- Ev sahibi ev maçları ve deplasman takımı deplasman maçları için en az 5
+  örnek bulunup bulunmadığı ayrıca kaydedilir.
+- `fullyVerified`, yalnız üç kaynak, kimlik ve örneklem denetimi tam olduğunda
+  true olur.
 - Kalan günlük kota 1500 veya altındaysa gölge toplama o taramada atlanır.
 - JSON dışa aktarımında tam `shadowContext` ve markete özel
   `shadowAssessment` bulunur.
@@ -101,8 +107,10 @@ Telegram seçimine bağlanmamıştır.
 ## Yeni sinyal düzeni
 
 - Gölge sinyal: Dino olasılığı %60–69.9, dakika 41–80; Telegram'a gönderilmez.
-- Sürpriz sinyal: Dino olasılığı %70–74.9, dakika 41–80.
-- Güçlü sinyal: Dino olasılığı %75+, dakika 25–80.
+- Sürpriz sinyal: Dino olasılığı %70–74.9, dakika 50–80.
+- Güçlü sinyal: Dino olasılığı %75+, dakika 50–80.
+- Tarama 25–80 arasında veri toplamaya devam eder; erken adaylar eğitim ve
+  denetim geçmişinde `signal_minute_waiting` olarak kalır.
 - Her iki sınıf da paneldeki minimum EDGE ayarını geçmelidir.
 - Her iki sınıf için canlı oran en az 1.40 olmalıdır.
 - Telegram sinyali için pre-match 1X2 verisi zorunludur. Böylece Python
@@ -164,6 +172,12 @@ Model yalnızca iki takımın şut, isabetli şut ve korner alanlarının tamam�
 API verisi olarak mevcutsa çalışır. Eksik değerler sıfıra çevrilmez ve eksik
 istatistikli maç Python'a veya Telegram'a gönderilmez.
 
-Maç durumu modelden önce ve Telegram'dan hemen önce yeniden doğrulanır. Bitmiş,
-durdurulmuş, engellenmiş, askıya alınmış veya 80. dakikayı geçmiş maç gönderilmez.
-Skor model çalıştıktan sonra değişmişse eski sinyal iptal edilir.
+İlk model bir Telegram adayı bulduğunda fixture, `/fixtures/statistics` ve
+`/odds/live?fixture=ID` yeniden çekilir. Altı temel alan, şut/isabet ilişkisi,
+skor-isabet ilişkisi, kümülatif değerlerin geriye gitmemesi ve skor değişirken
+istatistiğin donmaması denetlenir. Ardından Python yalnız bu maç için taze veriyle
+tekrar çalıştırılır. Telegram yalnız ikinci değerlendirmeyi kullanır.
+
+Bitmiş, durdurulmuş, engellenmiş, askıya alınmış, 50. dakikaya ulaşmamış veya
+80. dakikayı geçmiş maç gönderilmez. Gemini açıklamasından sonra skor yeniden
+değişmişse taze seçim de iptal edilir.

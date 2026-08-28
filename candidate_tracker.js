@@ -224,6 +224,24 @@ class CandidateTracker {
     }
 
 
+    latestFixtureMoment(fixtureId) {
+        const fixture = Number(fixtureId);
+        if (!Number.isFinite(fixture) || fixture <= 0) return null;
+
+        const selected = this.data.records
+            .filter(record =>
+                Number(record?.fixtureId) === fixture &&
+                record?.liveStats &&
+                record?.capturedAt
+            )
+            .sort((left, right) =>
+                new Date(right.capturedAt) - new Date(left.capturedAt)
+            )[0];
+
+        return selected ? { ...selected } : null;
+    }
+
+
     settleFixture(fixture) {
         const fixtureId = Number(fixture?.fixture?.id);
         if (!Number.isFinite(fixtureId) || fixtureId <= 0) return 0;
@@ -353,6 +371,15 @@ class CandidateTracker {
                 ).length,
                 predictionsAvailable: shadowContexts.filter(
                     context => context?.coverage?.predictionsAvailable === true
+                ).length,
+                identityVerified: shadowContexts.filter(
+                    context => context?.validation?.identityVerified === true
+                ).length,
+                sampleAdequate: shadowContexts.filter(
+                    context => context?.validation?.sampleAdequate === true
+                ).length,
+                fullyVerified: shadowContexts.filter(
+                    context => context?.validation?.fullyVerified === true
                 ).length
             },
             overall,

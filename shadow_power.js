@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const CACHE_BUCKETS = ['teamStats', 'standings', 'predictions'];
 
 
@@ -56,27 +56,85 @@ function compactSplit(fixtures, goalsFor, goalsAgainst, side) {
 }
 
 
-function parseTeamStatisticsPayload(payload, expectedTeamId = null) {
+function normalizeExpectedIdentity(expected) {
+    if (expected === null || expected === undefined) return {};
+    if (typeof expected === 'number' || typeof expected === 'string') {
+        return { teamId: numberOrNull(expected) };
+    }
+    return {
+        fixtureId: numberOrNull(expected.fixtureId),
+        leagueId: numberOrNull(expected.leagueId),
+        season: numberOrNull(expected.season),
+        teamId: numberOrNull(expected.teamId),
+        homeTeamId: numberOrNull(expected.homeTeamId),
+        awayTeamId: numberOrNull(expected.awayTeamId)
+    };
+}
+
+
+function identityCheck(actual, expected) {
+    if (expected === null || expected === undefined) return null;
+    if (actual === null || actual === undefined) return false;
+    return Number(actual) === Number(expected);
+}
+
+
+function checksAreValid(checks) {
+    const values = Object.values(checks).filter(value => value !== null);
+    return values.length > 0 && values.every(value => value === true);
+}
+
+
+function parseTeamStatisticsPayload(payload, expectedIdentity = null) {
+    const expected = normalizeExpectedIdentity(expectedIdentity);
     const raw = payload?.response;
     const response = Array.isArray(raw) ? raw[0] : raw;
     if (!response || typeof response !== 'object') {
-        return { available: false };
+        return {
+            available: false,
+            validation: {
+                identityValid: false,
+                reason: 'response_missing'
+            }
+        };
     }
 
     const fixtures = response.fixtures || {};
     const goalsFor = response.goals?.for || {};
     const goalsAgainst = response.goals?.against || {};
-    const teamId = numberOrNull(response.team?.id ?? expectedTeamId);
+    const teamId = numberOrNull(response.team?.id);
+    const leagueId = numberOrNull(response.league?.id);
+    const season = numberOrNull(response.league?.season);
     const totalPlayed = numberOrNull(fixtures?.played?.total);
     const totalWins = numberOrNull(fixtures?.wins?.total);
     const totalDraws = numberOrNull(fixtures?.draws?.total);
     const totalLosses = numberOrNull(fixtures?.loses?.total);
 
+    const identityChecks = {
+        teamIdMatches: identityCheck(teamId, expected.teamId),
+        leagueIdMatches: identityCheck(leagueId, expected.leagueId),
+        seasonMatches: identityCheck(season, expected.season)
+    };
+    const identityValid = Object.values(expected).filter(
+        value => value !== null && value !== undefined
+    ).length === 0
+        ? teamId !== null
+        : checksAreValid(identityChecks);
+
     return {
-        available: true,
+        available: identityValid,
         team: {
             id: teamId,
             name: response.team?.name || null
+        },
+        league: {
+            id: leagueId,
+            season
+        },
+        validation: {
+            identityValid,
+            checks: identityChecks,
+            expected
         },
         form: response.form || null,
         total: {
@@ -137,20 +195,39 @@ function compactStanding(entry) {
 }
 
 
-function parseStandingsPayload(payload) {
+function parseStandingsPayload(payload, expectedIdentity = null) {
+    const expected = normalizeExpectedIdentity(expectedIdentity);
     const responses = Array.isArray(payload?.response) ? payload.response : [];
     const entries = [];
+    const matchedLeagues = [];
 
     for (const response of responses) {
+        const leagueId = numberOrNull(response?.league?.id);
+        const season = numberOrNull(response?.league?.season);
+        const leagueMatches = identityCheck(leagueId, expected.leagueId);
+        const seasonMatches = identityCheck(season, expected.season);
+        if (leagueMatches === false || seasonMatches === false) continue;
+
         const standings = flattenStandings(response?.league?.standings || []);
         for (const standing of standings) {
             entries.push(compactStanding(standing));
         }
+        matchedLeagues.push({ leagueId, season });
     }
 
+    const hasExpectation = expected.leagueId !== null || expected.season !== null;
+    const identityValid = hasExpectation
+        ? matchedLeagues.length > 0
+        : entries.length > 0;
+
     return {
-        available: entries.length > 0,
-        entries
+        available: entries.length > 0 && identityValid,
+        entries,
+        validation: {
+            identityValid,
+            expected,
+            matchedLeagues
+        }
     };
 }
 
@@ -168,14 +245,50 @@ function predictionLean(percentages) {
 }
 
 
-function parsePredictionsPayload(payload) {
+function parsePredictionsPayload(payload, expectedIdentity = null) {
+    const expected = normalizeExpectedIdentity(expectedIdentity);
     const response = Array.isArray(payload?.response)
         ? payload.response[0]
         : null;
     const prediction = response?.predictions;
     if (!prediction || typeof prediction !== 'object') {
-        return { available: false };
+        return {
+            available: false,
+            validation: {
+                identityValid: false,
+                reason: 'prediction_missing',
+                expected
+            }
+        };
     }
+
+    const actual = {
+        fixtureId: numberOrNull(response?.fixture?.id),
+        leagueId: numberOrNull(response?.league?.id),
+        homeTeamId: numberOrNull(response?.teams?.home?.id),
+        awayTeamId: numberOrNull(response?.teams?.away?.id)
+    };
+    const checks = {
+        fixtureIdMatches: actual.fixtureId === null
+            ? null
+            : identityCheck(actual.fixtureId, expected.fixtureId),
+        leagueIdMatches: actual.leagueId === null
+            ? null
+            : identityCheck(actual.leagueId, expected.leagueId),
+        homeTeamIdMatches: actual.homeTeamId === null
+            ? null
+            : identityCheck(actual.homeTeamId, expected.homeTeamId),
+        awayTeamIdMatches: actual.awayTeamId === null
+            ? null
+            : identityCheck(actual.awayTeamId, expected.awayTeamId)
+    };
+    const explicitChecks = Object.values(checks).filter(value => value !== null);
+    const hasExpectedIdentity = Object.values(expected).some(
+        value => value !== null && value !== undefined
+    );
+    const identityValid = explicitChecks.length === 0
+        ? (!hasExpectedIdentity || Number.isFinite(expected.fixtureId))
+        : explicitChecks.every(value => value === true);
 
     const percent = {
         home: normalizePercent(prediction.percent?.home),
@@ -197,8 +310,20 @@ function parsePredictionsPayload(payload) {
             : null;
     }
 
+    const percentagesComplete = ['home', 'draw', 'away'].every(
+        key => Number.isFinite(Number(percent[key]))
+    );
+
     return {
-        available: true,
+        available: identityValid && percentagesComplete,
+        validation: {
+            identityValid,
+            percentagesComplete,
+            checks,
+            expected,
+            actual,
+            requestFixtureId: expected.fixtureId
+        },
         winner: {
             id: numberOrNull(prediction.winner?.id),
             name: prediction.winner?.name || null,
@@ -361,8 +486,20 @@ function buildMarketShadowAssessment(context, market) {
         }
     }
 
+    const agreements = [predictionAgrees, strengthAgrees]
+        .filter(value => value === true).length;
+    const disagreements = [predictionAgrees, strengthAgrees]
+        .filter(value => value === false).length;
+
     return {
         decisionImpact: false,
+        validationStatus: context?.validation?.fullyVerified === true
+            ? 'fully_verified'
+            : context?.available === true
+                ? 'partial'
+                : 'missing',
+        sourceAgreements: agreements,
+        sourceDisagreements: disagreements,
         predictionSupport,
         predictionAgrees,
         predictionLean: prediction?.marketLean || null,
@@ -401,6 +538,12 @@ class ShadowPowerCache {
                 return;
             }
             const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+            if (Number(parsed?.version) !== CACHE_VERSION) {
+                this.logger('> 🧪 Eski gölge güç önbelleği kimlik doğrulaması için sıfırlandı.');
+                this.data = this.emptyData();
+                this.save();
+                return;
+            }
             this.data = this.emptyData();
             this.data.updatedAt = parsed?.updatedAt || null;
             for (const bucket of CACHE_BUCKETS) {
