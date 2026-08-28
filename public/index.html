@@ -547,7 +547,7 @@
                     <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
                     <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
                 </div>
-                <p class="muted" id="auto-scan-description">Gün boyu yalnızca 25–80. dakikadaki canlı maçları tarar.</p>
+                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; Telegram sinyali yalnızca 50–80. dakikada açılır.</p>
             </div>
             <label class="switch" title="Otomatik taramayı aç/kapat">
                 <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
@@ -648,6 +648,18 @@
                     <div class="metric info">
                         <span class="metric-label">API tahmini var</span>
                         <span class="metric-value" id="candidate-shadow-predictions">0</span>
+                    </div>
+                    <div class="metric info">
+                        <span class="metric-label">Kimlik doğrulandı</span>
+                        <span class="metric-value" id="candidate-shadow-identity">0</span>
+                    </div>
+                    <div class="metric info">
+                        <span class="metric-label">Örneklem yeterli</span>
+                        <span class="metric-value" id="candidate-shadow-sample">0</span>
+                    </div>
+                    <div class="metric success">
+                        <span class="metric-label">Tam doğrulandı</span>
+                        <span class="metric-value" id="candidate-shadow-verified">0</span>
                     </div>
                 </div>
             </div>
@@ -846,7 +858,7 @@
             <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
             <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
             <input type="number" min="0" max="100" step="0.5" id="min-edge" value="3" placeholder="Örn: 3">
-            <p class="muted">Telegram için Dino en az <strong>%70</strong>, canlı oran en az <strong>1.40</strong> ve pre-match zorunludur. %60–69 yalnız gölge geçmişine yazılır.</p>
+            <p class="muted">Telegram için dakika <strong>50–80</strong>, Dino en az <strong>%70</strong>, canlı oran en az <strong>1.40</strong>, EDGE ve pre-match zorunludur. Gönderim öncesi skor, stats ve oran taze doğrulanır.</p>
             <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
         </div>
 
@@ -1079,7 +1091,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "25–80. dakikadaki tam-stat maçları 10 dakikada bir tarar; Telegram için %70+ ve pre-match zorunludur."
+                ? "25–80. dakikada veri toplar; 50–80. dakikada taze doğrulanmış %70+ Telegram sinyali üretir."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -1583,6 +1595,10 @@
                 fallback_security: ["🛡️ Güvenlik filtresi", "loss"],
                 score_only_blocked: ["🛡️ Score-only engeli", "loss"],
                 live_revalidation_failed: ["⏱️ Canlılık değişti", "loss"],
+                signal_minute_waiting: ["⏳ 50. dakika bekleniyor", "neutral"],
+                fresh_recheck_pending: ["🔄 Taze doğrulama bekliyor", "pending"],
+                fresh_recheck_superseded: ["♻️ Taze modelle yenilendi", "neutral"],
+                fresh_stats_validation_failed: ["🛡️ Taze stats reddi", "loss"],
                 telegram_failed: ["❌ Telegram hatası", "loss"],
                 model_error: ["❌ Model hatası", "loss"]
             };
@@ -1603,7 +1619,12 @@
             const prediction = context?.prediction?.marketLean ||
                 context?.prediction?.underOver ||
                 "-";
-            return `Güç:${strength} · API:${prediction}`;
+            const verified = context?.validation?.fullyVerified === true
+                ? "✅ Tam"
+                : context?.validation?.identityVerified === true
+                    ? "🟡 Kısmi"
+                    : "⚪ Eksik";
+            return `${verified} · Güç:${strength} · API:${prediction}`;
         }
 
         function renderCandidateHistory(data) {
@@ -1623,6 +1644,9 @@
             document.getElementById("candidate-shadow-team").textContent = shadowPower.teamStatsComplete ?? 0;
             document.getElementById("candidate-shadow-standings").textContent = shadowPower.standingsComplete ?? 0;
             document.getElementById("candidate-shadow-predictions").textContent = shadowPower.predictionsAvailable ?? 0;
+            document.getElementById("candidate-shadow-identity").textContent = shadowPower.identityVerified ?? 0;
+            document.getElementById("candidate-shadow-sample").textContent = shadowPower.sampleAdequate ?? 0;
+            document.getElementById("candidate-shadow-verified").textContent = shadowPower.fullyVerified ?? 0;
             const selectedDate = data?.filter?.date || "";
             const viewLabel = selectedDate
                 ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
