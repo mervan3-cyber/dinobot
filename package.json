@@ -1,6 +1,6 @@
 {
   "name": "dino-backend",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

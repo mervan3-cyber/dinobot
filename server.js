@@ -26,6 +26,7 @@ const {
     deriveStrengthSnapshot,
     buildMarketShadowAssessment
 } = require('./shadow_power');
+const dinoSelectorV2 = require('./dino_selector_v2');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -35,7 +36,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-precision50-verified-shadow-ubuntu-v15.3-2026-08-28';
+const BUILD_VERSION = 'ml-stacked-selector-verified-ubuntu-v16.0-2026-08-30';
 
 app.use(cors());
 app.use(express.json());
@@ -210,6 +211,16 @@ const TELEGRAM_MIN_MINUTE = 50;
 const TELEGRAM_MAX_MINUTE = 80;
 const MIN_SIGNAL_ODD = 1.40;
 
+// V16 ikinci katman: eski Dino yüzdesini tek başına karar kabul etmez.
+// Canlı tempo, skor, piyasa ve pre-match verisini birlikte yeniden puanlar.
+// 1.40 kör testte doğruluk modu olarak üstün çıktı. İstenirse sunucuda
+// DINO_V2_MIN_ODD=1.60 ile yükseltilebilir; 1.60 geçmiş kör testte daha
+// düşük isabet verdiği için varsayılan yapılmamıştır.
+const DINO_V2_SELECTOR_ENABLED =
+    String(process.env.DINO_V2_SELECTOR_ENABLED || 'true').toLowerCase() !== 'false';
+const DINO_V2_MIN_ODD = Number(process.env.DINO_V2_MIN_ODD) ||
+    Number(dinoSelectorV2.MODEL.policy.defaultMinimumOdd);
+
 // Kiralama hedefinde doğruluk önceliği: Telegram yalnızca gerçekten
 // pre-match + canlı istatistik modeline geçen maçları kabul eder.
 const PRECISION_MODE = Object.freeze({
@@ -238,8 +249,8 @@ let preferredPrematchBookmakerId =
 const PREMATCH_SUCCESS_TTL_MS = 8 * 24 * 60 * 60 * 1000;
 const PREMATCH_MISS_TTL_MS = 60 * 60 * 1000;
 
-// Bu kaynaklar yalnızca test verisi toplar. Hiçbiri Python ihtimalini,
-// value seçimini, EDGE filtresini veya Telegram kararını değiştirmez.
+// V16'da bu kaynaklar Python yüzdesini değiştirmez; ancak takım/lig kimliği,
+// örneklem ve API prediction eksiksiz doğrulanmadan Telegram kapısı açılmaz.
 const SHADOW_POWER_ENABLED = true;
 const SHADOW_TEAM_STATS_TTL_MS = 12 * 60 * 60 * 1000;
 const SHADOW_STANDINGS_TTL_MS = 60 * 60 * 1000;
@@ -315,7 +326,7 @@ const shadowPowerCache = new ShadowPowerCache({
 
 let shadowPowerSnapshot = {
     enabled: SHADOW_POWER_ENABLED,
-    decisionImpact: false,
+    decisionImpact: DINO_V2_SELECTOR_ENABLED,
     updatedAt: null,
     requestedMatches: 0,
     collectedMatches: 0,
@@ -1515,7 +1526,7 @@ async function golgeGucBaglamiGetir(mac) {
     ) {
         return {
             enabled: true,
-            decisionImpact: false,
+            decisionImpact: DINO_V2_SELECTOR_ENABLED,
             available: false,
             capturedAt: new Date().toISOString(),
             reason: 'fixture_league_season_or_team_id_missing'
@@ -1526,8 +1537,8 @@ async function golgeGucBaglamiGetir(mac) {
     const homeStatsKey = golgeCacheAnahtari(leagueId, season, homeTeamId);
     const awayStatsKey = golgeCacheAnahtari(leagueId, season, awayTeamId);
 
-    // Bu katman Telegram işlemlerinden sonra çağrıldığı için API yanıtı canlı
-    // sinyali geciktiremez. Lig tablosu ve takım verileri diskte cache'lenir.
+    // Lig tablosu ve takım verileri diskte cache'lenir. V16 bunları yalnız
+    // ikinci katman ön elemesini geçen kısa listedeki maçlar için çağırır.
     const standingsEntry = await cacheliGolgeApiGetir({
         bucket: 'standings',
         key: standingsKey,
@@ -1613,7 +1624,7 @@ async function golgeGucBaglamiGetir(mac) {
 
     return {
         enabled: true,
-        decisionImpact: false,
+        decisionImpact: DINO_V2_SELECTOR_ENABLED,
         available:
             teamStatsComplete ||
             standingsComplete ||
@@ -1686,7 +1697,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
     if (!SHADOW_POWER_ENABLED || matches.length === 0 || quotaLow) {
         shadowPowerSnapshot = {
             enabled: SHADOW_POWER_ENABLED,
-            decisionImpact: false,
+            decisionImpact: DINO_V2_SELECTOR_ENABLED,
             updatedAt: new Date().toISOString(),
             requestedMatches: matches.length,
             collectedMatches: 0,
@@ -1708,7 +1719,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
     }
 
     addSystemLog(
-        `> 🧪 Karara kapalı güç testi başlıyor: ${matches.length} tam-stat maç. Telegram seçimleri tamamlandı; sonuçlara etkisi yok.`
+        `> 🧬 V16 güç doğrulaması başlıyor: ${matches.length} ön aday. Kimlik, takım örneklemi, standings ve API prediction tam değilse sinyal kapalı.`
     );
 
     for (const mac of matches) {
@@ -1716,7 +1727,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
         contexts.set(Number(mac.fixture_id), context);
         const coverage = context?.coverage || {};
         addSystemLog(
-            `> 🧪 ${mac.mac_isim}: takım=${coverage.teamStatsComplete ? 'TAM' : 'YOK'} | tablo=${coverage.standingsComplete ? 'TAM' : 'YOK'} | prediction=${coverage.predictionsAvailable ? 'VAR' : 'YOK'} | kimlik=${context?.validation?.identityVerified ? 'OK' : 'EKSİK'} | örneklem=${context?.validation?.sampleAdequate ? 'OK' : 'YETERSİZ'} | ${context?.validation?.fullyVerified ? 'TAM DOĞRULANDI' : 'KISMİ'} | KARARA ETKİ YOK.`
+            `> 🧬 ${mac.mac_isim}: takım=${coverage.teamStatsComplete ? 'TAM' : 'YOK'} | tablo=${coverage.standingsComplete ? 'TAM' : 'YOK'} | prediction=${coverage.predictionsAvailable ? 'VAR' : 'YOK'} | kimlik=${context?.validation?.identityVerified ? 'OK' : 'EKSİK'} | örneklem=${context?.validation?.sampleAdequate ? 'OK' : 'YETERSİZ'} | ${context?.validation?.fullyVerified ? 'V16 ONAY' : 'V16 RED'}.`
         );
 
         const sourceStatuses = Object.values(context?.sources || {})
@@ -1732,7 +1743,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
     const values = [...contexts.values()];
     shadowPowerSnapshot = {
         enabled: true,
-        decisionImpact: false,
+        decisionImpact: DINO_V2_SELECTOR_ENABLED,
         updatedAt: new Date().toISOString(),
         requestedMatches: matches.length,
         collectedMatches: values.filter(context => context?.available).length,
@@ -3013,6 +3024,14 @@ function sinyalTuruBelirle(mac, dinoYuzde) {
 function firsatAdayiDahaIyiMi(yeniAday, mevcutAday) {
     if (!mevcutAday) return true;
 
+    const yeniSelector = Number(yeniAday?.selector_yuzde);
+    const mevcutSelector = Number(mevcutAday?.selector_yuzde);
+    if (Number.isFinite(yeniSelector) && Number.isFinite(mevcutSelector)) {
+        if (yeniSelector !== mevcutSelector) return yeniSelector > mevcutSelector;
+    } else if (Number.isFinite(yeniSelector)) {
+        return true;
+    }
+
     const yeniOlasilik = Number(yeniAday?.dino_yuzde);
     const mevcutOlasilik = Number(mevcutAday?.dino_yuzde);
     if (yeniOlasilik !== mevcutOlasilik) {
@@ -3048,7 +3067,9 @@ function adayDenetimKaydiOlustur({
     piyasaYuzde,
     edge,
     sinyalTuru,
-    liveOnlyDino
+    liveOnlyDino,
+    selectorScore,
+    selectorPolicy
 }) {
     const liveOnlyProbability = Number(liveOnlyDino?.[market]);
     const prematchSupport = prematchMarketDestegi(mac, market);
@@ -3099,8 +3120,23 @@ function adayDenetimKaydiOlustur({
         statsComplete: temelStatsTam(mac),
         liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
         minimumEdgeAtEvaluation: Number(state.globalMinEdge),
-        minimumOddAtEvaluation: MIN_SIGNAL_ODD,
+        minimumOddAtEvaluation: DINO_V2_SELECTOR_ENABLED
+            ? DINO_V2_MIN_ODD
+            : MIN_SIGNAL_ODD,
         minimumSignalMinuteAtEvaluation: TELEGRAM_MIN_MINUTE,
+        selectorV2Enabled: DINO_V2_SELECTOR_ENABLED,
+        selectorV2Probability: Number.isFinite(Number(selectorScore?.selectorProbability))
+            ? Number(Number(selectorScore.selectorProbability).toFixed(1))
+            : null,
+        selectorV2RawProbability: Number.isFinite(Number(selectorScore?.selectorRawProbability))
+            ? Number(Number(selectorScore.selectorRawProbability).toFixed(1))
+            : null,
+        selectorV2Threshold: Number(dinoSelectorV2.MODEL.policy.threshold * 100),
+        selectorV2MinimumOdd: DINO_V2_MIN_ODD,
+        selectorV2Eligible: selectorPolicy?.eligible === true,
+        selectorV2Reasons: Array.isArray(selectorPolicy?.reasons)
+            ? selectorPolicy.reasons
+            : [],
         decision: 'evaluating',
         decisionDetail: null
     };
@@ -3110,11 +3146,35 @@ function adayDenetimKaydiOlustur({
 const MODEL_MARKET_PATTERN = /^(MS1|X|MS2|[0-4]\.5_(ALT|UST))$/;
 
 
-function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}) {
-    const secilenler = {
-        surprise: null,
-        strong: null
+function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
+    if (!DINO_V2_SELECTOR_ENABLED) return true;
+    const marketNames = [...new Set([
+        ...Object.keys(mac?.canli_oranlar || {}),
+        ...Object.keys(dino || {}).filter(key => MODEL_MARKET_PATTERN.test(key))
+    ])];
+    const fullyVerifiedPlaceholder = {
+        validation: { fullyVerified: true }
     };
+    return marketNames.some(market => {
+        const score = dinoSelectorV2.scoreMarket(
+            mac,
+            market,
+            dino,
+            liveOnlyDino,
+            null
+        );
+        return dinoSelectorV2.policyCheck(
+            mac,
+            score,
+            fullyVerifiedPlaceholder,
+            DINO_V2_MIN_ODD
+        ).eligible;
+    });
+}
+
+
+function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}) {
+    const secilenler = { surprise: null, strong: null };
     const auditRecords = [];
     const minimumEdge = Number(state.globalMinEdge);
     const liveOdds = mac.canli_oranlar || {};
@@ -3124,6 +3184,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
     ])];
     const activeScanId = scanId || `scan-${Date.now()}`;
     const activeCapturedAt = capturedAt || new Date().toISOString();
+    const selectorShadowContext = mac?._selectorShadowContext || null;
 
     for (const market of marketNames) {
         const oddsData = liveOdds[market];
@@ -3134,20 +3195,38 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
         if (!Number.isFinite(dinoYuzde)) continue;
 
         const usableOdd = Number.isFinite(piyasaOrani) && piyasaOrani > 1;
-        const piyasaYuzde = usableOdd
-            ? (1 / piyasaOrani) * 100
+        const piyasaYuzde = usableOdd ? (1 / piyasaOrani) * 100 : null;
+        const edge = usableOdd ? dinoYuzde - piyasaYuzde : null;
+        const legacySinyalTuru = sinyalTuruBelirle(mac, dinoYuzde);
+        const selectorScore = DINO_V2_SELECTOR_ENABLED
+            ? dinoSelectorV2.scoreMarket(
+                mac,
+                market,
+                dino,
+                liveOnlyDino,
+                selectorShadowContext
+            )
             : null;
-        const edge = usableOdd
-            ? dinoYuzde - piyasaYuzde
+        const selectorPolicy = DINO_V2_SELECTOR_ENABLED
+            ? dinoSelectorV2.policyCheck(
+                mac,
+                selectorScore,
+                selectorShadowContext,
+                DINO_V2_MIN_ODD
+            )
             : null;
-        const sinyalTuru = sinyalTuruBelirle(mac, dinoYuzde);
-        const turEtiketi = sinyalTuru === 'strong'
-            ? 'GÜÇLÜ'
-            : sinyalTuru === 'surprise'
-                ? 'SÜRPRİZ'
-                : sinyalTuru === 'shadow'
-                    ? 'GÖLGE'
-                : 'SINIF DIŞI';
+        const sinyalTuru = DINO_V2_SELECTOR_ENABLED
+            ? (selectorPolicy?.eligible ? 'strong' : null)
+            : legacySinyalTuru;
+        const turEtiketi = DINO_V2_SELECTOR_ENABLED
+            ? (selectorPolicy?.eligible ? 'V16 UYGUN' : 'V16 RED')
+            : sinyalTuru === 'strong'
+                ? 'GÜÇLÜ'
+                : sinyalTuru === 'surprise'
+                    ? 'SÜRPRİZ'
+                    : sinyalTuru === 'shadow'
+                        ? 'GÖLGE'
+                        : 'SINIF DIŞI';
 
         const auditRecord = adayDenetimKaydiOlustur({
             scanId: activeScanId,
@@ -3161,7 +3240,9 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             piyasaYuzde,
             edge,
             sinyalTuru,
-            liveOnlyDino
+            liveOnlyDino,
+            selectorScore,
+            selectorPolicy
         });
         auditRecords.push(auditRecord);
 
@@ -3179,32 +3260,30 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             piyasaOrani,
             edge
         );
-
         addSystemLog(
-            `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
+            `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | V2:${Number.isFinite(Number(selectorScore?.selectorProbability)) ? `%${Number(selectorScore.selectorProbability).toFixed(1)}` : '-'} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
         );
 
         if (toplamGolMarketiSkoraGoreSonuclanmisMi(market, mac.skor)) {
             auditRecord.decision = 'market_already_decided';
             auditRecord.decisionDetail = `Mevcut skor ${mac.skor}, ${market} çizgisini zaten sonuçlandırdı.`;
-            addSystemLog(
-                `> 🚫 ${mac.mac_isim} | ${market}: mevcut skor ${mac.skor} nedeniyle market zaten sonuçlanmış; oran reddedildi.`
-            );
             continue;
         }
 
         if (scoreOnlyRedNedeni) {
             auditRecord.decision = 'fallback_security';
             auditRecord.decisionDetail = scoreOnlyRedNedeni;
-            if (edge >= minimumEdge) {
-                addSystemLog(
-                    `> 🛡️ ${mac.mac_isim} | ${market}: fallback güvenlik filtresi reddetti (${scoreOnlyRedNedeni}).`
-                );
-            }
+            continue;
+        }
+
+        if (DINO_V2_SELECTOR_ENABLED && !selectorPolicy?.eligible) {
+            auditRecord.decision = 'selector_v2_rejected';
+            auditRecord.decisionDetail = `V16 ikinci katman reddetti: ${(selectorPolicy?.reasons || []).join(', ') || 'puan üretilemedi'}.`;
             continue;
         }
 
         if (
+            !DINO_V2_SELECTOR_ENABLED &&
             !sinyalTuru &&
             dinoYuzde >= SIGNAL_RULES.surprise.minProbability &&
             Number(mac?.dakika) < TELEGRAM_MIN_MINUTE
@@ -3214,25 +3293,28 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             continue;
         }
 
-        if (!sinyalTuru) {
+        if (!DINO_V2_SELECTOR_ENABLED && !sinyalTuru) {
             auditRecord.decision = 'class_outside';
             auditRecord.decisionDetail = 'Dino ihtimali ve dakika, gölge/sürpriz/güçlü sınıfına uymadı.';
             continue;
         }
 
-        if (piyasaOrani < MIN_SIGNAL_ODD) {
+        const activeMinimumOdd = DINO_V2_SELECTOR_ENABLED
+            ? DINO_V2_MIN_ODD
+            : MIN_SIGNAL_ODD;
+        if (piyasaOrani < activeMinimumOdd) {
             auditRecord.decision = 'odds_below_minimum';
-            auditRecord.decisionDetail = `Canlı oran ${piyasaOrani}, minimum ${MIN_SIGNAL_ODD.toFixed(2)} altında.`;
+            auditRecord.decisionDetail = `Canlı oran ${piyasaOrani}, minimum ${activeMinimumOdd.toFixed(2)} altında.`;
             continue;
         }
 
-        if (edge < minimumEdge) {
+        if (!DINO_V2_SELECTOR_ENABLED && edge < minimumEdge) {
             auditRecord.decision = 'edge_below_minimum';
             auditRecord.decisionDetail = `EDGE %${edge.toFixed(1)}, minimum %${minimumEdge} altında.`;
             continue;
         }
 
-        if (sinyalTuru === 'shadow') {
+        if (!DINO_V2_SELECTOR_ENABLED && sinyalTuru === 'shadow') {
             auditRecord.decision = 'shadow_probability';
             auditRecord.decisionDetail = 'Dino %60–69.9: Telegram dışı gölge sinyal olarak kaydedildi.';
             continue;
@@ -3255,7 +3337,6 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
                 auditRecord.decisionDetail = `${market} çizgisi için pre-match ÜST/ALT desteği bulunamadı.`;
                 continue;
             }
-
             if (prematchSupport < PRECISION_MODE.minPrematchTotalSupport) {
                 auditRecord.decision = 'prematch_total_conflict';
                 auditRecord.decisionDetail = `Pre-match ${market} desteği %${prematchSupport.toFixed(1)}, gereken %${PRECISION_MODE.minPrematchTotalSupport} altında.`;
@@ -3264,7 +3345,9 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
         }
 
         auditRecord.decision = 'eligible_not_selected';
-        auditRecord.decisionDetail = 'Bütün temel filtreleri geçti; sınıf içi seçim bekliyor.';
+        auditRecord.decisionDetail = DINO_V2_SELECTOR_ENABLED
+            ? 'V16 ikinci katmanı ve bütün doğrulama kapılarını geçti; maç içi en iyi market seçimi bekleniyor.'
+            : 'Bütün temel filtreleri geçti; sınıf içi seçim bekliyor.';
 
         const aday = {
             market,
@@ -3273,9 +3356,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             dino_yuzde: dinoYuzde,
             oran: piyasaOrani,
             piyasa_yuzde: piyasaYuzde.toFixed(1),
-            bookmaker: typeof oddsData === 'object'
-                ? oddsData.bookmaker
-                : 'Bilinmiyor',
+            bookmaker: typeof oddsData === 'object' ? oddsData.bookmaker : 'Bilinmiyor',
             model_varyanti: dino?.MODEL_VARYANTI || 'live_only',
             live_only_yuzde: Number.isFinite(Number(liveOnlyDino?.[market]))
                 ? Number(liveOnlyDino[market])
@@ -3284,11 +3365,16 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
                 ? Number(prematchMarketDestegi(mac, market).toFixed(1))
                 : null,
             prematch_kaynak: prematchMarketKaynagi(mac, market),
+            selector_yuzde: Number.isFinite(Number(selectorScore?.selectorProbability))
+                ? Number(selectorScore.selectorProbability.toFixed(1))
+                : null,
+            selector_raw_yuzde: Number.isFinite(Number(selectorScore?.selectorRawProbability))
+                ? Number(selectorScore.selectorRawProbability.toFixed(1))
+                : null,
+            selector_model_surumu: dinoSelectorV2.MODEL.version,
             auditRecord
         };
 
-        // Bir sınıfta birden fazla market uygunsa doğruluk önceliğiyle Dino
-        // ihtimali en yüksek olanı, eşitlikte EDGE'i yüksek olanı seç.
         if (firsatAdayiDahaIyiMi(aday, secilenler[sinyalTuru])) {
             secilenler[sinyalTuru] = aday;
         }
@@ -3296,11 +3382,11 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
 
     for (const selected of Object.values(secilenler).filter(Boolean)) {
         selected.auditRecord.decision = 'selected_for_class';
-        selected.auditRecord.decisionDetail = 'Sınıfındaki en yüksek Dino ihtimalli uygun market.';
+        selected.auditRecord.decisionDetail = DINO_V2_SELECTOR_ENABLED
+            ? 'V16 ikinci katmanda gerçekleşme olasılığı en yüksek doğrulanmış market.'
+            : 'Sınıfındaki en yüksek Dino ihtimalli uygun market.';
     }
 
-    // Aynı maçta iki tür de aynı taramada çıkabilir. Güçlü sinyali önce
-    // gönder, ardından risk almak isteyenler için sürpriz sinyali gönder.
     return {
         selections: [secilenler.strong, secilenler.surprise].filter(Boolean),
         auditRecords
@@ -3578,6 +3664,9 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
             marketProbability: firsat?.piyasa_yuzde,
             modelVariant: firsat?.model_varyanti,
             liveOnlyProbability: firsat?.live_only_yuzde,
+            selectorV2Probability: firsat?.selector_yuzde,
+            selectorV2RawProbability: firsat?.selector_raw_yuzde,
+            selectorV2ModelVersion: firsat?.selector_model_surumu,
             prematchSource: mac?.prematch_source,
             prematchProbabilities: mac?.prematch_available
                 ? {
@@ -3699,13 +3788,19 @@ async function telegramSinyaliGonder(
     const ekCanliStats = telegramEkStatsSatirlari(mac);
 
     const gucluSinyal = firsat?.sinyal_turu === 'strong';
-    const sinyalBasligi = gucluSinyal
+    const sinyalBasligi = DINO_V2_SELECTOR_ENABLED
+        ? '🧬 DİNO V16 DOĞRULANMIŞ SİNYAL'
+        : gucluSinyal
         ? '🟢 DİNO GÜÇLÜ SİNYAL'
         : '🟡 DİNO SÜRPRİZ SİNYAL';
-    const sinyalAciklamasi = gucluSinyal
+    const sinyalAciklamasi = DINO_V2_SELECTOR_ENABLED
+        ? 'İkinci katman doğruluk sinyali'
+        : gucluSinyal
         ? 'Doğruluk öncelikli güçlü sinyal'
         : 'Risk almak isteyenler için sürpriz sinyal';
-    const modelEtiketi = firsat?.model_varyanti === 'live_plus_prematch'
+    const modelEtiketi = DINO_V2_SELECTOR_ENABLED
+        ? 'Dino + piyasa + pre-match + canlı tempo ikinci katmanı'
+        : firsat?.model_varyanti === 'live_plus_prematch'
         ? 'Canlı istatistik + pre-match modeli'
         : 'Canlı istatistik modeli';
     const prematchSatiri = mac?.prematch_available
@@ -3733,9 +3828,9 @@ async function telegramSinyaliGonder(
 🏷️ <b>Sinyal Sınıfı:</b> ${telegramHtml(sinyalAciklamasi)}
 
 🎯 <b>Value Market:</b> ${telegramHtml(firsat.market)}
-📈 <b>EDGE:</b> +${telegramHtml(firsat.edge)}%
 💵 <b>Canlı Oran:</b> ${telegramHtml(firsat.oran)}
 🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
+🧬 <b>V16 Gerçekleşme Puanı:</b> %${telegramHtml(firsat.selector_yuzde ?? '-')}
 🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
 📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
 🧠 <b>Model:</b> ${telegramHtml(modelEtiketi)}${prematchSatiri}${prematchMarketSatiri}${liveOnlySatiri}${statsDogrulamaSatiri}
@@ -3856,6 +3951,29 @@ async function botuCalistir() {
                 `> ❌ Model sonuç hizası geçersiz: ${macListesi.length} maç / ${Array.isArray(dinoSonuclari) ? dinoSonuclari.length : 0} sonuç. Tarama iptal edildi.`
             );
             return;
+        }
+
+        // V16 önce ikinci katmanın puan eşiğini geçebilecek maçları ucuz bir
+        // ön kontrolden geçirir. Standing/takım/prediction çağrıları yalnız bu
+        // kısa liste için yapılır; tam doğrulanmayan maç Telegram'a kapalıdır.
+        let selectorShadowContexts = new Map();
+        if (DINO_V2_SELECTOR_ENABLED) {
+            const selectorOnAdaylari = macListesi.filter((mac, index) => {
+                const dino = dinoSonuclari[index];
+                if (!dino || dino.HATA) return false;
+                const liveOnlyDino = dino?.LIVE_ONLY || (
+                    dino?.MODEL_VARYANTI === 'live_only' ? dino : null
+                );
+                return selectorV2OnAdayMi(mac, dino, liveOnlyDino);
+            });
+            addSystemLog(
+                `> 🧠 V16 ön seçim: ${macListesi.length} tam-stat maçtan ${selectorOnAdaylari.length} tanesi güç doğrulamasına aday.`
+            );
+            selectorShadowContexts = await golgeGucBaglamlariniTopla(selectorOnAdaylari);
+            for (const mac of macListesi) {
+                mac._selectorShadowContext =
+                    selectorShadowContexts.get(Number(mac.fixture_id)) || null;
+            }
         }
 
         let onaylanan = 0;
@@ -4053,7 +4171,7 @@ async function botuCalistir() {
                     ? 'GÜÇLÜ'
                     : 'SÜRPRİZ';
                 addSystemLog(
-                    `> 🚨 TAZE ML VALUE: ${mac.mac_isim} | ${firsat.market} | +${firsat.edge}% | ${turEtiketi}`
+                    `> 🚨 TAZE ML VALUE: ${mac.mac_isim} | ${firsat.market} | +${DINO_V2_SELECTOR_ENABLED ? firsat.selector_yuzde : firsat.edge}% | ${DINO_V2_SELECTOR_ENABLED ? 'V16' : turEtiketi}`
                 );
             }
 
@@ -4097,14 +4215,15 @@ async function botuCalistir() {
             }
         }
 
-        // Gölge güç verileri bütün Python/Gemini/Telegram kararları bittikten
-        // sonra toplanır. Bu sıralama özellikle korunur: endpoint sonuçları
-        // mevcut sinyali değiştiremez ve canlı gönderimi geciktiremez.
+        // V16'da güç bağlamı yukarıda yalnız ön adaylar için toplandı. Burada
+        // aynı doğrulanmış bağlam aday ve gönderilmiş sinyal geçmişine eklenir.
         try {
-            const shadowContexts = await golgeGucBaglamlariniTopla(macListesi);
-            golgeBaglaminiKayitlaraEkle(candidateAuditRows, shadowContexts);
+            if (!DINO_V2_SELECTOR_ENABLED) {
+                selectorShadowContexts = await golgeGucBaglamlariniTopla(macListesi);
+            }
+            golgeBaglaminiKayitlaraEkle(candidateAuditRows, selectorShadowContexts);
 
-            for (const [fixtureId, context] of shadowContexts) {
+            for (const [fixtureId, context] of selectorShadowContexts) {
                 const assessmentByMarket = {};
                 for (const record of candidateAuditRows) {
                     if (
@@ -4611,6 +4730,7 @@ function paylasilanSinyallerCsvOlustur(signals) {
         'signal_id', 'fixture_id', 'signal_type', 'sent_at', 'match', 'league',
         'minute', 'score', 'market', 'dino_probability', 'edge', 'odds',
         'bookmaker', 'market_probability', 'model_variant', 'live_only_probability',
+        'selector_v2_probability', 'selector_v2_raw_probability', 'selector_v2_model_version',
         'prematch_source', 'prematch_home', 'prematch_draw', 'prematch_away',
         'prematch_market_support', 'prematch_market_source', 'stats_source',
         ...STATS_VALIDATION_CSV_HEADERS,
@@ -4631,6 +4751,8 @@ function paylasilanSinyallerCsvOlustur(signals) {
             signal.match, signal.league, signal.minute, signal.score, signal.market,
             signal.dinoProbability, signal.edge, signal.odds, signal.bookmaker,
             signal.marketProbability, signal.modelVariant, signal.liveOnlyProbability,
+            signal.selectorV2Probability, signal.selectorV2RawProbability,
+            signal.selectorV2ModelVersion,
             signal.prematchSource, signal.prematchProbabilities?.home,
             signal.prematchProbabilities?.draw, signal.prematchProbabilities?.away,
             signal.prematchMarketSupport, signal.prematchMarketSource, signal.statsSource,
@@ -4696,13 +4818,19 @@ app.get(
         const payload = signalTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
-            minimumSignalOdd: MIN_SIGNAL_ODD,
+            minimumSignalOdd: DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
             currentMinimumEdge: state.globalMinEdge,
+            selectorV2: {
+                enabled: DINO_V2_SELECTOR_ENABLED,
+                version: dinoSelectorV2.MODEL.version,
+                policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
+                edgeDecisionImpact: false
+            },
             precisionMode: PRECISION_MODE,
             freshSignalValidation: FRESH_SIGNAL_VALIDATION,
             shadowPowerTest: {
                 enabled: SHADOW_POWER_ENABLED,
-                decisionImpact: false,
+                decisionImpact: DINO_V2_SELECTOR_ENABLED,
                 endpoints: ['teams/statistics', 'standings', 'predictions']
             },
             historyFilter: selection.filter,
@@ -4745,6 +4873,9 @@ function adayGecmisiCsvOlustur(records) {
         'record_id', 'scan_id', 'captured_at', 'fixture_id', 'match', 'league',
         'minute', 'score', 'market', 'signal_class', 'dino_probability', 'edge',
         'odds', 'market_probability', 'bookmaker', 'decision', 'decision_detail',
+        'selector_v2_probability', 'selector_v2_raw_probability',
+        'selector_v2_threshold', 'selector_v2_minimum_odd',
+        'selector_v2_eligible', 'selector_v2_reasons',
         'minimum_edge', 'minimum_odd', 'model_variant', 'live_only_probability',
         'prematch_probability_delta', 'prematch_available', 'prematch_source',
         'prematch_home', 'prematch_draw', 'prematch_away',
@@ -4767,7 +4898,11 @@ function adayGecmisiCsvOlustur(records) {
             record.match, record.league, record.minute, record.score, record.market,
             record.signalClass, record.dinoProbability, record.edge, record.odds,
             record.marketProbability, record.bookmaker, record.decision,
-            record.decisionDetail, record.minimumEdgeAtEvaluation,
+            record.decisionDetail, record.selectorV2Probability,
+            record.selectorV2RawProbability, record.selectorV2Threshold,
+            record.selectorV2MinimumOdd, record.selectorV2Eligible,
+            Array.isArray(record.selectorV2Reasons) ? record.selectorV2Reasons.join(' | ') : null,
+            record.minimumEdgeAtEvaluation,
             record.minimumOddAtEvaluation, record.modelVariant,
             record.liveOnlyProbability, record.prematchProbabilityDelta,
             record.prematchAvailable, record.prematchSource,
@@ -4826,12 +4961,18 @@ app.get(
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
             currentMinimumEdge: state.globalMinEdge,
-            minimumSignalOdd: MIN_SIGNAL_ODD,
+            minimumSignalOdd: DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
+            selectorV2: {
+                enabled: DINO_V2_SELECTOR_ENABLED,
+                version: dinoSelectorV2.MODEL.version,
+                policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
+                edgeDecisionImpact: false
+            },
             precisionMode: PRECISION_MODE,
             freshSignalValidation: FRESH_SIGNAL_VALIDATION,
             shadowPowerTest: {
                 enabled: SHADOW_POWER_ENABLED,
-                decisionImpact: false,
+                decisionImpact: DINO_V2_SELECTOR_ENABLED,
                 endpoints: ['teams/statistics', 'standings', 'predictions']
             },
             historyFilter: selection.filter,
@@ -5286,7 +5427,18 @@ app.get(
                 state.globalMinEdge,
 
             minimumSignalOdd:
-                MIN_SIGNAL_ODD,
+                DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
+
+            selectorV2: {
+                enabled: DINO_V2_SELECTOR_ENABLED,
+                version: dinoSelectorV2.MODEL.version,
+                policy: {
+                    ...dinoSelectorV2.MODEL.policy,
+                    activeMinimumOdd: DINO_V2_MIN_ODD
+                },
+                edgeDecisionImpact: false,
+                training: dinoSelectorV2.MODEL.training
+            },
 
             precisionMode:
                 PRECISION_MODE,
@@ -5303,7 +5455,7 @@ app.get(
             shadowPowerTracking: {
                 ...shadowPowerSnapshot,
                 enabled: SHADOW_POWER_ENABLED,
-                decisionImpact: false,
+                decisionImpact: DINO_V2_SELECTOR_ENABLED,
                 minimumQuotaReserve: SHADOW_MIN_QUOTA_REMAINING,
                 cache: shadowPowerCache.summary()
             },
@@ -5383,7 +5535,9 @@ app.listen(
 
 
         addSystemLog(
-            `> 🎯 Minimum EDGE: %${state.globalMinEdge}`
+            DINO_V2_SELECTOR_ENABLED
+                ? `> 🧬 V16 ikinci katman AKTİF: eşik %${dinoSelectorV2.MODEL.policy.threshold * 100} | dakika ${dinoSelectorV2.MODEL.policy.minimumMinute}-${dinoSelectorV2.MODEL.policy.maximumMinute} | oran ${DINO_V2_MIN_ODD}+ | EDGE kararı etkilemez.`
+                : `> 🎯 Legacy minimum EDGE: %${state.globalMinEdge}`
         );
 
         addSystemLog(
@@ -5410,11 +5564,15 @@ app.listen(
         );
 
         addSystemLog(
-            "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 50–80. dakika | 🟢 Güçlü: %75+ ve 50–80. dakika."
+            DINO_V2_SELECTOR_ENABLED
+                ? "> 🧠 Seçim kuralı: Dino tek başına sınıf belirlemez; V16 bütün marketleri yeniden puanlar ve maç başına yalnız en güçlü doğrulanmış adayı seçer."
+                : "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 50–80. dakika | 🟢 Güçlü: %75+ ve 50–80. dakika."
         );
 
         addSystemLog(
-            "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
+            DINO_V2_SELECTOR_ENABLED
+                ? "> 🗃️ Paylaşılan sinyal takibi aktif: V16 maç başına en fazla 1 doğrulanmış sinyal kaydeder."
+                : "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
         );
 
         addSystemLog(
@@ -5422,7 +5580,7 @@ app.listen(
         );
 
         addSystemLog(
-            `> 🧪 API güç gölge testi AÇIK: kimlik + lig/sezon + en az 5 ev/deplasman örneklemi + standings + predictions doğrulanır | KARARA ETKİ YOK | Kota koruması: ${SHADOW_MIN_QUOTA_REMAINING}.`
+            `> 🧬 API güç doğrulaması AÇIK: kimlik + lig/sezon + en az 5 ev/deplasman örneklemi + standings + predictions eksiksiz olmalı | V16 KARAR KAPISI | Kota koruması: ${SHADOW_MIN_QUOTA_REMAINING}.`
         );
 
         addSystemLog(

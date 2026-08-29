@@ -358,7 +358,9 @@ class CandidateTracker {
             prematchBlocked,
             livePlusPrematch,
             shadowPower: {
-                decisionImpact: false,
+                decisionImpact: shadowContexts.some(
+                    context => context?.decisionImpact === true
+                ),
                 contextMoments: shadowContexts.length,
                 available: shadowContexts.filter(
                     context => context?.available === true

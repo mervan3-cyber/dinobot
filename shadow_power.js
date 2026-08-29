@@ -429,7 +429,7 @@ function deriveStrengthSnapshot(homeStats, awayStats, homeStanding, awayStanding
             homeRank,
             awayRank
         },
-        note: 'Yalnız gölge test metriğidir; Telegram ve Dino kararına etkisi yoktur.'
+        note: 'V16 ikinci katman bağlamıdır; tam doğrulama Telegram kapısında zorunludur.'
     };
 }
 
@@ -492,7 +492,7 @@ function buildMarketShadowAssessment(context, market) {
         .filter(value => value === false).length;
 
     return {
-        decisionImpact: false,
+        decisionImpact: context?.decisionImpact === true,
         validationStatus: context?.validation?.fullyVerified === true
             ? 'fully_verified'
             : context?.available === true

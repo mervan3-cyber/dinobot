@@ -1,183 +1,98 @@
-# Ubuntu Kurulumu — Dino v15.3 Precision 50 + Taze Doğrulama
+# Ubuntu Kurulumu — Dino V16 İkinci Katman
 
-Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. Mevcut .env
-dosyanızı silmeyin veya paylaşmayın. node_modules klasörünü yeniden kopyalamanız
-gerekmez.
+Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. `.env`,
+`dino_signal_history.json`, `dino_candidate_history.json` ve önbellek JSON
+dosyalarınızı silmeyin. ZIP içindeki dosyaları aynı dizin yapısıyla sunucuya
+kopyalayın.
 
-## Güncellenecek dosyalar
+## V16 için zorunlu yeni dosyalar
 
-Paketteki dosyaları proje klasörünüze aynı dizin yapısıyla kopyalayın. Bu sürümde
-özellikle aşağıdaki dosyalar birlikte kullanılmalıdır:
+- `server.js`
+- `dino_selector_v2.js`
+- `dino_selector_v2.json`
+- `signal_tracker.js`
+- `candidate_tracker.js`
+- `shadow_power.js`
+- `prematch_odds.js`
+- `public/index.html`
+- `index.html`
+- `tahmin_yap.py`
+- `dino_live_models_all.json`
+- `package.json`
 
-- server.js
-- signal_tracker.js
-- candidate_tracker.js
-- prematch_odds.js
-- shadow_power.js
-- public/index.html
-- index.html (paneli dosya olarak açan kurulumlar için aynı kopya)
-- tahmin_yap.py
-- dino_live_models_all.json
-- package.json
+`dino_selector_v2.js` veya `dino_selector_v2.json` eksik olursa V16 başlamaz.
+Bu güvenli davranış yanlışlıkla eski karar sistemine dönülmesini önler.
 
-İlk açılışta dino_signal_history.json otomatik oluşur. Bu dosya yalnızca Telegram
-API'sine başarıyla gönderilmiş sinyalleri ve sonradan bulunan maç sonuçlarını
-tutar. Güncellemelerde bu dosyayı silmeyin.
+## V16 nasıl karar verir?
 
-İlk açılışta dino_candidate_history.json da otomatik oluşur. Bu dosya tam
-istatistikli maçlarda modelin gördüğü bütün market anlarını, eleme nedenlerini
-ve final sonuçlarını tutar. Telegram'a gitmeyen adayları sonradan incelemek için
-bu dosyayı da silmeyin.
+1. Eski Dino, bütün market olasılıklarını üretir.
+2. V16; Dino, canlı oran/piyasa, pre-match, skor, dakika ve canlı tempoyu
+   ikinci kez birlikte puanlar.
+3. Yalnız V16 puanı en az `%76`, dakika `50–80` ve oran en az `1.40` olan ön
+   adaylar güç doğrulamasına geçer.
+4. `/teams/statistics`, `/standings` ve `/predictions` cevaplarında takım,
+   fixture, lig/sezon kimliği ve en az 5 ev/deplasman örneklemi doğrulanır.
+5. Tam doğrulanmayan maç gönderilmez.
+6. Telegram öncesinde fixture, canlı istatistik ve canlı oran yeniden çekilir;
+   Python ve V16 ikinci kez çalışır.
+7. Her maçtan en fazla bir market gönderilir.
 
-İlk açılışta dino_prematch_cache.json otomatik oluşur. Fixture bazında pre-match
-oranlarını sakladığı için aynı maçın 10 dakikalık taramalarında gereksiz API
-isteği yapılmaz. Güncellemelerde bu dosyayı da koruyun.
+EDGE JSON/CSV denetiminde saklanır fakat V16 Telegram kararını etkilemez.
+`0.5 ALT`, `0.5 ÜST` ve `1.5 ALT` eğitim sonucuna göre V16 seçimine kapalıdır.
 
-İlk açılışta dino_shadow_power_cache.json otomatik oluşur. Takım gücü, puan
-durumu ve API tahminlerini önbellekler. v15.3, kimlik doğrulama alanı bulunmayan
-eski gölge önbelleğini güvenli biçimde otomatik yeniler.
+## Oran ayarı
 
-## Ortam değişkenleri
+Varsayılan doğruluk modu:
 
-Mevcut .env dosyanızda anahtarlarınız bulunmalıdır. Python için önerilen satır:
+    DINO_V2_MIN_ODD=1.40
+
+Kullanıcı isterse `.env` içinde `1.60` yapabilir:
+
+    DINO_V2_MIN_ODD=1.60
+
+Ancak eldeki kör testte `1.60` doğruluğu artırmadı; tersine uygun dokuz adayın
+yalnız dördü kazandı. Bu yüzden V16 doğruluk modunun varsayılanı `1.40`tır.
+
+Güvenli geri dönüş için V16 kapatılabilir:
+
+    DINO_V2_SELECTOR_ENABLED=false
+
+Bu satır yalnız acil geri dönüş içindir; normal kullanımda eklenmemelidir.
+
+Diğer önerilen ortam ayarları:
 
     PYTHON_BIN=python3
-
-İsteğe bağlı pre-match bookmaker ayarları:
-
     PREMATCH_BOOKMAKER_NAME=Bet365
-
-Bookmaker kimliği API'den ada göre çözülür. Kimliği elle sabitlemek isterseniz
-`PREMATCH_BOOKMAKER_ID` ekleyebilirsiniz; normal kurulumda gerekli değildir.
-
-Gölge testinin çalışmayı bırakacağı kota koruma sınırı isteğe bağlıdır:
-
     SHADOW_MIN_QUOTA_REMAINING=1500
 
-API, Telegram veya Gemini anahtarlarını sohbetlerde ve ekran görüntülerinde
-paylaşmayın.
+API, Telegram veya Gemini anahtarlarını ekran görüntüsünde ya da paylaşımda
+göstermeyin.
 
 ## Başlatma
 
-Mevcut başlatma yönteminizi kullanabilirsiniz:
-
     npm install
-    node server.js
-
-PM2 kullanıyorsanız:
-
     pm2 restart BOT_SUREC_ADI --update-env
+    pm2 save
 
-## Doğrulama
+İlk kurulumda PM2 yoksa `node server.js` ile de başlatılabilir.
 
-Başlangıç logunda şu sürüm görünmelidir:
+## Doğru sürümü kontrol etme
 
-    ml-precision50-verified-shadow-ubuntu-v15.3-2026-08-28
+Başlangıç logunda şunlar görünmelidir:
 
-Ayrıca şu iki satır görünür:
+    ml-stacked-selector-verified-ubuntu-v16.0-2026-08-30
+    V16 ikinci katman AKTİF: eşik %76 | dakika 50-80 | oran 1.4+ | EDGE kararı etkilemez.
+    API güç doğrulaması AÇIK ... | V16 KARAR KAPISI
 
-    Minimum canlı oran: 1.40
-    Gölge: Dino %60–69.9 | Sürpriz: %70–74.9 ve 50–80 | Güçlü: %75+ ve 50–80
-    Precision pre-match modu: AÇIK
-    Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü.
-    Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir.
-    Telegram öncesi taze doğrulama AÇIK: fixture + statistics + live odds + Python tekrar
-    API güç gölge testi AÇIK: kimlik + örneklem + standings + predictions | KARARA ETKİ YOK
+Panelde `V16 Makine Ayarları` ve `V16 Güç Doğrulaması` kartları görünmelidir.
+Görünmüyorsa mutlaka `public/index.html` yanlış yere kopyalanmıştır.
 
-## API güç gölge testi
+## Korunacak veri dosyaları
 
-Bu sürüm `/teams/statistics`, `/standings` ve `/predictions` verilerini toplar.
-Gölge test çağrıları Python, Gemini ve Telegram işlemleri tamamlandıktan sonra
-yapılır. Bu alanlar Dino ihtimaline, EDGE hesabına, market filtresine veya
-Telegram seçimine bağlanmamıştır.
+- `dino_signal_history.json`: Telegram'a giden sinyaller ve sonuçları.
+- `dino_candidate_history.json`: gönderilmeyenler dahil bütün market anları.
+- `dino_prematch_cache.json`: fixture bazında pre-match önbelleği.
+- `dino_shadow_power_cache.json`: takım/standings/prediction önbelleği.
 
-- Takım istatistikleri 12 saat önbelleklenir.
-- Puan durumu 1 saat önbelleklenir.
-- API tahmini fixture başına 36 saat önbelleklenir.
-- Takım, lig, sezon ve fixture kimlikleri cevapla eşleştirilir.
-- Ev sahibi ev maçları ve deplasman takımı deplasman maçları için en az 5
-  örnek bulunup bulunmadığı ayrıca kaydedilir.
-- `fullyVerified`, yalnız üç kaynak, kimlik ve örneklem denetimi tam olduğunda
-  true olur.
-- Kalan günlük kota 1500 veya altındaysa gölge toplama o taramada atlanır.
-- JSON dışa aktarımında tam `shadowContext` ve markete özel
-  `shadowAssessment` bulunur.
-- CSV dışa aktarımında `shadow_` ile başlayan düz eğitim alanları bulunur.
-
-## Yeni sinyal düzeni
-
-- Gölge sinyal: Dino olasılığı %60–69.9, dakika 41–80; Telegram'a gönderilmez.
-- Sürpriz sinyal: Dino olasılığı %70–74.9, dakika 50–80.
-- Güçlü sinyal: Dino olasılığı %75+, dakika 50–80.
-- Tarama 25–80 arasında veri toplamaya devam eder; erken adaylar eğitim ve
-  denetim geçmişinde `signal_minute_waiting` olarak kalır.
-- Her iki sınıf da paneldeki minimum EDGE ayarını geçmelidir.
-- Her iki sınıf için canlı oran en az 1.40 olmalıdır.
-- Telegram sinyali için pre-match 1X2 verisi zorunludur. Böylece Python
-  `live_plus_prematch` varyantını kullanır.
-- ALT/ÜST sinyallerinde seçilen çizginin pre-match taraf olasılığı en az %45
-  olmalıdır. Veri yoksa veya pre-match piyasa ters yöndeyse sinyal yalnız aday
-  geçmişinde kalır.
-- Mevcut skor nedeniyle zaten kazanmış veya kaybetmiş toplam gol çizgileri
-  stale/hatalı oran kabul edilerek engellenir.
-- Her maç en fazla bir sürpriz ve bir güçlü sinyal gönderebilir.
-- İki sinyal aynı dakikada, aynı markette veya farklı marketlerde olabilir.
-- Bir sınıfta birden fazla market uygunsa Dino olasılığı en yüksek market seçilir;
-  eşitlikte EDGE değeri yüksek olan seçilir.
-- Aynı sınıf ikinci kez gönderilmez. Telegram gönderimi başarısızsa hak kullanılmaz
-  ve sonraki taramada yeniden denenebilir.
-
-## Paylaşılan sinyal takibi
-
-Paneldeki Paylaşılan Sinyal Takibi bölümü yalnızca Telegram'da gerçekten
-paylaşılan sinyalleri gösterir. Bot, sonuç bekleyen fixture'ları 10 dakikada bir
-API-Football üzerinden kontrol eder. Paneldeki Sonuçları Kontrol Et düğmesi de
-aynı işlemi elle başlatır.
-
-Panelden iki analiz dosyası indirilebilir:
-
-- JSON: bütün canlı istatistik anlık görüntüsünü, özetleri ve sonuçları içerir.
-- CSV: Excel veya başka analiz araçları için düz tablodur.
-
-Kazanma oranları sürpriz ve güçlü sinyaller için ayrı tutulur. Aynı maçta iki tür
-paylaşılmışsa iki ayrı sinyal kaydı oluşur fakat fixture kimliği aynı kalır.
-
-## Tam-stat aday denetimi
-
-Paneldeki Tam-Stat Aday Denetimi, Telegram'a gönderilmeyen marketleri de kaydeder.
-Her kayıtta Dino ihtimali, oran, EDGE, dakika, skor, canlı istatistikler ve kesin
-karar nedeni bulunur. Live-only olasılık, pre-match'li olasılık, aradaki fark ve
-pre-match market desteği de kaydedilir. Model tahmini bulunup canlı oranı bulunmayan marketler de
-`live_odds_missing` kararıyla tutulur. Sonuç bekleyen adaylar paylaşılan sinyallerle aynı toplu API
-isteğinde kontrol edilir; böylece gereksiz ayrı sonuç istekleri oluşturulmaz.
-
-Panelden aday geçmişi JSON veya CSV olarak indirilebilir. Aynı fixture ve market
-farklı tarama dakikalarında ayrı kayıt olarak tutulur. Bu sayede EDGE, oran, dakika,
-sınıf ve tekrar kilidi nedeniyle kaçırılan seçimler sonradan karşılaştırılabilir.
-
-## Türkiye saati tarih görünümü
-
-Panelde hem Tam-Stat Aday Denetimi hem de Paylaşılan Sinyal Takibi bölümünde tarih
-seçimi bulunur. `Tüm Veriler` seçeneği bütün geçmişin sayaçlarını gösterir. Bir gün
-seçildiğinde gün sınırları `Europe/Istanbul` saat dilimine göre hesaplanır; sayaçlar,
-tablo, JSON ve CSV indirmeleri aynı seçili güne göre filtrelenir. Tablolardaki
-`Tarih (TSİ)` sütunu kayıt saatini Türkiye saatiyle gösterir.
-
-API istek kuyruğu timeout sonrası otomatik toparlanır. Timeout ve geçici 5xx/429
-hatalarında endpoint adı loga yazılır ve en fazla üç kontrollü deneme yapılır.
-
-## Canlı veri güvenliği
-
-Model yalnızca iki takımın şut, isabetli şut ve korner alanlarının tamamı gerçek
-API verisi olarak mevcutsa çalışır. Eksik değerler sıfıra çevrilmez ve eksik
-istatistikli maç Python'a veya Telegram'a gönderilmez.
-
-İlk model bir Telegram adayı bulduğunda fixture, `/fixtures/statistics` ve
-`/odds/live?fixture=ID` yeniden çekilir. Altı temel alan, şut/isabet ilişkisi,
-skor-isabet ilişkisi, kümülatif değerlerin geriye gitmemesi ve skor değişirken
-istatistiğin donmaması denetlenir. Ardından Python yalnız bu maç için taze veriyle
-tekrar çalıştırılır. Telegram yalnız ikinci değerlendirmeyi kullanır.
-
-Bitmiş, durdurulmuş, engellenmiş, askıya alınmış, 50. dakikaya ulaşmamış veya
-80. dakikayı geçmiş maç gönderilmez. Gemini açıklamasından sonra skor yeniden
-değişmişse taze seçim de iptal edilir.
+Yeni JSON ve CSV dışa aktarımlarında `selectorV2Probability`, V16 red nedenleri,
+tam güç bağlamı ve sonuç alanları eğitim için saklanır.
