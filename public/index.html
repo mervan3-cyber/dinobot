@@ -627,10 +627,10 @@
             <div class="card" style="margin:12px 0; background:#151d22; border-color:#32789b;">
                 <div class="section-title" style="margin-bottom:10px;">
                     <div>
-                        <h3 style="color:#64b5f6;">🧪 API Güç Gölge Testi</h3>
-                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu ve API tahmini yalnızca karşılaştırma için kaydedilir.</p>
+                        <h3 style="color:#64b5f6;">🧬 V16 Güç Doğrulaması</h3>
+                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu, kimlik ve API tahmini eksiksiz doğrulanmayan maç gönderilmez.</p>
                     </div>
-                    <span class="mini-badge bg-info">KARARA ETKİ YOK</span>
+                    <span class="mini-badge bg-success">KARAR KAPISI</span>
                 </div>
                 <div class="metrics signal-metrics">
                     <div class="metric info">
@@ -676,10 +676,10 @@
                             <th>Market</th>
                             <th>Sınıf</th>
                             <th>Dino</th>
-                            <th>Model</th>
+                            <th>V16</th>
                             <th>Pre Destek</th>
                             <th>Gölge Test</th>
-                            <th>EDGE</th>
+                            <th>EDGE (kayıt)</th>
                             <th>Oran</th>
                             <th>Karar</th>
                             <th>Sonuç</th>
@@ -710,11 +710,11 @@
                     <strong id="ml-market">-</strong>
                 </div>
                 <div class="ml-cell">
-                    <span class="muted">Dino ihtimali</span>
+                    <span class="muted">V16 gerçekleşme</span>
                     <strong id="ml-probability">-</strong>
                 </div>
                 <div class="ml-cell">
-                    <span class="muted">EDGE</span>
+                    <span class="muted">Eski Dino</span>
                     <strong class="positive" id="ml-edge">-</strong>
                 </div>
             </div>
@@ -855,11 +855,10 @@
         </div>
 
         <div class="card">
-            <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
-            <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
-            <input type="number" min="0" max="100" step="0.5" id="min-edge" value="3" placeholder="Örn: 3">
-            <p class="muted">Telegram için dakika <strong>50–80</strong>, Dino en az <strong>%70</strong>, canlı oran en az <strong>1.40</strong>, EDGE ve pre-match zorunludur. Gönderim öncesi skor, stats ve oran taze doğrulanır.</p>
-            <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
+            <h3 style="margin-bottom:10px;">🧬 V16 Makine Ayarları</h3>
+            <label class="muted" for="min-edge">Legacy EDGE (yalnız rapor)</label>
+            <input type="number" id="min-edge" value="3" disabled>
+            <p class="muted">Aktif karar: <strong>V16 en az %76</strong>, dakika <strong>50–80</strong>, canlı oran en az <strong>1.40</strong>, tam pre-match ve tam API güç doğrulaması. EDGE artık sinyali elemez. Her maçtan en fazla bir doğrulanmış market seçilir.</p>
         </div>
 
         <div class="card">
@@ -1245,12 +1244,12 @@
             document.getElementById("ml-match").textContent = selection?.matchName || output.matchName;
             document.getElementById("ml-market").textContent = selection?.market || "Filtreyi geçmedi";
 
-            const probability = selection?.market ? Number(output.values?.[selection.market]) : NaN;
-            document.getElementById("ml-probability").textContent = Number.isFinite(probability)
-                ? `%${probability.toFixed(1)}`
+            const dinoProbability = selection?.market ? Number(output.values?.[selection.market]) : NaN;
+            document.getElementById("ml-probability").textContent = selection?.edge !== null && selection?.edge !== undefined
+                ? `%${selection.edge.toFixed(1)}`
                 : "-";
-            document.getElementById("ml-edge").textContent = selection?.edge !== null && selection?.edge !== undefined
-                ? `+%${selection.edge.toFixed(1)}`
+            document.getElementById("ml-edge").textContent = Number.isFinite(dinoProbability)
+                ? `%${dinoProbability.toFixed(1)}`
                 : "-";
 
             document.getElementById("ml-note").textContent = output.variant === "score_only"
@@ -1581,8 +1580,9 @@
                 sent: ["✅ Gönderildi", "win"],
                 already_sent: ["🔁 Önceden gönderildi", "neutral"],
                 telegram_candidate: ["⏳ Gönderim adayı", "pending"],
-                selected_for_class: ["🎯 Sınıf birincisi", "pending"],
+                selected_for_class: ["🧬 V16 seçimi", "pending"],
                 eligible_not_selected: ["↔️ Daha güçlü market seçildi", "neutral"],
+                selector_v2_rejected: ["🧬 V16 reddetti", "loss"],
                 edge_below_minimum: ["📉 EDGE altı", "loss"],
                 odds_below_minimum: ["💸 Oran 1.40 altı", "loss"],
                 shadow_probability: ["👁️ Gölge %60–69", "neutral"],
@@ -1696,9 +1696,9 @@
                     record.dinoProbability !== null && record.dinoProbability !== undefined
                         ? `%${record.dinoProbability}`
                         : "-",
-                    record.modelVariant === "live_plus_prematch"
-                        ? "🧭 Karma"
-                        : "📡 Canlı",
+                    record.selectorV2Probability !== null && record.selectorV2Probability !== undefined
+                        ? `%${record.selectorV2Probability}`
+                        : "-",
                     record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined
                         ? `%${record.prematchMarketSupport}`
                         : "-",
