@@ -547,7 +547,7 @@
                     <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
                     <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
                 </div>
-                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; Telegram sinyali yalnızca 50–80. dakikada açılır.</p>
+                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; V16 Telegram sinyali yalnızca 60–80. dakikada açılır.</p>
             </div>
             <label class="switch" title="Otomatik taramayı aç/kapat">
                 <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
@@ -627,10 +627,10 @@
             <div class="card" style="margin:12px 0; background:#151d22; border-color:#32789b;">
                 <div class="section-title" style="margin-bottom:10px;">
                     <div>
-                        <h3 style="color:#64b5f6;">🧬 V16 Güç Doğrulaması</h3>
-                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu, kimlik ve API tahmini eksiksiz doğrulanmayan maç gönderilmez.</p>
+                        <h3 style="color:#64b5f6;">🧬 V16 Güç Bağlamı</h3>
+                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu ve API tahmini V16 puanına ek bağlam sağlar; eksik olması tek başına sinyali engellemez.</p>
                     </div>
-                    <span class="mini-badge bg-success">KARAR KAPISI</span>
+                    <span class="mini-badge bg-info">MODEL GİRDİSİ · VETO YOK</span>
                 </div>
                 <div class="metrics signal-metrics">
                     <div class="metric info">
@@ -858,7 +858,7 @@
             <h3 style="margin-bottom:10px;">🧬 V16 Makine Ayarları</h3>
             <label class="muted" for="min-edge">Legacy EDGE (yalnız rapor)</label>
             <input type="number" id="min-edge" value="3" disabled>
-            <p class="muted">Aktif karar: <strong>V16 en az %76</strong>, dakika <strong>50–80</strong>, canlı oran en az <strong>1.40</strong>, tam pre-match ve tam API güç doğrulaması. EDGE artık sinyali elemez. Her maçtan en fazla bir doğrulanmış market seçilir.</p>
+            <p class="muted">Aktif karar: <strong>V16 en az %76</strong>, dakika <strong>60–80</strong>, canlı oran en az <strong>1.40</strong>. EDGE, harici pre-destek ve tam API güç şartı sinyali tek başına elemez; bunlar model girdisi ve denetim verisi olarak saklanır. Her maçtan en fazla bir market seçilir.</p>
         </div>
 
         <div class="card">
@@ -1090,7 +1090,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "25–80. dakikada veri toplar; 50–80. dakikada taze doğrulanmış %70+ Telegram sinyali üretir."
+                ? "25–80. dakikada veri toplar; 60–80. dakikada V16 %76+ ve taze doğrulanmış Telegram sinyali üretir."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
