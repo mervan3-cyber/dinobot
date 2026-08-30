@@ -216,12 +216,12 @@
   "policy": {
     "active": true,
     "threshold": 0.76,
-    "minimumMinute": 50,
+    "minimumMinute": 60,
     "maximumMinute": 80,
     "accuracyModeMinimumOdd": 1.4,
     "commercialMinimumOdd": 1.6,
     "defaultMinimumOdd": 1.4,
-    "requireFullyVerifiedShadow": true,
+    "requireFullyVerifiedShadow": false,
     "excludedMarkets": [
       "0.5_UST",
       "0.5_ALT",

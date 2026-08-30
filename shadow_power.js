@@ -429,7 +429,7 @@ function deriveStrengthSnapshot(homeStats, awayStats, homeStanding, awayStanding
             homeRank,
             awayRank
         },
-        note: 'V16 ikinci katman bağlamıdır; tam doğrulama Telegram kapısında zorunludur.'
+        note: 'V16 ikinci katman bağlamıdır; eksik veya tam doğrulanmamış bağlam tek başına Telegram vetosu değildir.'
     };
 }
 

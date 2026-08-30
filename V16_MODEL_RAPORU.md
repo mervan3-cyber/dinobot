@@ -1,4 +1,15 @@
-# Dino V16 Model Raporu
+# Dino V16.1 Model ve Karar Raporu
+
+## 30 Ağustos sonrası karar güncellemesi
+
+30 Ağustos kör gününde V16 `%76`, `60–80. dakika` ve `1.40+` kuralı 12 seçimde
+9 doğru yaptı. 26–30 Ağustos yuvarlanan testinde aynı kural 65 seçimde 53 doğru
+sonuç verdi (`%81,5`). Bu nedenle Telegram kapısı 60. dakikaya taşındı.
+
+Tam API güç bağlamı veto olmaktan çıkarıldı; takım gücü, standings ve API
+tahmini V16 girdisi ve denetim verisi olarak kalır. Harici pre-destek ve EDGE
+barajları V16 kararını elemez. Gecikmiş skor/goal durumları için Telegram öncesi
+12 saniyelik ikinci skor, oran ve olay kontrolü eklendi.
 
 ## Veri
 
@@ -43,8 +54,8 @@ isteğe bağlı ortam ayarıdır.
 - Pre-match seçilen ALT/ÜST çizgisi doğrudan modele girer.
 - Şut, isabet, korner, xG, topa sahip olma, kart, faul, ofsayt ve kurtarış
   tempoları birlikte değerlendirilir.
-- Takım istatistiği, standings, API prediction, kimlik ve örneklem tamlığı
-  Telegram için zorunlu kapıdır.
+- Takım istatistiği, standings ve API prediction V16 girdisidir; tamlık durumu
+  kaydedilir fakat eksiklik tek başına Telegram vetosu değildir.
 - Telegram öncesi taze veriyle hem Python hem V16 tekrar çalışır.
 - Maç başına en fazla bir sinyal seçilir.
 

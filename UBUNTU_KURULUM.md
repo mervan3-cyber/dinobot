@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino V16 İkinci Katman
+# Ubuntu Kurulumu — Dino V16.1 Doğruluk Kuralı
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. `.env`,
 `dino_signal_history.json`, `dino_candidate_history.json` ve önbellek JSON
@@ -28,16 +28,19 @@ Bu güvenli davranış yanlışlıkla eski karar sistemine dönülmesini önler.
 1. Eski Dino, bütün market olasılıklarını üretir.
 2. V16; Dino, canlı oran/piyasa, pre-match, skor, dakika ve canlı tempoyu
    ikinci kez birlikte puanlar.
-3. Yalnız V16 puanı en az `%76`, dakika `50–80` ve oran en az `1.40` olan ön
-   adaylar güç doğrulamasına geçer.
+3. Yalnız V16 puanı en az `%76`, dakika `60–80` ve oran en az `1.40` olan ön
+   adaylar değerlendirmeye geçer.
 4. `/teams/statistics`, `/standings` ve `/predictions` cevaplarında takım,
    fixture, lig/sezon kimliği ve en az 5 ev/deplasman örneklemi doğrulanır.
-5. Tam doğrulanmayan maç gönderilmez.
+5. Güç bağlamının tam olmaması tek başına veto değildir; bulunan alanlar V16
+   girdisi ve denetim verisi olarak kullanılır.
 6. Telegram öncesinde fixture, canlı istatistik ve canlı oran yeniden çekilir;
-   Python ve V16 ikinci kez çalışır.
+   Python ve V16 ikinci kez çalışır. Sonra 12 saniyelik ikinci doğrulamada skor,
+   canlı oran ve olay akışı kontrol edilir.
 7. Her maçtan en fazla bir market gönderilir.
 
 EDGE JSON/CSV denetiminde saklanır fakat V16 Telegram kararını etkilemez.
+Pre-match desteği V16 model girdisidir; ayrıca sabit bir pre-destek barajı yoktur.
 `0.5 ALT`, `0.5 ÜST` ve `1.5 ALT` eğitim sonucuna göre V16 seçimine kapalıdır.
 
 ## Oran ayarı
@@ -80,11 +83,11 @@ göstermeyin.
 
 Başlangıç logunda şunlar görünmelidir:
 
-    ml-stacked-selector-verified-ubuntu-v16.0-2026-08-30
-    V16 ikinci katman AKTİF: eşik %76 | dakika 50-80 | oran 1.4+ | EDGE kararı etkilemez.
-    API güç doğrulaması AÇIK ... | V16 KARAR KAPISI
+    ml-v16.1-score-only-decision-ubuntu-2026-08-31
+    V16 ikinci katman AKTİF: eşik %76 | dakika 60-80 | oran 1.4+ | EDGE kararı etkilemez.
+    API güç bağlamı AÇIK ... | EKSİK BAĞLAM TEK BAŞINA VETO DEĞİL
 
-Panelde `V16 Makine Ayarları` ve `V16 Güç Doğrulaması` kartları görünmelidir.
+Panelde `V16 Makine Ayarları` ve `V16 Güç Bağlamı` kartları görünmelidir.
 Görünmüyorsa mutlaka `public/index.html` yanlış yere kopyalanmıştır.
 
 ## Korunacak veri dosyaları

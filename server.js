@@ -36,7 +36,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-stacked-selector-verified-ubuntu-v16.0-2026-08-30';
+const BUILD_VERSION = 'ml-v16.1-score-only-decision-ubuntu-2026-08-31';
 
 app.use(cors());
 app.use(express.json());
@@ -207,7 +207,7 @@ const SIGNAL_RULES = Object.freeze({
     })
 });
 
-const TELEGRAM_MIN_MINUTE = 50;
+const TELEGRAM_MIN_MINUTE = 60;
 const TELEGRAM_MAX_MINUTE = 80;
 const MIN_SIGNAL_ODD = 1.40;
 
@@ -221,8 +221,9 @@ const DINO_V2_SELECTOR_ENABLED =
 const DINO_V2_MIN_ODD = Number(process.env.DINO_V2_MIN_ODD) ||
     Number(dinoSelectorV2.MODEL.policy.defaultMinimumOdd);
 
-// Kiralama hedefinde doğruluk önceliği: Telegram yalnızca gerçekten
-// pre-match + canlı istatistik modeline geçen maçları kabul eder.
+// Legacy karar hattının pre-match kapılarıdır. V16 aktifken pre-match
+// verisi model girdisi ve denetim kaydı olarak kalır; tek başına Telegram
+// sinyalini veto etmez.
 const PRECISION_MODE = Object.freeze({
     requirePrematchOneXTwo: true,
     requireExactPrematchTotal: true,
@@ -238,6 +239,25 @@ const FRESH_SIGNAL_VALIDATION = Object.freeze({
     refreshStatistics: true,
     refreshLiveOdds: true,
     rerunPython: true
+});
+
+// Aynı sağlayıcının fixture ve oran akışı birkaç saniye birlikte gecikebilir.
+// İkinci doğrulama bu yüzden beklemeli yapılır; olay akışında çok yeni gol varsa
+// veya seçilen oran değişmiş/kapanmışsa sinyal bir sonraki taramaya bırakılır.
+const STALE_GOAL_GUARD = Object.freeze({
+    enabled: true,
+    confirmationDelayMs: Math.max(
+        5000,
+        Number(process.env.STALE_GOAL_CONFIRMATION_DELAY_MS) || 12000
+    ),
+    recentGoalCooldownMinutes: Math.max(
+        1,
+        Number(process.env.STALE_GOAL_COOLDOWN_MINUTES) || 2
+    ),
+    maximumOddDrift: Math.max(
+        0.01,
+        Number(process.env.STALE_GOAL_MAX_ODD_DRIFT) || 0.03
+    )
 });
 
 const PREFERRED_PREMATCH_BOOKMAKER_NAME =
@@ -327,6 +347,7 @@ const shadowPowerCache = new ShadowPowerCache({
 let shadowPowerSnapshot = {
     enabled: SHADOW_POWER_ENABLED,
     decisionImpact: DINO_V2_SELECTOR_ENABLED,
+    hardGate: false,
     updatedAt: null,
     requestedMatches: 0,
     collectedMatches: 0,
@@ -1698,6 +1719,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
         shadowPowerSnapshot = {
             enabled: SHADOW_POWER_ENABLED,
             decisionImpact: DINO_V2_SELECTOR_ENABLED,
+            hardGate: false,
             updatedAt: new Date().toISOString(),
             requestedMatches: matches.length,
             collectedMatches: 0,
@@ -1744,6 +1766,7 @@ async function golgeGucBaglamlariniTopla(maclar) {
     shadowPowerSnapshot = {
         enabled: true,
         decisionImpact: DINO_V2_SELECTOR_ENABLED,
+        hardGate: false,
         updatedAt: new Date().toISOString(),
         requestedMatches: matches.length,
         collectedMatches: values.filter(context => context?.available).length,
@@ -3321,6 +3344,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
         }
 
         if (
+            !DINO_V2_SELECTOR_ENABLED &&
             PRECISION_MODE.requirePrematchOneXTwo &&
             dino?.MODEL_VARYANTI !== 'live_plus_prematch'
         ) {
@@ -3330,7 +3354,11 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
         }
 
         const totalMarket = /_(ALT|UST)$/.test(market);
-        if (totalMarket && PRECISION_MODE.requireExactPrematchTotal) {
+        if (
+            !DINO_V2_SELECTOR_ENABLED &&
+            totalMarket &&
+            PRECISION_MODE.requireExactPrematchTotal
+        ) {
             const prematchSupport = prematchMarketDestegi(mac, market);
             if (!Number.isFinite(prematchSupport)) {
                 auditRecord.decision = 'prematch_total_missing';
@@ -3696,13 +3724,47 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
 }
 
 
-async function sinyalOncesiCanlilikDogrula(mac) {
-    try {
-        const response = await apiGet(
-            `/fixtures?id=${Number(mac.fixture_id)}`
+function gecerliGolOlaylariniAyikla(events) {
+    return (Array.isArray(events) ? events : []).filter(event => {
+        if (normalizeText(event?.type) !== 'goal') return false;
+        const detail = normalizeText(event?.detail);
+        const comments = normalizeText(event?.comments);
+        const aciklama = `${detail} ${comments}`;
+        return !(
+            aciklama.includes('missed') ||
+            aciklama.includes('cancel') ||
+            aciklama.includes('disallow') ||
+            aciklama.includes('annul')
         );
-        const latest = Array.isArray(response.data?.response)
-            ? response.data.response[0]
+    });
+}
+
+
+async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
+    try {
+        if (STALE_GOAL_GUARD.enabled) {
+            addSystemLog(
+                `> ⏳ ${mac.mac_isim}: gecikmiş gol/oran koruması için ${Math.round(STALE_GOAL_GUARD.confirmationDelayMs / 1000)} saniye bekleniyor.`
+            );
+            await sleep(STALE_GOAL_GUARD.confirmationDelayMs);
+        }
+
+        const fixtureId = Number(mac.fixture_id);
+        const [fixtureResult, oddsResult, eventsResult] = await Promise.allSettled([
+            apiGet(`/fixtures?id=${fixtureId}`),
+            apiGet('/odds/live', { params: { fixture: fixtureId } }),
+            apiGet(`/fixtures/events?fixture=${fixtureId}`, { dinoMaxAttempts: 1 })
+        ]);
+
+        if (fixtureResult.status !== 'fulfilled') {
+            throw fixtureResult.reason || new Error('fixture doğrulaması alınamadı');
+        }
+        if (oddsResult.status !== 'fulfilled') {
+            throw oddsResult.reason || new Error('canlı oran doğrulaması alınamadı');
+        }
+
+        const latest = Array.isArray(fixtureResult.value.data?.response)
+            ? fixtureResult.value.data.response[0]
             : null;
 
         if (
@@ -3742,9 +3804,82 @@ async function sinyalOncesiCanlilikDogrula(mac) {
             return false;
         }
 
+        const currentMinute = Number(latest.fixture.status.elapsed);
+        const currentOdds = parseLiveOdds(oddsResult.value).get(fixtureId);
+        if (!currentOdds || Object.keys(currentOdds).length === 0) {
+            addSystemLog(
+                `> ⛔ ${mac.mac_isim}: ikinci kontrolde canlı oranlar kapandı veya alınamadı.`
+            );
+            return false;
+        }
+
+        for (const firsat of Array.isArray(firsatlar) ? firsatlar : []) {
+            const oddsData = currentOdds[firsat.market];
+            const currentOdd = oddsData && typeof oddsData === 'object'
+                ? Number(oddsData.oran)
+                : Number(oddsData);
+            const selectedOdd = Number(firsat.oran);
+
+            if (!Number.isFinite(currentOdd) || currentOdd < DINO_V2_MIN_ODD) {
+                addSystemLog(
+                    `> ⛔ ${mac.mac_isim}: ${firsat.market} ikinci kontrolde kapandı veya oran ${currentOdd || '-'} ile minimumun altına indi.`
+                );
+                return false;
+            }
+            if (
+                Number.isFinite(selectedOdd) &&
+                Math.abs(currentOdd - selectedOdd) > STALE_GOAL_GUARD.maximumOddDrift
+            ) {
+                addSystemLog(
+                    `> ⛔ ${mac.mac_isim}: ${firsat.market} oranı ${selectedOdd} → ${currentOdd} değişti; eski V16 kararı gönderilmedi.`
+                );
+                return false;
+            }
+        }
+
+        if (eventsResult.status === 'fulfilled') {
+            const events = Array.isArray(eventsResult.value.data?.response)
+                ? eventsResult.value.data.response
+                : [];
+            const goalEvents = gecerliGolOlaylariniAyikla(events);
+            const officialGoalCount = Number(latestHome) + Number(latestAway);
+
+            if (goalEvents.length > officialGoalCount) {
+                addSystemLog(
+                    `> ⛔ ${mac.mac_isim}: olay akışında ${goalEvents.length} gol, fixture skorunda ${officialGoalCount} gol var; sağlayıcı akışı tutarsız.`
+                );
+                return false;
+            }
+
+            const lastGoalMinute = goalEvents.reduce((latestMinute, event) => {
+                const elapsed = Number(event?.time?.elapsed);
+                return Number.isFinite(elapsed)
+                    ? Math.max(latestMinute, elapsed)
+                    : latestMinute;
+            }, -Infinity);
+
+            if (
+                Number.isFinite(lastGoalMinute) &&
+                currentMinute - lastGoalMinute <= STALE_GOAL_GUARD.recentGoalCooldownMinutes
+            ) {
+                addSystemLog(
+                    `> ⛔ ${mac.mac_isim}: son gol ${lastGoalMinute}', güncel dakika ${currentMinute}'; ${STALE_GOAL_GUARD.recentGoalCooldownMinutes} dakikalık gol soğuma süresi dolmadı.`
+                );
+                return false;
+            }
+        } else {
+            addSystemLog(
+                `> ⚠️ ${mac.mac_isim}: olay akışı alınamadı; skor ve oran çift doğrulamasıyla devam ediliyor.`
+            );
+        }
+
         mac.dakika = latest.fixture.status.elapsed;
         mac.status_short = latest.fixture.status.short ?? null;
         mac.status_long = latest.fixture.status.long ?? null;
+
+        addSystemLog(
+            `> ✅ ${mac.mac_isim}: ikinci skor + oran + olay doğrulaması geçti (${mac.dakika}' / ${latestScore}).`
+        );
 
         return true;
 
@@ -3955,7 +4090,8 @@ async function botuCalistir() {
 
         // V16 önce ikinci katmanın puan eşiğini geçebilecek maçları ucuz bir
         // ön kontrolden geçirir. Standing/takım/prediction çağrıları yalnız bu
-        // kısa liste için yapılır; tam doğrulanmayan maç Telegram'a kapalıdır.
+        // kısa liste için yapılır. Bu bağlam V16 puanına katkı verir; herhangi
+        // bir alanın eksikliği artık tek başına Telegram vetosu değildir.
         let selectorShadowContexts = new Map();
         if (DINO_V2_SELECTOR_ENABLED) {
             const selectorOnAdaylari = macListesi.filter((mac, index) => {
@@ -4185,7 +4321,7 @@ async function botuCalistir() {
 
             // İki sinyal de aynı veri anına ait olduğundan canlılık/skor bir kez
             // doğrulanır ve ardından bekleme süresi olmadan arka arkaya gönderilir.
-            if (!await sinyalOncesiCanlilikDogrula(mac)) {
+            if (!await sinyalOncesiCanlilikDogrula(mac, gonderilecekFirsatlar)) {
                 for (const firsat of gonderilecekFirsatlar) {
                     firsat.auditRecord.decision = 'live_revalidation_failed';
                     firsat.auditRecord.decisionDetail = 'Telegram öncesi dakika/skor/canlılık kontrolü başarısız.';
@@ -4826,11 +4962,15 @@ app.get(
                 policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
                 edgeDecisionImpact: false
             },
-            precisionMode: PRECISION_MODE,
+            precisionMode: {
+                ...PRECISION_MODE,
+                decisionImpact: !DINO_V2_SELECTOR_ENABLED
+            },
             freshSignalValidation: FRESH_SIGNAL_VALIDATION,
             shadowPowerTest: {
                 enabled: SHADOW_POWER_ENABLED,
                 decisionImpact: DINO_V2_SELECTOR_ENABLED,
+                hardGate: false,
                 endpoints: ['teams/statistics', 'standings', 'predictions']
             },
             historyFilter: selection.filter,
@@ -4968,11 +5108,15 @@ app.get(
                 policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
                 edgeDecisionImpact: false
             },
-            precisionMode: PRECISION_MODE,
+            precisionMode: {
+                ...PRECISION_MODE,
+                decisionImpact: !DINO_V2_SELECTOR_ENABLED
+            },
             freshSignalValidation: FRESH_SIGNAL_VALIDATION,
             shadowPowerTest: {
                 enabled: SHADOW_POWER_ENABLED,
                 decisionImpact: DINO_V2_SELECTOR_ENABLED,
+                hardGate: false,
                 endpoints: ['teams/statistics', 'standings', 'predictions']
             },
             historyFilter: selection.filter,
@@ -5441,7 +5585,10 @@ app.get(
             },
 
             precisionMode:
-                PRECISION_MODE,
+                {
+                    ...PRECISION_MODE,
+                    decisionImpact: !DINO_V2_SELECTOR_ENABLED
+                },
 
             freshSignalValidation:
                 FRESH_SIGNAL_VALIDATION,
@@ -5456,9 +5603,13 @@ app.get(
                 ...shadowPowerSnapshot,
                 enabled: SHADOW_POWER_ENABLED,
                 decisionImpact: DINO_V2_SELECTOR_ENABLED,
+                hardGate: false,
                 minimumQuotaReserve: SHADOW_MIN_QUOTA_REMAINING,
                 cache: shadowPowerCache.summary()
             },
+
+            staleGoalGuard:
+                STALE_GOAL_GUARD,
 
             statisticsCoverage: {
                 updatedAt: statisticsCoverageSnapshot.updatedAt,
@@ -5545,7 +5696,9 @@ app.listen(
         );
 
         addSystemLog(
-            `> 🧭 Precision pre-match modu: AÇIK | Tercih: ${PREFERRED_PREMATCH_BOOKMAKER_NAME} | Pre-match yoksa Telegram yok.`
+            DINO_V2_SELECTOR_ENABLED
+                ? `> 🧭 Pre-match: V16 model girdisi + denetim kaydı | Harici veto YOK | Tercih: ${PREFERRED_PREMATCH_BOOKMAKER_NAME}.`
+                : `> 🧭 Legacy precision pre-match modu: AÇIK | Tercih: ${PREFERRED_PREMATCH_BOOKMAKER_NAME} | Pre-match yoksa Telegram yok.`
         );
 
 
@@ -5580,11 +5733,11 @@ app.listen(
         );
 
         addSystemLog(
-            `> 🧬 API güç doğrulaması AÇIK: kimlik + lig/sezon + en az 5 ev/deplasman örneklemi + standings + predictions eksiksiz olmalı | V16 KARAR KAPISI | Kota koruması: ${SHADOW_MIN_QUOTA_REMAINING}.`
+            `> 🧬 API güç bağlamı AÇIK: takım gücü + standings + predictions V16 girdisi ve denetim verisidir | EKSİK BAĞLAM TEK BAŞINA VETO DEĞİL | Kota koruması: ${SHADOW_MIN_QUOTA_REMAINING}.`
         );
 
         addSystemLog(
-            `> 🛡️ Telegram öncesi taze doğrulama AÇIK: fixture + /fixtures/statistics + /odds/live?fixture + tek maç Python tekrar çalıştırma | dakika ${TELEGRAM_MIN_MINUTE}-${TELEGRAM_MAX_MINUTE}.`
+            `> 🛡️ Telegram öncesi taze doğrulama AÇIK: fixture + stats + canlı oran + tek maç Python + ${Math.round(STALE_GOAL_GUARD.confirmationDelayMs / 1000)} sn gecikmiş gol/olay kontrolü | dakika ${TELEGRAM_MIN_MINUTE}-${TELEGRAM_MAX_MINUTE}.`
         );
 
 
