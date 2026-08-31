@@ -563,6 +563,91 @@
             <button id="force-scan-btn" type="button" style="width:auto; padding:10px 15px; margin:0;" onclick="forceScan()">ŞİMDİ TARA</button>
         </div>
 
+        <div class="card" style="border-color:#8b5cf6; background:#211b2b;">
+            <div class="section-title">
+                <div>
+                    <h3>🤖 Sadece Yapay Zekâ Kör Testi</h3>
+                    <p class="muted" id="grok-history-updated" style="margin-top:4px;">Tam-stat 25–80. dakika maçlarını Grok tek başına değerlendirir.</p>
+                </div>
+                <div class="tracker-actions">
+                    <span class="mini-badge bg-muted" id="grok-only-status">AYAR BEKLENİYOR</span>
+                    <button id="grok-refresh-btn" type="button" style="background:var(--success);" onclick="refreshGrokResults()">Sonuçları Kontrol Et</button>
+                    <button type="button" style="background:var(--info);" onclick="downloadGrokExport('json')">AI JSON</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadGrokExport('csv')">AI CSV</button>
+                </div>
+            </div>
+
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>🕶️ Bağımsız karar alanı</strong>
+                    <span class="muted">Takım kimlikleri Grok'tan saklanır. Bu bölüm Telegram ve V16 kararlarını etkilemez.</span>
+                </div>
+                <select id="grok-history-date" class="history-date-select" aria-label="Grok kör test tarihi" onchange="changeGrokHistoryDate(this.value)">
+                    <option value="">🗂️ Tüm Veriler</option>
+                </select>
+            </div>
+
+            <div class="metrics signal-metrics">
+                <div class="metric info">
+                    <span class="metric-label">Karar anı</span>
+                    <span class="metric-value" id="grok-decisions">0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Seçim</span>
+                    <span class="metric-value" id="grok-selections">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Pas</span>
+                    <span class="metric-value" id="grok-passes">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Bekleyen</span>
+                    <span class="metric-value" id="grok-pending">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Kazanan / Kaybeden</span>
+                    <span class="metric-value" id="grok-win-loss">0 / 0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Başarı</span>
+                    <span class="metric-value" id="grok-hit-rate">-</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Ort. oran</span>
+                    <span class="metric-value" id="grok-average-odds">-</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Teorik ROI</span>
+                    <span class="metric-value" id="grok-roi">-</span>
+                </div>
+            </div>
+
+            <p class="muted" id="grok-policy-note" style="margin-bottom:10px;">Grok, açık 1X2 ve toplam gol marketlerinden oranı en az 1.50 olan tek bir marketi seçebilir veya pas geçebilir.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Karar</th>
+                            <th>Tarih (TSİ)</th>
+                            <th>Maç</th>
+                            <th>Dk. / Skor</th>
+                            <th>Market</th>
+                            <th>Oran</th>
+                            <th>Grok %</th>
+                            <th>Güven</th>
+                            <th>Sonuç</th>
+                            <th>Final</th>
+                            <th>Gerekçe</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grok-history-rows">
+                        <tr><td colspan="11" class="empty-row">Henüz Grok-only kör test kararı yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="card">
             <div class="section-title">
                 <div>
@@ -922,6 +1007,7 @@
         let coverageFilter = "all";
         let signalHistoryDate = "";
         let candidateHistoryDate = "";
+        let grokHistoryDate = "";
         let pollingStarted = false;
 
         const logBox = document.getElementById("log-box");
@@ -980,6 +1066,7 @@
                 setInterval(fetchCoverage, 7500);
                 setInterval(fetchSignalHistory, 10000);
                 setInterval(fetchCandidateHistory, 15000);
+                setInterval(fetchGrokHistory, 10000);
             }
         }
 
@@ -990,6 +1077,7 @@
                 fetchCoverage(),
                 fetchSignalHistory(),
                 fetchCandidateHistory(),
+                fetchGrokHistory(),
                 fetchLogs()
             ]);
         }
@@ -1118,6 +1206,9 @@
 
                 if (data.statisticsCoverage) {
                     renderCoverageSummary(data.statisticsCoverage);
+                }
+                if (data.grokOnlyTracking) {
+                    renderGrokOnlyStatus(data.grokOnlyTracking);
                 }
             } catch (error) {
                 setConnection(false);
@@ -1568,6 +1659,185 @@
             const suffix = format === "csv" ? "/export.csv" : "/export";
             const link = document.createElement("a");
             link.href = `${BACKEND_URL}/api/signal-history${suffix}${historyExportQuery(signalHistoryDate)}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function renderGrokOnlyStatus(status) {
+            const badge = document.getElementById("grok-only-status");
+            if (!badge) return;
+
+            if (status.enabled === false) {
+                badge.textContent = "KAPALI";
+                badge.className = "mini-badge bg-danger";
+            } else if (status.configured !== true) {
+                badge.textContent = "AYAR EKSİK";
+                badge.className = "mini-badge bg-danger";
+            } else if (status.isRunning === true) {
+                badge.textContent = "GROK DÜŞÜNÜYOR";
+                badge.className = "mini-badge bg-warning";
+            } else {
+                badge.textContent = "AKTİF · TELEGRAM ETKİSİ YOK";
+                badge.className = "mini-badge bg-success";
+            }
+
+            const note = document.getElementById("grok-policy-note");
+            if (!note) return;
+            const model = status.model || "model ayarı eksik";
+            const minimumOdd = Number.isFinite(Number(status.minimumOdd))
+                ? Number(status.minimumOdd).toFixed(2)
+                : "1.50";
+            note.textContent = `${model}: tam-stat 25–80. dakika; açık 1X2 ve toplam gol marketlerinden ${minimumOdd}+ oranlı tek seçim veya pas. Takım kimliği kördür, Telegram etkisi yoktur.`;
+            if (status.lastError) {
+                note.textContent += ` Son bağlantı hatası: ${status.lastError}`;
+            }
+        }
+
+        function grokDecisionInfo(action) {
+            if (action === "SELECT") return { text: "🎯 Seçti", className: "win" };
+            if (action === "PASS") return { text: "⏭️ Pas", className: "neutral" };
+            return { text: "⚠️ Hata", className: "loss" };
+        }
+
+        function renderGrokHistory(data) {
+            const summary = data?.summary || {};
+            const performance = summary.performance || {};
+            document.getElementById("grok-decisions").textContent = summary.decisionMoments ?? 0;
+            document.getElementById("grok-selections").textContent = performance.selections ?? 0;
+            document.getElementById("grok-passes").textContent = summary.passes ?? 0;
+            document.getElementById("grok-pending").textContent = performance.pending ?? 0;
+            document.getElementById("grok-win-loss").textContent = `${performance.wins ?? 0} / ${performance.losses ?? 0}`;
+            document.getElementById("grok-hit-rate").textContent = formatPercent(performance.hitRate);
+            document.getElementById("grok-average-odds").textContent = Number.isFinite(Number(performance.averageOdds))
+                ? Number(performance.averageOdds).toFixed(3)
+                : "-";
+            document.getElementById("grok-roi").textContent = formatPercent(performance.roi);
+            renderGrokOnlyStatus(data?.status || {});
+
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate
+                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
+                : "Tüm Veriler";
+            document.getElementById("grok-history-updated").textContent = summary.updatedAt
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(summary.updatedAt)}`
+                : `Görünüm: ${viewLabel} · Henüz karar kaydı yok`;
+            syncHistoryDateOptions("grok-history-date", data?.filter, selectedDate);
+
+            const body = document.getElementById("grok-history-rows");
+            body.replaceChildren();
+            const decisions = Array.isArray(data?.decisions) ? data.decisions : [];
+            if (decisions.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 11;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde Grok-only kararı yok.`
+                    : "Henüz Grok-only kör test kararı yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const decision of decisions) {
+                const row = document.createElement("tr");
+                const decisionInfo = grokDecisionInfo(decision.action);
+                const actionCell = document.createElement("td");
+                const actionBadge = document.createElement("span");
+                actionBadge.className = `result-label ${decisionInfo.className}`;
+                actionBadge.textContent = decisionInfo.text;
+                actionCell.appendChild(actionBadge);
+                row.appendChild(actionCell);
+
+                const values = [
+                    formatDateTime(decision.capturedAt),
+                    decision.match || "-",
+                    `${decision.minute ?? "-"}' / ${decision.score || "-"}`,
+                    decision.market || "-",
+                    Number.isFinite(Number(decision.odds)) ? Number(decision.odds).toFixed(3) : "-",
+                    formatPercent(decision.estimatedProbability),
+                    formatPercent(decision.confidence)
+                ];
+                for (const value of values) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                }
+
+                const resultCell = document.createElement("td");
+                if (decision.action === "SELECT") {
+                    const resultInfo = signalResultInfo(decision?.settlement?.result);
+                    const resultBadge = document.createElement("span");
+                    resultBadge.className = `result-label ${resultInfo.className}`;
+                    resultBadge.textContent = resultInfo.text;
+                    resultCell.appendChild(resultBadge);
+                } else {
+                    resultCell.textContent = "-";
+                }
+                row.appendChild(resultCell);
+
+                const finalCell = document.createElement("td");
+                finalCell.textContent = decision?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+
+                const rationaleCell = document.createElement("td");
+                rationaleCell.textContent = decision.error || decision.rationale || "-";
+                rationaleCell.title = Array.isArray(decision.riskFlags)
+                    ? decision.riskFlags.join(" · ")
+                    : "";
+                row.appendChild(rationaleCell);
+                body.appendChild(row);
+            }
+        }
+
+        async function fetchGrokHistory() {
+            try {
+                const data = await apiFetch(
+                    historyApiPath("/api/grok-only-history", 200, grokHistoryDate)
+                );
+                renderGrokHistory(data || {});
+            } catch (_) {
+                // Grok proxy veya takip uç noktası geçici kapalıysa panelin
+                // V16 ve Telegram bölümleri çalışmaya devam eder.
+            }
+        }
+
+        async function changeGrokHistoryDate(value) {
+            grokHistoryDate = value || "";
+            await fetchGrokHistory();
+        }
+
+        async function refreshGrokResults() {
+            const button = document.getElementById("grok-refresh-btn");
+            button.disabled = true;
+            button.textContent = "KONTROL EDİLİYOR…";
+            try {
+                const result = await apiFetch("/api/grok-only-history/refresh", { method: "POST" });
+                if (result.success === false && !result.busy) {
+                    throw new Error(result.message || "Grok-only sonuçları güncellenemedi.");
+                }
+                showToast(result.message || "Grok-only sonuç kontrolü tamamlandı.");
+                await Promise.allSettled([
+                    fetchGrokHistory(),
+                    fetchSignalHistory(),
+                    fetchCandidateHistory(),
+                    fetchLogs()
+                ]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sonuçları Kontrol Et";
+            }
+        }
+
+        function downloadGrokExport(format) {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const link = document.createElement("a");
+            link.href = `${BACKEND_URL}/api/grok-only-history${suffix}${historyExportQuery(grokHistoryDate)}`;
             link.target = "_blank";
             link.rel = "noopener";
             document.body.appendChild(link);
