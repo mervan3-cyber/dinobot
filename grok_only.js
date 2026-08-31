@@ -24,6 +24,12 @@ function clampPercent(value) {
     return Number(Math.max(0, Math.min(100, parsed)).toFixed(1));
 }
 
+function probabilityPercent(value) {
+    const parsed = numberOrNull(value);
+    if (parsed === null) return null;
+    return Number((parsed >= 0 && parsed <= 1 ? parsed * 100 : parsed).toFixed(1));
+}
+
 function normalizeAction(value) {
     const action = String(value || '').trim().toUpperCase();
     return ['SELECT', 'PASS', 'ERROR'].includes(action) ? action : 'ERROR';
@@ -115,9 +121,9 @@ function buildBlindCandidate(match, minimumOdd = 1.5) {
         prematch: match?.prematch_available === true
             ? {
                 source: match?.prematch_source || null,
-                home: numberOrNull(match?.prematch_p_home),
-                draw: numberOrNull(match?.prematch_p_draw),
-                away: numberOrNull(match?.prematch_p_away)
+                home_percent: probabilityPercent(match?.prematch_p_home),
+                draw_percent: probabilityPercent(match?.prematch_p_draw),
+                away_percent: probabilityPercent(match?.prematch_p_away)
             }
             : null
     };
