@@ -27,6 +27,11 @@ const {
     buildMarketShadowAssessment
 } = require('./shadow_power');
 const dinoSelectorV2 = require('./dino_selector_v2');
+const {
+    GrokOnlyClient,
+    GrokOnlyTracker,
+    GrokOnlyEngine
+} = require('./grok_only');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -36,7 +41,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v16.1-score-only-decision-ubuntu-2026-08-31';
+const BUILD_VERSION = 'ml-v16.2-grok-only-blind-test-ubuntu-2026-08-31';
 
 app.use(cors());
 app.use(express.json());
@@ -63,6 +68,23 @@ const kanalID =
 
 const geminiKey =
     process.env.GEMINI_API_KEY;
+
+// Grok-only kör test, OpenAI-uyumlu bir uç nokta üzerinden çalışır.
+// Bu anahtar hiçbir API cevabına, loga veya dışa aktarıma yazılmaz.
+const grokOnlyBaseUrl =
+    process.env.GROK_ONLY_BASE_URL ||
+    process.env.AI_BASE_URL ||
+    '';
+
+const grokOnlyApiKey =
+    process.env.GROK_ONLY_API_KEY ||
+    process.env.AI_API_KEY ||
+    '';
+
+const grokOnlyModel =
+    process.env.GROK_ONLY_MODEL ||
+    process.env.AI_MODEL ||
+    'grok-4.6';
 
 const pythonBinary =
     process.env.PYTHON_BIN ||
@@ -187,6 +209,12 @@ const SHADOW_POWER_CACHE_FILE =
         'dino_shadow_power_cache.json'
     );
 
+const GROK_ONLY_HISTORY_FILE =
+    path.join(
+        __dirname,
+        'dino_grok_only_history.json'
+    );
+
 const SIGNAL_RULES = Object.freeze({
     shadow: Object.freeze({
         minProbability: 60,
@@ -288,6 +316,21 @@ const SIGNAL_RESULT_REFRESH_MS =
 const SIGNAL_RESULT_BATCH_SIZE =
     20;
 
+const GROK_ONLY_ENABLED =
+    String(process.env.GROK_ONLY_ENABLED || 'true').toLowerCase() !== 'false';
+const GROK_ONLY_MIN_ODD = Math.max(
+    1.01,
+    Number(process.env.GROK_ONLY_MIN_ODD) || 1.50
+);
+const GROK_ONLY_BATCH_SIZE = Math.max(
+    1,
+    Math.min(10, Number(process.env.GROK_ONLY_BATCH_SIZE) || 2)
+);
+const GROK_ONLY_TIMEOUT_MS = Math.max(
+    5000,
+    Number(process.env.GROK_ONLY_TIMEOUT_MS) || 90000
+);
+
 
 let state = {
 
@@ -342,6 +385,28 @@ const prematchOddsCache = new PrematchOddsCache({
 const shadowPowerCache = new ShadowPowerCache({
     filePath: SHADOW_POWER_CACHE_FILE,
     logger: message => addSystemLog(message)
+});
+
+const grokOnlyTracker = new GrokOnlyTracker({
+    filePath: GROK_ONLY_HISTORY_FILE,
+    logger: message => addSystemLog(message),
+    maxRecords: 50000
+});
+
+const grokOnlyClient = new GrokOnlyClient({
+    baseUrl: grokOnlyBaseUrl,
+    apiKey: grokOnlyApiKey,
+    model: grokOnlyModel,
+    timeoutMs: GROK_ONLY_TIMEOUT_MS
+});
+
+const grokOnlyEngine = new GrokOnlyEngine({
+    client: grokOnlyClient,
+    tracker: grokOnlyTracker,
+    logger: message => addSystemLog(message),
+    enabled: GROK_ONLY_ENABLED,
+    minimumOdd: GROK_ONLY_MIN_ODD,
+    batchSize: GROK_ONLY_BATCH_SIZE
 });
 
 let shadowPowerSnapshot = {
@@ -4071,6 +4136,14 @@ async function botuCalistir() {
             return;
         }
 
+        // Bağımsız Grok kör testi aynı tam-stat havuzunu görür; takım ve lig
+        // kimlikleri modele gönderilmez. Promise beklenmez: Grok/proxy yavaş
+        // ya da kapalı olsa bile V16/Python/Telegram hattı devam eder.
+        grokOnlyEngine.scan(macListesi)
+            .catch(error => addSystemLog(
+                `> ⚠️ Grok-only kör test beklenmedik hata verdi; V16 etkilenmedi: ${error.message}`
+            ));
+
         addSystemLog(
             `> 📊 Python canlı istatistik modeline yalnızca ${macListesi.length} tam istatistikli maç gönderiliyor.`
         );
@@ -4577,9 +4650,11 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
 
     const signalFixtureIDs = signalTracker.unresolvedFixtureIds();
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
+    const grokOnlyFixtureIDs = grokOnlyTracker.unresolvedFixtureIds();
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
-        ...candidateFixtureIDs
+        ...candidateFixtureIDs,
+        ...grokOnlyFixtureIDs
     ])];
     if (fixtureIDs.length === 0) {
         return {
@@ -4587,7 +4662,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures: 0,
             resolvedSignals: 0,
             resolvedCandidates: 0,
-            message: 'Bekleyen paylaşılan sinyal veya aday kaydı yok.'
+            resolvedGrokOnly: 0,
+            message: 'Bekleyen paylaşılan sinyal, aday veya Grok-only seçimi yok.'
         };
     }
 
@@ -4595,6 +4671,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     let checkedFixtures = 0;
     let resolvedSignals = 0;
     let resolvedCandidates = 0;
+    let resolvedGrokOnly = 0;
 
     try {
         for (
@@ -4617,12 +4694,13 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             for (const fixture of fixtures) {
                 resolvedSignals += signalTracker.settleFixture(fixture);
                 resolvedCandidates += candidateTracker.settleFixture(fixture);
+                resolvedGrokOnly += grokOnlyTracker.settleFixture(fixture);
             }
         }
 
-        if (resolvedSignals > 0 || resolvedCandidates > 0 || manuel) {
+        if (resolvedSignals > 0 || resolvedCandidates > 0 || resolvedGrokOnly > 0 || manuel) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram sinyali | ${resolvedCandidates} aday market sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedGrokOnly} Grok-only sonuçlandı.`
             );
         }
 
@@ -4631,8 +4709,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures,
             resolvedSignals,
             resolvedCandidates,
-            message: resolvedSignals > 0 || resolvedCandidates > 0
-                ? `${resolvedSignals} sinyal ve ${resolvedCandidates} aday market sonucu güncellendi.`
+            resolvedGrokOnly,
+            message: resolvedSignals > 0 || resolvedCandidates > 0 || resolvedGrokOnly > 0
+                ? `${resolvedSignals} sinyal, ${resolvedCandidates} aday ve ${resolvedGrokOnly} Grok-only sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -4644,6 +4723,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures,
             resolvedSignals,
             resolvedCandidates,
+            resolvedGrokOnly,
             message: error.message
         };
     } finally {
@@ -5004,6 +5084,131 @@ app.get(
             `attachment; filename="dino-paylasilan-sinyaller-${dosyaEtiketi}.csv"`
         );
         res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(selection.items)}`);
+    }
+);
+
+
+function grokOnlyCsvOlustur(decisions) {
+    const headers = [
+        'decision_id', 'fixture_id', 'captured_at', 'action', 'match', 'league',
+        'minute', 'score', 'market', 'odds', 'bookmaker',
+        'estimated_probability', 'confidence', 'rationale', 'risk_flags', 'error',
+        'model', 'minimum_odd', 'blind_mode', 'telegram_impact', 'stats_source',
+        'home_shots', 'home_shots_on_goal', 'home_corners', 'home_possession',
+        'home_yellow', 'home_red', 'home_fouls', 'home_offsides', 'home_saves', 'home_xg',
+        'away_shots', 'away_shots_on_goal', 'away_corners', 'away_possession',
+        'away_yellow', 'away_red', 'away_fouls', 'away_offsides', 'away_saves', 'away_xg',
+        'offered_markets', 'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
+    ];
+
+    const rows = decisions.map(item => {
+        const home = item?.liveStats?.home || {};
+        const away = item?.liveStats?.away || {};
+        const settlement = item?.settlement || {};
+        return [
+            item.decisionId, item.fixtureId, item.capturedAt, item.action,
+            item.match, item.league, item.minute, item.score, item.market,
+            item.odds, item.bookmaker, item.estimatedProbability, item.confidence,
+            item.rationale,
+            Array.isArray(item.riskFlags) ? item.riskFlags.join(' | ') : null,
+            item.error, item.model, item.minimumOdd, item.blindMode,
+            item.telegramImpact, item.statsSource,
+            home.shots, home.shots_on_goal, home.corners, home.possession,
+            home.yellow_cards, home.red_cards, home.fouls, home.offsides, home.saves, home.xg,
+            away.shots, away.shots_on_goal, away.corners, away.possession,
+            away.yellow_cards, away.red_cards, away.fouls, away.offsides, away.saves, away.xg,
+            item.offeredMarkets, settlement.result, settlement.profit,
+            settlement.finalScore, settlement.fixtureStatus, settlement.resolvedAt
+        ].map(csvHucre).join(',');
+    });
+
+    return [headers.map(csvHucre).join(','), ...rows].join('\n');
+}
+
+
+app.get(
+    '/api/grok-only-history',
+    (req, res) => {
+        const allDecisions = grokOnlyTracker.list(100000);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            allDecisions,
+            'capturedAt'
+        );
+        if (!selection) return;
+
+        res.json({
+            filter: selection.filter,
+            status: grokOnlyEngine.publicStatus(),
+            summary: grokOnlyTracker.summary(selection.items),
+            decisions: grokOnlyTracker.list(req.query.limit, selection.items)
+        });
+    }
+);
+
+
+app.post(
+    '/api/grok-only-history/refresh',
+    async (req, res) => {
+        const result = await paylasilanSinyalSonuclariniGuncelle({ manuel: true });
+        res.json({
+            ...result,
+            grokOnlySummary: grokOnlyTracker.summary()
+        });
+    }
+);
+
+
+app.get(
+    '/api/grok-only-history/export',
+    (req, res) => {
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            grokOnlyTracker.list(100000),
+            'capturedAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
+        const payload = grokOnlyTracker.exportPayload({
+            buildVersion: BUILD_VERSION,
+            model: grokOnlyModel,
+            minimumOdd: GROK_ONLY_MIN_ODD,
+            minuteRange: { minimum: 25, maximum: 80 },
+            marketPolicy: 'Grok may select one currently offered 1X2 or total-goals market, or PASS.',
+            identityBlind: true,
+            telegramImpact: false,
+            historyFilter: selection.filter,
+            note: 'Bu bağımsız kör test V16/Python/Telegram kararlarını değiştirmez.'
+        }, selection.items);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-grok-only-kor-test-${dosyaEtiketi}.json"`
+        );
+        res.send(JSON.stringify(payload, null, 2));
+    }
+);
+
+
+app.get(
+    '/api/grok-only-history/export.csv',
+    (req, res) => {
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            grokOnlyTracker.list(100000),
+            'capturedAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-grok-only-kor-test-${dosyaEtiketi}.csv"`
+        );
+        res.send(`\uFEFF${grokOnlyCsvOlustur(selection.items)}`);
     }
 );
 
@@ -5639,6 +5844,11 @@ app.get(
                 summary: candidateTracker.summary()
             },
 
+            grokOnlyTracking: {
+                ...grokOnlyEngine.publicStatus(),
+                summary: grokOnlyTracker.summary()
+            },
+
             nextRunTime:
                 nextRunTime,
 
@@ -5660,6 +5870,8 @@ loadData();
 signalTracker.load();
 
 candidateTracker.load();
+
+grokOnlyTracker.load();
 
 prematchOddsCache.load();
 
@@ -5738,6 +5950,12 @@ app.listen(
 
         addSystemLog(
             `> 🛡️ Telegram öncesi taze doğrulama AÇIK: fixture + stats + canlı oran + tek maç Python + ${Math.round(STALE_GOAL_GUARD.confirmationDelayMs / 1000)} sn gecikmiş gol/olay kontrolü | dakika ${TELEGRAM_MIN_MINUTE}-${TELEGRAM_MAX_MINUTE}.`
+        );
+
+        addSystemLog(
+            grokOnlyEngine.configured()
+                ? `> 🤖 Grok-only kör test AKTİF: ${grokOnlyModel} | tam-stat 25-80 dk | serbest market | oran ${GROK_ONLY_MIN_ODD.toFixed(2)}+ | Telegram etkisi YOK.`
+                : `> ⚪ Grok-only kör test HAZIR DEĞİL: AI_BASE_URL / AI_API_KEY / AI_MODEL ayarlarını kontrol et. V16 etkilenmez.`
         );
 
 

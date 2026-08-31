@@ -1,4 +1,4 @@
-# Ubuntu Kurulumu — Dino V16.1 Doğruluk Kuralı
+# Ubuntu Kurulumu — Dino V16.2 + Grok-Only Kör Test
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. `.env`,
 `dino_signal_history.json`, `dino_candidate_history.json` ve önbellek JSON
@@ -14,6 +14,7 @@ kopyalayın.
 - `candidate_tracker.js`
 - `shadow_power.js`
 - `prematch_odds.js`
+- `grok_only.js`
 - `public/index.html`
 - `index.html`
 - `tahmin_yap.py`
@@ -71,6 +72,33 @@ Diğer önerilen ortam ayarları:
 API, Telegram veya Gemini anahtarlarını ekran görüntüsünde ya da paylaşımda
 göstermeyin.
 
+## Sadece Yapay Zekâ kör testi
+
+Bu bölüm ana V16/Python/Telegram sisteminden tamamen ayrıdır. Yalnızca gerçek
+canlı istatistikleri tam olan `25–80` dakika maçlarını Grok'a yollar. Takım,
+lig ve fixture kimlikleri modele gönderilmez. Grok o anda açık olan 1X2 ve
+toplam gol marketlerinden oranı en az `1.50` olan tek bir marketi seçebilir
+veya pas geçebilir.
+
+`.env` dosyanıza, aldığınız OpenAI-uyumlu bağlantının bilgilerini ekleyin:
+
+    AI_BASE_URL=http://SUNUCU_ADRESI:PORT/v1
+    AI_API_KEY=BURAYA_GIZLI_ANAHTAR
+    AI_MODEL=grok-4.6
+    GROK_ONLY_ENABLED=true
+    GROK_ONLY_MIN_ODD=1.50
+
+İsteğe bağlı dayanıklılık ayarları:
+
+    GROK_ONLY_BATCH_SIZE=2
+    GROK_ONLY_TIMEOUT_MS=90000
+
+Anahtar hiçbir loga, panel cevabına veya JSON/CSV dışa aktarımına yazılmaz.
+Grok bağlantısı hata verirse yalnız bu kör-test turu hata kaydı alır; V16 ve
+Telegram taraması beklemez veya durmaz. Grok seçimi Telegram'a gönderilmez.
+Sonuçlar `dino_grok_only_history.json` dosyasında kalır ve paneldeki
+`Sadece Yapay Zekâ Kör Testi` bölümünden JSON/CSV indirilebilir.
+
 ## Başlatma
 
     npm install
@@ -83,11 +111,12 @@ göstermeyin.
 
 Başlangıç logunda şunlar görünmelidir:
 
-    ml-v16.1-score-only-decision-ubuntu-2026-08-31
+    ml-v16.2-grok-only-blind-test-ubuntu-2026-08-31
     V16 ikinci katman AKTİF: eşik %76 | dakika 60-80 | oran 1.4+ | EDGE kararı etkilemez.
     API güç bağlamı AÇIK ... | EKSİK BAĞLAM TEK BAŞINA VETO DEĞİL
 
-Panelde `V16 Makine Ayarları` ve `V16 Güç Bağlamı` kartları görünmelidir.
+Panelde `Sadece Yapay Zekâ Kör Testi`, `V16 Makine Ayarları` ve
+`V16 Güç Bağlamı` kartları görünmelidir.
 Görünmüyorsa mutlaka `public/index.html` yanlış yere kopyalanmıştır.
 
 ## Korunacak veri dosyaları
@@ -96,6 +125,7 @@ Görünmüyorsa mutlaka `public/index.html` yanlış yere kopyalanmıştır.
 - `dino_candidate_history.json`: gönderilmeyenler dahil bütün market anları.
 - `dino_prematch_cache.json`: fixture bazında pre-match önbelleği.
 - `dino_shadow_power_cache.json`: takım/standings/prediction önbelleği.
+- `dino_grok_only_history.json`: Grok seçim/pas/hata kararları ve sonuçları.
 
 Yeni JSON ve CSV dışa aktarımlarında `selectorV2Probability`, V16 red nedenleri,
 tam güç bağlamı ve sonuç alanları eğitim için saklanır.
