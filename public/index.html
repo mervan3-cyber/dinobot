@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dino İddaa | Admin Kontrol Merkezi</title>
+    <title>Dino Operations | Canlı Kontrol Merkezi</title>
     <style>
         :root {
             --primary: #ff9800;
@@ -499,11 +499,697 @@
             .history-filter { align-items: stretch; flex-direction: column; }
             .history-date-select { width: 100%; }
         }
++        /* V17.3 Operations Center */
+        html {
+            scroll-behavior: smooth;
+            color-scheme: dark;
+        }
+
+        body {
+            position: relative;
+            padding: 0;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 12% -10%, rgba(255, 177, 59, 0.13), transparent 30rem),
+                radial-gradient(circle at 90% 10%, rgba(60, 214, 156, 0.08), transparent 34rem),
+                #080b10;
+            font-family: "Segoe UI Variable", "Segoe UI", Tahoma, sans-serif;
+            font-size: 16px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.26;
+            background-image:
+                linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+            background-size: 38px 38px;
+            mask-image: linear-gradient(to bottom, #000, transparent 74%);
+        }
+
+        * {
+            font-family: inherit;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 32px 64px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        #login-screen {
+            max-width: 460px;
+            margin-top: min(16vh, 140px);
+            padding: 32px;
+            background: rgba(15, 20, 27, .96);
+            border: 1px solid #28313d;
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+        }
+
+        #login-screen h2 {
+            letter-spacing: -.025em;
+        }
+
+        .command-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 8px 2px 20px;
+        }
+
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 177, 59, .42);
+            border-radius: 15px;
+            color: #ffbd58;
+            background: linear-gradient(145deg, rgba(255,177,59,.16), rgba(255,177,59,.035));
+            box-shadow: inset 0 0 24px rgba(255,177,59,.08), 0 10px 30px rgba(0,0,0,.35);
+            font-weight: 900;
+            letter-spacing: -.08em;
+        }
+
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            right: 7px;
+            top: 7px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #42df98;
+            box-shadow: 0 0 0 4px rgba(66,223,152,.11), 0 0 15px rgba(66,223,152,.75);
+            animation: statusPulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            50% { opacity: .45; transform: scale(.82); }
+        }
+
+        .brand-copy h1 {
+            margin: 0;
+            color: #f7f9fb;
+            font-size: clamp(1.2rem, 2vw, 1.55rem);
+            line-height: 1.15;
+            letter-spacing: -.035em;
+        }
+
+        .brand-copy p {
+            margin-top: 5px;
+            color: #8793a2;
+            font-size: .87rem;
+        }
+
+        .header-health {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .connection-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 8px 13px;
+            border: 1px solid #283440;
+            border-radius: 999px;
+            background: rgba(15, 21, 28, .9);
+            color: #aeb8c4;
+            font-size: .86rem;
+            font-weight: 750;
+        }
+
+        .istanbul-clock {
+            color: #dce2e8;
+            font-variant-numeric: tabular-nums;
+            font-size: .88rem;
+            font-weight: 700;
+        }
+
+        .command-nav {
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            display: flex;
+            gap: 6px;
+            margin: 0 0 18px;
+            padding: 8px;
+            overflow-x: auto;
+            border: 1px solid rgba(53, 64, 76, .9);
+            border-radius: 14px;
+            background: rgba(10, 14, 19, .9);
+            box-shadow: 0 12px 34px rgba(0,0,0,.24);
+            backdrop-filter: blur(16px);
+            scrollbar-width: none;
+        }
+
+        .command-nav::-webkit-scrollbar { display: none; }
+
+        .command-nav button {
+            width: auto;
+            min-width: max-content;
+            margin: 0;
+            padding: 9px 13px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: #99a5b3;
+            font-size: .82rem;
+            font-weight: 750;
+        }
+
+        .command-nav button:hover,
+        .command-nav button.active {
+            color: #fff;
+            opacity: 1;
+            border-color: #35414e;
+            background: #1a212a;
+        }
+
+        .command-nav button.active {
+            color: #ffc063;
+            border-color: rgba(255,177,59,.38);
+            background: rgba(255,177,59,.11);
+        }
+
+        .workspace-overview {
+            scroll-margin-top: 76px;
+        }
+
+        .top-meta {
+            grid-template-columns: 1.05fr 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .meta-item,
+        .metric {
+            position: relative;
+            overflow: hidden;
+            padding: 14px;
+            border: 1px solid #28323d;
+            border-radius: 13px;
+            background: linear-gradient(145deg, rgba(21,27,35,.98), rgba(15,20,27,.98));
+        }
+
+        .meta-item::before,
+        .metric::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.09), transparent);
+        }
+
+        .meta-label,
+        .metric-label {
+            color: #8793a2;
+            font-size: .82rem;
+            line-height: 1.25;
+        }
+
+        .meta-value {
+            margin-top: 3px;
+            color: #edf1f5;
+            font-size: .9rem;
+            font-weight: 760;
+        }
+
+        .meta-subvalue {
+            display: block;
+            margin-top: 5px;
+            color: #6f7c8b;
+            font-size: .76rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .quota-track {
+            height: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #222b35;
+        }
+
+        .quota-track span {
+            display: block;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #42df98, #8af0c0);
+            transition: width .35s ease, background .35s ease;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(250px, .8fr) minmax(220px, .65fr);
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .control-card {
+            min-height: 126px;
+            padding: 17px;
+            border: 1px solid #2a3541;
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(19,25,33,.98), rgba(13,18,24,.98));
+            box-shadow: 0 14px 36px rgba(0,0,0,.18);
+        }
+
+        .control-card__top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .control-card h3 {
+            color: #f1f4f7;
+            font-size: 1rem;
+        }
+
+        .control-card p {
+            margin-top: 7px;
+            color: #8793a2;
+            font-size: .86rem;
+            line-height: 1.5;
+        }
+
+        .control-card.primary-control {
+            border-color: rgba(255,177,59,.32);
+            background:
+                linear-gradient(125deg, rgba(255,177,59,.09), transparent 48%),
+                linear-gradient(145deg, #151b23, #0e1319);
+        }
+
+        .control-card.auto-control {
+            border-color: rgba(66,223,152,.26);
+        }
+
+        .control-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .control-actions button,
+        .quick-scan-button {
+            width: auto;
+            margin: 0;
+            padding: 10px 14px;
+            border-radius: 10px;
+        }
+
+        .quick-scan-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .quick-scan-button {
+            width: 100%;
+            background: linear-gradient(135deg, #ff9d1f, #ffc45f);
+            color: #1b1205;
+            box-shadow: 0 8px 24px rgba(255,157,31,.18);
+        }
+
+        .overview-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .overview-metric {
+            min-height: 102px;
+            padding: 15px;
+            border: 1px solid #27323d;
+            border-radius: 15px;
+            background: rgba(13,18,24,.88);
+        }
+
+        .overview-metric__label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #8692a0;
+            font-size: .82rem;
+        }
+
+        .overview-metric strong {
+            display: block;
+            margin-top: 12px;
+            color: #f5f7fa;
+            font-size: 1.65rem;
+            line-height: 1;
+            letter-spacing: -.04em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .overview-metric small {
+            display: block;
+            margin-top: 9px;
+            color: #647181;
+            font-size: .76rem;
+        }
+
+        .overview-metric.accent strong { color: #ffbc56; }
+        .overview-metric.success strong { color: #55e39e; }
+        .overview-metric.info strong { color: #6eb7ff; }
+
+        .dashboard-sections {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-sections > .card {
+            scroll-margin-top: 76px;
+        }
+
+        #section-decision { order: 1; }
+        #section-signals { order: 2; }
+        #section-coverage { order: 3; }
+        #section-audit { order: 4; }
+        #section-tariff { order: 5; }
+        #section-schedule { order: 6; }
+        #section-radar { order: 7; }
+
+        .card {
+            margin-bottom: 12px;
+            padding: 18px;
+            border-color: #28333e;
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(19,25,32,.98), rgba(13,18,24,.98));
+            box-shadow: 0 16px 40px rgba(0,0,0,.17);
+        }
+
+        .section-title {
+            margin-bottom: 14px;
+        }
+
+        .section-title h3,
+        .card > h3 {
+            color: #f4f6f8;
+            font-size: 1.02rem;
+            letter-spacing: -.012em;
+        }
+
+        .muted {
+            color: #8c98a6;
+            font-size: .87rem;
+            line-height: 1.5;
+        }
+
+        button,
+        .button-link {
+            border-radius: 10px;
+        }
+
+        .status-badge,
+        .mini-badge {
+            border: 1px solid rgba(255,255,255,.08);
+            font-size: .74rem;
+            letter-spacing: .015em;
+        }
+
+        .bg-success { background: rgba(52,168,108,.2); color: #69e8aa; border-color: rgba(80,222,151,.24); }
+        .bg-danger { background: rgba(211,70,70,.19); color: #ff8b86; border-color: rgba(255,105,98,.24); }
+        .bg-warning { background: rgba(211,154,43,.2); color: #ffd36d; border-color: rgba(255,195,77,.25); }
+        .bg-info { background: rgba(58,135,210,.2); color: #86c6ff; border-color: rgba(103,177,245,.24); }
+        .bg-muted { background: #252e38; color: #b4bdc7; }
+
+        .metrics {
+            gap: 9px;
+        }
+
+        .metric-value {
+            margin-top: 8px;
+            font-size: 1.42rem;
+            letter-spacing: -.03em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .table-wrap {
+            border-color: #29343f;
+            border-radius: 12px;
+            background: #0d1217;
+        }
+
+        table {
+            background: transparent;
+        }
+
+        th,
+        td {
+            padding: 11px 10px;
+            border-bottom-color: #252e37;
+            font-size: .85rem;
+        }
+
+        th {
+            background: #1b232c;
+            color: #cbd3db;
+            font-weight: 750;
+        }
+
+        tbody tr {
+            transition: background .16s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(255,255,255,.025);
+        }
+
+        input[type="password"],
+        input[type="number"],
+        input[type="time"],
+        input[type="date"],
+        select {
+            min-height: 42px;
+            border-color: #303b47;
+            border-radius: 10px;
+            background: #151b22;
+        }
+
+        .table-search {
+            width: min(260px, 100%);
+            min-height: 38px;
+            margin: 0;
+            padding: 8px 11px;
+            border: 1px solid #303b47;
+            border-radius: 9px;
+            background: #11171d;
+            color: #eef2f5;
+            font-size: .84rem;
+            outline: none;
+        }
+
+        .table-search:focus {
+            border-color: rgba(255,177,59,.65);
+            box-shadow: 0 0 0 3px rgba(255,177,59,.09);
+        }
+
+        .tariff-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 12px 0 14px;
+        }
+
+        .tariff-chip {
+            padding: 7px 10px;
+            border: 1px solid #303b46;
+            border-radius: 999px;
+            background: #131920;
+            color: #aeb8c3;
+            font-size: .79rem;
+            font-weight: 700;
+        }
+
+        .tariff-chip strong { color: #f4f6f8; }
+
+        .tariff-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .tariff-group {
+            padding: 14px;
+            border: 1px solid #29343f;
+            border-radius: 13px;
+            background: #0f141a;
+        }
+
+        .tariff-group h4 {
+            margin-bottom: 10px;
+            color: #dfe5eb;
+            font-size: .9rem;
+        }
+
+        .tariff-rule-list {
+            display: grid;
+            gap: 7px;
+        }
+
+        .tariff-rule {
+            display: grid;
+            grid-template-columns: minmax(78px, .7fr) repeat(3, 1fr);
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border: 1px solid #252f39;
+            border-radius: 9px;
+            background: #141a21;
+            color: #9da8b4;
+            font-size: .78rem;
+        }
+
+        .tariff-rule strong {
+            color: #f0f3f6;
+            font-size: .82rem;
+        }
+
+        .decision-breakdown {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .decision-breakdown__item {
+            padding: 10px;
+            border: 1px solid #28333e;
+            border-radius: 10px;
+            background: #11171d;
+        }
+
+        .decision-breakdown__item span {
+            display: block;
+            overflow: hidden;
+            color: #8793a0;
+            font-size: .74rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .decision-breakdown__item strong {
+            display: block;
+            margin-top: 7px;
+            color: #e9edf1;
+            font-size: 1.08rem;
+        }
+
+        .log-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .log-filter {
+            width: auto;
+            margin: 0;
+            padding: 7px 10px;
+            background: #222b35;
+            color: #aeb8c3;
+            font-size: .77rem;
+        }
+
+        .log-filter.active {
+            background: rgba(255,177,59,.13);
+            color: #ffc264;
+            border: 1px solid rgba(255,177,59,.32);
+        }
+
+        .logs {
+            height: 300px;
+            border-color: #26313b;
+            border-radius: 12px;
+            background: #05080b;
+            color: #58e598;
+            font-size: .8rem;
+        }
+
+        .log-line {
+            padding: 2px 5px;
+            border-left: 2px solid transparent;
+        }
+
+        .log-line.warning { color: #ffd16b; border-left-color: #d99d39; }
+        .log-line.error { color: #ff8d87; border-left-color: #e45a53; }
+        .log-line.signal { color: #75bfff; border-left-color: #4a9fe8; }
+
+        @media (max-width: 980px) {
+            .container { padding: 18px 16px 50px; }
+            .control-grid { grid-template-columns: 1fr 1fr; }
+            .primary-control { grid-column: 1 / -1; }
+            .top-meta,
+            .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tariff-columns { grid-template-columns: 1fr; }
+            .decision-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 640px) {
+            .container { padding: 12px 10px 42px; }
+            .command-header { align-items: flex-start; }
+            .header-health { align-items: flex-end; flex-direction: column; }
+            .istanbul-clock { font-size: .78rem; }
+            .control-grid,
+            .top-meta,
+            .overview-metrics { grid-template-columns: 1fr; }
+            .primary-control { grid-column: auto; }
+            .control-card { min-height: auto; }
+            .tariff-rule { grid-template-columns: 1fr 1fr; }
+            .tracker-actions { justify-content: flex-start; }
+            .section-title { align-items: flex-start; flex-direction: column; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            .brand-mark::after { animation: none; }
+            *, *::before, *::after { transition: none !important; }
+        }
     </style>
 </head>
 <body>
     <div class="container" id="login-screen">
-        <h2>🦖 Dino Admin Paneli</h2>
+        <div class="brand-lockup" style="justify-content:center; margin-bottom:18px;">
+            <div class="brand-mark" aria-hidden="true">DN</div>
+            <div class="brand-copy">
+                <h1>Dino Operations</h1>
+                <p>Yetkili kontrol merkezi</p>
+            </div>
+        </div>
         <input type="password" id="admin-pass" placeholder="Admin Şifresini Girin" autocomplete="current-password">
         <button id="login-button" type="button" onclick="login()">Giriş Yap</button>
         <p id="login-error" class="hidden" style="color: var(--danger); text-align: center; margin-top: 10px;">Hatalı şifre!</p>
@@ -511,65 +1197,130 @@
     </div>
 
     <div class="container hidden" id="dashboard">
-        <h2>⚙️ Sistem Kontrolü</h2>
-
-        <div class="top-meta">
-            <div class="meta-item">
-                <span class="meta-label">Sunucu bağlantısı</span>
-                <span class="meta-value" id="connection-state">Bağlanıyor…</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Sürüm</span>
-                <span class="meta-value" id="build-version">-</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">API kalan istek</span>
-                <span class="meta-value" id="quota-remaining">-</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Sonraki tarama</span>
-                <span class="meta-value" id="next-run">-</span>
-            </div>
-        </div>
-
-        <div class="card flex-between status-action">
-            <div>
-                <h3 style="margin-bottom: 6px;">Sistem Şalteri</h3>
-                <span class="status-badge bg-danger" id="bot-status-badge">SİSTEM KAPALI</span>
-                <span class="status-badge bg-muted" id="scan-status-badge">TARAMA BEKLİYOR</span>
-            </div>
-            <button id="toggle-btn" type="button" style="width:auto; padding:10px 20px;" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
-        </div>
-
-        <div class="card flex-between" style="background:#17221a; border-color:#356e3a;">
-            <div>
-                <div class="flex-between" style="justify-content:flex-start; margin-bottom:5px;">
-                    <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
-                    <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+        <header class="command-header">
+            <div class="brand-lockup">
+                <div class="brand-mark" aria-hidden="true">DN</div>
+                <div class="brand-copy">
+                    <h1>Dino Operations</h1>
+                    <p>Canlı karar ve sinyal kontrol merkezi</p>
                 </div>
-                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; V17 her marketi kendi dakika, V16 ve EDGE penceresinde değerlendirir.</p>
             </div>
-            <label class="switch" title="Otomatik taramayı aç/kapat">
-                <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
-                <span class="switch-slider"></span>
-            </label>
-        </div>
-
-        <div class="card flex-between status-action" style="background:#191c1f; border-color:var(--primary);">
-            <div>
-                <h3 style="margin-bottom: 5px; color: var(--primary);">⚡ Hızlı Tarama</h3>
-                <p class="muted">Saati beklemeden hemen bir tarama başlatır.</p>
+            <div class="header-health">
+                <time class="istanbul-clock" id="istanbul-clock">--:--:-- TSİ</time>
+                <span class="connection-pill" id="connection-state">● Bağlanıyor…</span>
             </div>
-            <button id="force-scan-btn" type="button" style="width:auto; padding:10px 15px; margin:0;" onclick="forceScan()">ŞİMDİ TARA</button>
-        </div>
+        </header>
 
-        <div class="card">
+        <nav class="command-nav" aria-label="Panel bölümleri">
+            <button type="button" class="active" data-target="section-overview" onclick="jumpToSection('section-overview', this)">Genel Bakış</button>
+            <button type="button" data-target="section-decision" onclick="jumpToSection('section-decision', this)">Son Karar</button>
+            <button type="button" data-target="section-signals" onclick="jumpToSection('section-signals', this)">Sinyaller</button>
+            <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
+            <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
+            <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">V17 Tarifesi</button>
+            <button type="button" data-target="section-radar" onclick="jumpToSection('section-radar', this)">Sistem Radarı</button>
+        </nav>
+
+        <section class="workspace-overview" id="section-overview">
+            <div class="top-meta">
+                <div class="meta-item">
+                    <span class="meta-label">Çalışan sürüm</span>
+                    <span class="meta-value" id="build-version">-</span>
+                    <span class="meta-subvalue" id="tariff-status">Tarife okunuyor…</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">API kalan istek</span>
+                    <span class="meta-value" id="quota-remaining">-</span>
+                    <div class="quota-track" aria-hidden="true"><span id="quota-progress"></span></div>
+                    <span class="meta-subvalue" id="quota-note">Günlük 7.500 kota üzerinden</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Sonraki otomatik tarama</span>
+                    <span class="meta-value" id="next-run">-</span>
+                    <span class="meta-subvalue" id="next-run-countdown">Sayaç bekliyor</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Karar güvenliği</span>
+                    <span class="meta-value">Tam-stat + taze doğrulama</span>
+                    <span class="meta-subvalue">ALT kapalı · oran 1.50+</span>
+                </div>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-card primary-control">
+                    <div class="control-card__top">
+                        <div>
+                            <h3>Ana sistem</h3>
+                            <p>Tarama motoru, model ve Telegram hattını tek noktadan yönet.</p>
+                        </div>
+                        <div>
+                            <span class="status-badge bg-danger" id="bot-status-badge">SİSTEM KAPALI</span>
+                            <span class="status-badge bg-muted" id="scan-status-badge">TARAMA BEKLİYOR</span>
+                        </div>
+                    </div>
+                    <div class="control-actions">
+                        <button id="toggle-btn" type="button" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
+                    </div>
+                </div>
+
+                <div class="control-card auto-control">
+                    <div class="control-card__top">
+                        <div>
+                            <h3>Otomatik tarama</h3>
+                            <p id="auto-scan-description">25–80. dakikadaki tam-stat maçları 10 dakikada bir tarar.</p>
+                        </div>
+                        <label class="switch" title="Otomatik taramayı aç/kapat">
+                            <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-actions">
+                        <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+                    </div>
+                </div>
+
+                <div class="control-card quick-scan-card">
+                    <div>
+                        <h3>Hızlı tarama</h3>
+                        <p>Program saatini beklemeden canlı havuzu şimdi kontrol et.</p>
+                    </div>
+                    <button class="quick-scan-button" id="force-scan-btn" type="button" onclick="forceScan()">ŞİMDİ TARA</button>
+                </div>
+            </div>
+
+            <div class="overview-metrics">
+                <div class="overview-metric accent">
+                    <span class="overview-metric__label">Paylaşılan sinyal <span>↗</span></span>
+                    <strong id="overview-signal-total">0</strong>
+                    <small>Seçili tarih görünümü</small>
+                </div>
+                <div class="overview-metric success">
+                    <span class="overview-metric__label">Başarı oranı <span>✓</span></span>
+                    <strong id="overview-hit-rate">-</strong>
+                    <small>Sonuçlanan paylaşımlar</small>
+                </div>
+                <div class="overview-metric info">
+                    <span class="overview-metric__label">Teorik ROI <span>₺</span></span>
+                    <strong id="overview-roi">-</strong>
+                    <small>Sabit 1 birim bahis hesabı</small>
+                </div>
+                <div class="overview-metric">
+                    <span class="overview-metric__label">Tam-stat canlı maç <span>●</span></span>
+                    <strong id="overview-full-stats">0</strong>
+                    <small>Son taramadaki hazır maçlar</small>
+                </div>
+            </div>
+        </section>
+
+        <main class="dashboard-sections">
+        <div class="card" id="section-audit">
             <div class="section-title">
                 <div>
                     <h3>🧪 Tam-Stat Aday Denetimi</h3>
                     <p class="muted" id="candidate-history-updated" style="margin-top:4px;">%60–69 gölge sinyaller ve pre-match filtreleri dahil bütün tam-stat market anları tutulur.</p>
                 </div>
                 <div class="tracker-actions">
+                    <input class="table-search" id="candidate-search" type="search" placeholder="Maç veya market ara…" aria-label="Aday tablosunda ara" oninput="filterTableRows(this.value, 'candidate-history-rows')">
                     <button type="button" style="background:var(--info);" onclick="downloadCandidateExport('json')">ADAY JSON</button>
                     <button type="button" style="background:#59636d;" onclick="downloadCandidateExport('csv')">ADAY CSV</button>
                 </div>
@@ -621,6 +1372,13 @@
                 <div class="metric success">
                     <span class="metric-label">Karma model anı</span>
                     <span class="metric-value" id="candidate-prematch-model">0</span>
+                </div>
+            </div>
+
+            <div>
+                <p class="muted" style="margin-bottom:8px;">En sık karar ve eleme nedenleri</p>
+                <div class="decision-breakdown" id="decision-breakdown">
+                    <div class="decision-breakdown__item"><span>Veri bekleniyor</span><strong>—</strong></div>
                 </div>
             </div>
 
@@ -692,7 +1450,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-decision">
             <div class="section-title">
                 <div>
                     <h3>🧠 Son Makine Kararı</h3>
@@ -721,13 +1479,14 @@
             <p class="muted" id="ml-note" style="margin-top:10px;">Canlı şut, isabet, korner, dakika ve skor verisi tamamlandığında model çalışır.</p>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-signals">
             <div class="section-title">
                 <div>
                     <h3>📈 Paylaşılan Sinyal Takibi</h3>
                     <p class="muted" id="signal-history-updated" style="margin-top:4px;">Yalnızca Telegram'da başarıyla paylaşılan sinyaller burada tutulur.</p>
                 </div>
                 <div class="tracker-actions">
+                    <input class="table-search" id="signal-search" type="search" placeholder="Maç veya market ara…" aria-label="Sinyal tablosunda ara" oninput="filterTableRows(this.value, 'signal-history-rows')">
                     <button id="signal-refresh-btn" type="button" style="background:var(--success);" onclick="refreshSignalResults()">Sonuçları Kontrol Et</button>
                     <button type="button" style="background:var(--info);" onclick="downloadSignalExport('json')">JSON İndir</button>
                     <button type="button" style="background:#59636d;" onclick="downloadSignalExport('csv')">CSV İndir</button>
@@ -771,7 +1530,7 @@
                 </div>
             </div>
 
-            <p class="muted" style="margin-bottom:10px;">Her maç için en fazla 1 sürpriz ve 1 güçlü sinyal kaydedilir. İkisi aynı dakikada ve aynı ya da farklı markette olabilir.</p>
+            <p class="muted" style="margin-bottom:10px;">Her maç için en fazla bir ilk sinyal ve yalnız daha ileri dakikada, farklı markette bir takip sinyali kaydedilir.</p>
 
             <div class="table-wrap">
                 <table>
@@ -782,7 +1541,7 @@
                             <th>Maç</th>
                             <th>Dk.</th>
                             <th>Market</th>
-                            <th>Dino</th>
+                            <th>V16</th>
                             <th>Oran</th>
                             <th>Sonuç</th>
                             <th>Final</th>
@@ -795,7 +1554,7 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-coverage">
             <div class="section-title">
                 <div>
                     <h3>📊 Canlı İstatistik Kapsamı</h3>
@@ -832,6 +1591,7 @@
                 <button type="button" class="filter-button" data-filter="complete" onclick="setCoverageFilter('complete', this)">✅ Stats tam</button>
                 <button type="button" class="filter-button" data-filter="incomplete" onclick="setCoverageFilter('incomplete', this)">❌ Stats eksik</button>
                 <button type="button" class="filter-button" data-filter="unsupported" onclick="setCoverageFilter('unsupported', this)">🚫 Coverage yok</button>
+                <input class="table-search" id="coverage-search" type="search" placeholder="Maç veya lig ara…" aria-label="Canlı maçlarda ara" oninput="filterTableRows(this.value, 'coverage-rows')">
             </div>
 
             <div class="table-wrap">
@@ -854,14 +1614,39 @@
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom:10px;">🗺️ V17 Dondurulmuş Tarife</h3>
-            <label class="muted" for="min-edge">Legacy EDGE (yalnız rapor)</label>
-            <input type="number" id="min-edge" value="3" disabled>
-            <p class="muted">Aktif karar: canlı oran en az <strong>1.50</strong>; bütün <strong>ALT marketleri kapalı</strong>. İlk sinyal ve daha ileri dakikadaki farklı market takip sinyali, markete özel dakika + V16 + EDGE aralığıyla seçilir. Maç başına en fazla iki sinyal verilir.</p>
+        <div class="card" id="section-tariff">
+            <div class="section-title">
+                <div>
+                    <h3>🗺️ V17 Kilitli Karar Tarifesi</h3>
+                    <p class="muted" style="margin-top:4px;">Kör test boyunca kurallar salt okunurdur; panelden yanlışlıkla değiştirilemez.</p>
+                </div>
+                <span class="mini-badge bg-success">🔒 KİLİTLİ</span>
+            </div>
+            <input type="hidden" id="min-edge" value="3">
+            <div class="tariff-summary">
+                <span class="tariff-chip">Sürüm <strong id="tariff-version-label">-</strong></span>
+                <span class="tariff-chip">Minimum oran <strong id="tariff-minimum-odd">1.50</strong></span>
+                <span class="tariff-chip">İlk kural <strong id="tariff-primary-count">6</strong></span>
+                <span class="tariff-chip">Takip kuralı <strong id="tariff-follow-count">3</strong></span>
+                <span class="tariff-chip">ALT marketleri <strong style="color:#ff8b86;">Kapalı</strong></span>
+            </div>
+            <div class="tariff-columns">
+                <div class="tariff-group">
+                    <h4>İlk sinyal haritası</h4>
+                    <div class="tariff-rule-list" id="tariff-primary-rules">
+                        <div class="muted">Tarife sunucudan okunuyor…</div>
+                    </div>
+                </div>
+                <div class="tariff-group">
+                    <h4>Takip sinyali haritası</h4>
+                    <div class="tariff-rule-list" id="tariff-follow-rules">
+                        <div class="muted">Tarife sunucudan okunuyor…</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-schedule">
             <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
             <p class="muted" style="margin-bottom:12px;">Kapalı bırakırsan otomatik sistem gün boyu 10 dakikada bir çalışır. Açarsan yalnızca aşağıdaki saat aralıklarında çalışır.</p>
             <div class="flex-between" style="margin-bottom:15px;">
@@ -892,16 +1677,27 @@
             <button type="button" style="background:var(--success);" onclick="saveSchedule()">Tüm Programı Sunucuya İlet</button>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-radar">
             <div class="section-title">
                 <div>
                     <h3>📡 Canlı Sistem Radarı</h3>
                     <p class="muted" style="margin-top:4px;">Tarama, istatistik ve ML işlemleri anlık olarak burada görünür.</p>
                 </div>
-                <button type="button" style="width:auto; margin:0; padding:7px 10px; background:#454c52; font-size:.75rem;" onclick="fetchLogs()">Yenile</button>
+                <div class="tracker-actions">
+                    <span class="mini-badge bg-muted" id="log-visible-count">0 KAYIT</span>
+                    <button type="button" style="background:#454c52;" onclick="fetchLogs()">Yenile</button>
+                </div>
+            </div>
+            <div class="log-toolbar">
+                <button type="button" class="log-filter active" data-log-filter="all" onclick="setLogFilter('all', this)">Tümü</button>
+                <button type="button" class="log-filter" data-log-filter="signal" onclick="setLogFilter('signal', this)">Sinyaller</button>
+                <button type="button" class="log-filter" data-log-filter="warning" onclick="setLogFilter('warning', this)">Uyarılar</button>
+                <button type="button" class="log-filter" data-log-filter="error" onclick="setLogFilter('error', this)">Hatalar</button>
+                <input class="table-search" id="log-search" type="search" placeholder="Kayıtlarda ara…" aria-label="Sistem kayıtlarında ara" oninput="setLogSearch(this.value)">
             </div>
             <div class="logs" id="log-box"><div class="log-line">&gt; Panel sunucuya bağlandı. Kayıtlar bekleniyor...</div></div>
         </div>
+        </main>
     </div>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -912,6 +1708,7 @@
         const BACKEND_URL = window.location.protocol === "file:"
             ? REMOTE_BACKEND_URL
             : window.location.origin;
+        const API_DAILY_QUOTA = 7500;
 
         let isBotRunning = false;
         let isScanning = false;
@@ -923,6 +1720,10 @@
         let signalHistoryDate = "";
         let candidateHistoryDate = "";
         let pollingStarted = false;
+        let nextRunTarget = 0;
+        let latestSystemLogs = [];
+        let activeLogFilter = "all";
+        let activeLogSearch = "";
 
         const logBox = document.getElementById("log-box");
         document.getElementById("login-server").textContent = `Sunucu: ${BACKEND_URL}`;
@@ -943,6 +1744,240 @@
             toast.classList.remove("hidden");
             clearTimeout(showToast.timer);
             showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
+        }
+
+        function updateIstanbulClock() {
+            const element = document.getElementById("istanbul-clock");
+            if (!element) return;
+            element.textContent = `${new Intl.DateTimeFormat("tr-TR", {
+                timeZone: "Europe/Istanbul",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            }).format(new Date())} TSİ`;
+        }
+
+        function updateNextRunCountdown() {
+            const element = document.getElementById("next-run-countdown");
+            if (!element) return;
+            if (!autoScanEnabled) {
+                element.textContent = "Otomatik tarama kapalı";
+                return;
+            }
+            if (!Number.isFinite(nextRunTarget) || nextRunTarget <= 0) {
+                element.textContent = "Sayaç bekliyor";
+                return;
+            }
+            const remainingSeconds = Math.max(0, Math.ceil((nextRunTarget - Date.now()) / 1000));
+            if (remainingSeconds <= 0) {
+                element.textContent = isScanning ? "Tarama devam ediyor" : "Tarama başlamak üzere";
+                return;
+            }
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            element.textContent = `${minutes} dk ${String(seconds).padStart(2, "0")} sn kaldı`;
+        }
+
+        function renderQuota(remaining) {
+            const value = Number(remaining);
+            const bar = document.getElementById("quota-progress");
+            const note = document.getElementById("quota-note");
+            if (!bar || !note || !Number.isFinite(value)) {
+                if (bar) bar.style.width = "0";
+                if (note) note.textContent = "Kota bilgisi bekleniyor";
+                return;
+            }
+            const percent = Math.max(0, Math.min(100, (value / API_DAILY_QUOTA) * 100));
+            bar.style.width = `${percent.toFixed(1)}%`;
+            bar.style.background = value < 1500
+                ? "linear-gradient(90deg, #e65e58, #ff8b86)"
+                : value < 3000
+                    ? "linear-gradient(90deg, #d79b35, #ffd16b)"
+                    : "linear-gradient(90deg, #42df98, #8af0c0)";
+            note.textContent = `Günlük kotanın %${percent.toFixed(0)} kadarı kaldı`;
+        }
+
+        function jumpToSection(sectionId, button) {
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+            document.querySelectorAll(".command-nav button").forEach(item => item.classList.remove("active"));
+            button?.classList.add("active");
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function setupNavigationObserver() {
+            if (!("IntersectionObserver" in window)) return;
+            const sections = document.querySelectorAll("[id^='section-']");
+            const observer = new IntersectionObserver(entries => {
+                const visible = entries
+                    .filter(entry => entry.isIntersecting)
+                    .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+                if (!visible) return;
+                document.querySelectorAll(".command-nav button").forEach(button => {
+                    button.classList.toggle("active", button.dataset.target === visible.target.id);
+                });
+            }, { rootMargin: "-72px 0px -62% 0px", threshold: [0.05, 0.3] });
+            sections.forEach(section => observer.observe(section));
+        }
+
+        function orderDashboardSections() {
+            const container = document.querySelector(".dashboard-sections");
+            if (!container) return;
+            [
+                "section-decision",
+                "section-signals",
+                "section-coverage",
+                "section-audit",
+                "section-tariff",
+                "section-schedule",
+                "section-radar"
+            ].forEach(id => {
+                const section = document.getElementById(id);
+                if (section) container.appendChild(section);
+            });
+        }
+
+        function filterTableRows(query, bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const normalized = String(query || "").trim().toLocaleLowerCase("tr-TR");
+            for (const row of body.querySelectorAll("tr")) {
+                if (row.querySelector(".empty-row")) {
+                    row.hidden = false;
+                    continue;
+                }
+                row.hidden = normalized.length > 0 &&
+                    !row.textContent.toLocaleLowerCase("tr-TR").includes(normalized);
+            }
+        }
+
+        function applyTableSearch(inputId, bodyId) {
+            const input = document.getElementById(inputId);
+            if (input) filterTableRows(input.value, bodyId);
+        }
+
+        function marketDisplayName(market) {
+            return String(market || "-").replace("_UST", " ÜST").replace("_ALT", " ALT");
+        }
+
+        function edgeDisplay(rule) {
+            const source = rule?.edgeField === "v16Edge" ? "V16" : "Dino";
+            if (Number(rule?.edgeLow) <= -99) return `${source} ≤ +${rule.edgeHigh}`;
+            const high = Number(rule?.edgeHigh) > 0 ? `+${rule.edgeHigh}` : rule?.edgeHigh;
+            return `${source} ${rule?.edgeLow}…${high}`;
+        }
+
+        function renderTariffRuleList(containerId, rules) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.replaceChildren();
+            for (const rule of Array.isArray(rules) ? rules : []) {
+                const row = document.createElement("div");
+                row.className = "tariff-rule";
+                const values = [
+                    marketDisplayName(rule.market),
+                    `${rule.minuteLow}–${rule.minuteHigh}. dk`,
+                    `V16 %${rule.v16Minimum}+`,
+                    edgeDisplay(rule)
+                ];
+                values.forEach((value, index) => {
+                    const cell = document.createElement(index === 0 ? "strong" : "span");
+                    cell.textContent = value;
+                    row.appendChild(cell);
+                });
+                container.appendChild(row);
+            }
+            if (container.childElementCount === 0) {
+                const empty = document.createElement("span");
+                empty.className = "muted";
+                empty.textContent = "Aktif kural yok.";
+                container.appendChild(empty);
+            }
+        }
+
+        function renderMarketTariff(tariff) {
+            if (!tariff) return;
+            document.getElementById("tariff-status").textContent =
+                tariff.enabled ? `${tariff.version || "V17"} · kilitli` : "Tarife kapalı";
+            document.getElementById("tariff-version-label").textContent = tariff.version || "-";
+            document.getElementById("tariff-minimum-odd").textContent =
+                Number.isFinite(Number(tariff.minimumOdd)) ? Number(tariff.minimumOdd).toFixed(2) : "-";
+            document.getElementById("tariff-primary-count").textContent =
+                Array.isArray(tariff.primaryRules) ? tariff.primaryRules.length : 0;
+            document.getElementById("tariff-follow-count").textContent =
+                Array.isArray(tariff.followRules) ? tariff.followRules.length : 0;
+            renderTariffRuleList("tariff-primary-rules", tariff.primaryRules);
+            renderTariffRuleList("tariff-follow-rules", tariff.followRules);
+        }
+
+        function renderDecisionBreakdown(byDecision) {
+            const container = document.getElementById("decision-breakdown");
+            if (!container) return;
+            const entries = Object.entries(byDecision || {})
+                .map(([key, count]) => ({ key, count: Number(count) || 0 }))
+                .sort((left, right) => right.count - left.count)
+                .slice(0, 4);
+            container.replaceChildren();
+            for (const entry of entries) {
+                const item = document.createElement("div");
+                item.className = "decision-breakdown__item";
+                const label = document.createElement("span");
+                label.textContent = candidateDecisionInfo(entry.key).text;
+                label.title = entry.key;
+                const value = document.createElement("strong");
+                value.textContent = entry.count;
+                item.append(label, value);
+                container.appendChild(item);
+            }
+            if (entries.length === 0) {
+                const item = document.createElement("div");
+                item.className = "decision-breakdown__item";
+                item.innerHTML = "<span>Veri bekleniyor</span><strong>—</strong>";
+                container.appendChild(item);
+            }
+        }
+
+        function logKind(entry) {
+            const text = String(entry || "").toLocaleUpperCase("tr-TR");
+            if (text.includes("❌") || text.includes("⛔") || text.includes("HATA")) return "error";
+            if (text.includes("⚠️") || text.includes("TIMEOUT") || text.includes("UYARI")) return "warning";
+            if (text.includes("SİNYAL") || text.includes("ML VALUE") || text.includes("✅")) return "signal";
+            return "info";
+        }
+
+        function renderLogEntries() {
+            const shouldScroll = autoScroll;
+            const filtered = latestSystemLogs.filter(entry => {
+                const kind = logKind(entry);
+                const typeMatches = activeLogFilter === "all" || kind === activeLogFilter;
+                const searchMatches = !activeLogSearch ||
+                    String(entry).toLocaleLowerCase("tr-TR").includes(activeLogSearch);
+                return typeMatches && searchMatches;
+            });
+            logBox.replaceChildren();
+            const rows = filtered.length > 0 ? filtered : ["> Bu filtreye uygun kayıt yok."];
+            for (const entry of rows) {
+                const line = document.createElement("div");
+                const kind = logKind(entry);
+                line.className = `log-line ${kind === "info" ? "" : kind}`.trim();
+                line.textContent = String(entry);
+                logBox.appendChild(line);
+            }
+            const count = document.getElementById("log-visible-count");
+            if (count) count.textContent = `${filtered.length} KAYIT`;
+            if (shouldScroll) logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setLogFilter(filter, button) {
+            activeLogFilter = filter;
+            document.querySelectorAll(".log-filter").forEach(item => item.classList.remove("active"));
+            button?.classList.add("active");
+            renderLogEntries();
+        }
+
+        function setLogSearch(value) {
+            activeLogSearch = String(value || "").trim().toLocaleLowerCase("tr-TR");
+            renderLogEntries();
         }
 
         async function apiFetch(path, options = {}) {
@@ -998,6 +2033,12 @@
             const element = document.getElementById("connection-state");
             element.textContent = connected ? "● Bağlı" : "● Bağlantı yok";
             element.style.color = connected ? "#68d66d" : "#ff7167";
+            element.style.borderColor = connected
+                ? "rgba(80,222,151,.28)"
+                : "rgba(255,105,98,.28)";
+            element.style.background = connected
+                ? "rgba(52,168,108,.11)"
+                : "rgba(211,70,70,.11)";
         }
 
         function formatDateTime(value) {
@@ -1106,11 +2147,15 @@
 
                 document.getElementById("build-version").textContent = data.buildVersion || "-";
                 document.getElementById("quota-remaining").textContent = data.quotaRemaining ?? "-";
+                renderQuota(data.quotaRemaining);
+                nextRunTarget = Number(data.nextRunTime) || 0;
                 document.getElementById("next-run").textContent = !autoScanEnabled
                     ? "Otomatik kapalı"
                     : data.nextRunTime
                         ? formatDateTime(data.nextRunTime)
                         : "Bekliyor";
+                updateNextRunCountdown();
+                renderMarketTariff(data.marketTariff);
 
                 if (data.minEdge !== undefined && data.minEdge !== null) {
                     document.getElementById("min-edge").value = data.minEdge;
@@ -1146,23 +2191,8 @@
                 setConnection(true);
                 if (!Array.isArray(logs)) return;
 
-                const shouldScroll = autoScroll;
-                logBox.replaceChildren();
-                if (logs.length === 0) {
-                    const line = document.createElement("div");
-                    line.className = "log-line";
-                    line.textContent = "> Henüz log kaydı yok.";
-                    logBox.appendChild(line);
-                } else {
-                    for (const entry of logs) {
-                        const line = document.createElement("div");
-                        line.className = "log-line";
-                        line.textContent = String(entry);
-                        logBox.appendChild(line);
-                    }
-                }
-
-                if (shouldScroll) logBox.scrollTop = logBox.scrollHeight;
+                latestSystemLogs = logs;
+                renderLogEntries();
                 renderLatestMlDecision(logs);
             } catch (error) {
                 setConnection(false);
@@ -1453,6 +2483,9 @@
             document.getElementById("signal-strong-rate").textContent = formatPercent(strong.hitRate);
             document.getElementById("signal-win-loss").textContent = `${overall.wins ?? 0} / ${overall.losses ?? 0}`;
             document.getElementById("signal-roi").textContent = formatPercent(overall.roi);
+            document.getElementById("overview-signal-total").textContent = overall.total ?? 0;
+            document.getElementById("overview-hit-rate").textContent = formatPercent(overall.hitRate);
+            document.getElementById("overview-roi").textContent = formatPercent(overall.roi);
             const selectedDate = data?.filter?.date || "";
             const viewLabel = selectedDate
                 ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
@@ -1503,7 +2536,7 @@
                     signal.match || "-",
                     signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
                     signal.market || "-",
-                    formatPercent(signal.dinoProbability),
+                    formatPercent(signal.selectorV2Probability ?? signal.dinoProbability),
                     Number.isFinite(Number(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
                 for (const value of plainValues) {
@@ -1532,6 +2565,7 @@
                     historyApiPath("/api/signal-history", 100, signalHistoryDate)
                 );
                 renderSignalHistory(data || {});
+                applyTableSearch("signal-search", "signal-history-rows");
             } catch (_) {
                 // Takip uç noktası geçici olarak cevap vermezse diğer panel
                 // kontrolleri çalışmaya devam etsin.
@@ -1642,6 +2676,7 @@
             document.getElementById("candidate-shadow").textContent = summary.shadowSignals ?? 0;
             document.getElementById("candidate-prematch-blocked").textContent = summary.prematchBlocked ?? 0;
             document.getElementById("candidate-prematch-model").textContent = summary.livePlusPrematch ?? 0;
+            renderDecisionBreakdown(summary.byDecision || {});
             const shadowPower = summary.shadowPower || {};
             document.getElementById("candidate-shadow-context").textContent = shadowPower.contextMoments ?? 0;
             document.getElementById("candidate-shadow-team").textContent = shadowPower.teamStatsComplete ?? 0;
@@ -1744,6 +2779,7 @@
                     historyApiPath("/api/candidate-history", 200, candidateHistoryDate)
                 );
                 renderCandidateHistory(data || {});
+                applyTableSearch("candidate-search", "candidate-history-rows");
             } catch (_) {
                 // Aday geçmişi geçici olarak okunamazsa ana panel çalışmaya devam eder.
             }
@@ -1771,6 +2807,7 @@
             document.getElementById("coverage-unsupported").textContent = data.unsupportedCount ?? 0;
             document.getElementById("coverage-complete").textContent = data.completeStatsCount ?? 0;
             document.getElementById("coverage-incomplete").textContent = data.incompleteStatsCount ?? 0;
+            document.getElementById("overview-full-stats").textContent = data.completeStatsCount ?? 0;
             document.getElementById("coverage-updated").textContent = data.updatedAt
                 ? `Son güncelleme: ${formatDateTime(data.updatedAt)}`
                 : "Henüz tarama yapılmadı.";
@@ -1782,6 +2819,7 @@
                 renderCoverageSummary(data || {});
                 coverageMatches = Array.isArray(data?.matches) ? data.matches : [];
                 renderCoverageRows();
+                applyTableSearch("coverage-search", "coverage-rows");
             } catch (error) {
                 // Eski backend çalışıyorsa ana kontroller çalışmaya devam etsin.
             }
@@ -1866,7 +2904,15 @@
                 });
                 body.appendChild(row);
             }
+            applyTableSearch("coverage-search", "coverage-rows");
         }
+
+        updateIstanbulClock();
+        updateNextRunCountdown();
+        orderDashboardSections();
+        setupNavigationObserver();
+        setInterval(updateIstanbulClock, 1000);
+        setInterval(updateNextRunCountdown, 1000);
     </script>
 </body>
 </html>
