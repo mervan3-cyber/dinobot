@@ -547,7 +547,7 @@
                     <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
                     <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
                 </div>
-                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; V16 Telegram sinyali yalnızca 60–80. dakikada açılır.</p>
+                <p class="muted" id="auto-scan-description">25–80. dakikada veri toplar; V17 her marketi kendi dakika, V16 ve EDGE penceresinde değerlendirir.</p>
             </div>
             <label class="switch" title="Otomatik taramayı aç/kapat">
                 <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
@@ -839,11 +839,11 @@
                     <span class="metric-value" id="signal-pending">0</span>
                 </div>
                 <div class="metric warning">
-                    <span class="metric-label">Sürpriz başarı</span>
+                    <span class="metric-label">Takip başarı</span>
                     <span class="metric-value" id="signal-surprise-rate">-</span>
                 </div>
                 <div class="metric success">
-                    <span class="metric-label">Güçlü başarı</span>
+                    <span class="metric-label">İlk sinyal başarı</span>
                     <span class="metric-value" id="signal-strong-rate">-</span>
                 </div>
                 <div class="metric success">
@@ -940,10 +940,10 @@
         </div>
 
         <div class="card">
-            <h3 style="margin-bottom:10px;">🧬 V16 Makine Ayarları</h3>
+            <h3 style="margin-bottom:10px;">🗺️ V17 Dondurulmuş Tarife</h3>
             <label class="muted" for="min-edge">Legacy EDGE (yalnız rapor)</label>
             <input type="number" id="min-edge" value="3" disabled>
-            <p class="muted">Aktif karar: <strong>V16 en az %76</strong>, dakika <strong>60–80</strong>, canlı oran en az <strong>1.40</strong>. EDGE, harici pre-destek ve tam API güç şartı sinyali tek başına elemez; bunlar model girdisi ve denetim verisi olarak saklanır. Her maçtan en fazla bir market seçilir.</p>
+            <p class="muted">Aktif karar: canlı oran en az <strong>1.50</strong>; bütün <strong>ALT marketleri kapalı</strong>. İlk sinyal ve daha ileri dakikadaki farklı market takip sinyali, markete özel dakika + V16 + EDGE aralığıyla seçilir. Maç başına en fazla iki sinyal verilir.</p>
         </div>
 
         <div class="card">
@@ -1178,7 +1178,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "25–80. dakikada veri toplar; 60–80. dakikada V16 %76+ ve taze doğrulanmış Telegram sinyali üretir."
+                ? "25–80. dakikada veri toplar; markete özel V17 penceresi uygunsa taze doğrulanmış Telegram sinyali üretir."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -1516,7 +1516,9 @@
             return Number.isFinite(parsed) ? `%${parsed.toFixed(1)}` : "-";
         }
 
-        function signalTypeInfo(type) {
+        function signalTypeInfo(type, tariffSlot) {
+            if (tariffSlot === "primary") return { text: "🟢 İlk", className: "strong" };
+            if (tariffSlot === "follow") return { text: "🔁 Takip", className: "surprise" };
             return type === "strong"
                 ? { text: "🟢 Güçlü", className: "strong" }
                 : { text: "🟡 Sürpriz", className: "surprise" };
@@ -1533,8 +1535,8 @@
         function renderSignalHistory(data) {
             const summary = data?.summary || {};
             const overall = summary.overall || {};
-            const surprise = summary.byType?.surprise || {};
-            const strong = summary.byType?.strong || {};
+            const surprise = summary.byTariffSlot?.follow || summary.byType?.surprise || {};
+            const strong = summary.byTariffSlot?.primary || summary.byType?.strong || {};
 
             document.getElementById("signal-total").textContent = overall.total ?? 0;
             document.getElementById("signal-pending").textContent = overall.pending ?? 0;
@@ -1574,7 +1576,7 @@
 
             for (const signal of signals) {
                 const row = document.createElement("tr");
-                const typeInfo = signalTypeInfo(signal.signalType);
+                const typeInfo = signalTypeInfo(signal.signalType, signal.tariffSlot);
                 const resultInfo = signalResultInfo(signal?.settlement?.result);
 
                 const typeCell = document.createElement("td");
@@ -1850,11 +1852,12 @@
                 sent: ["✅ Gönderildi", "win"],
                 already_sent: ["🔁 Önceden gönderildi", "neutral"],
                 telegram_candidate: ["⏳ Gönderim adayı", "pending"],
-                selected_for_class: ["🧬 V16 seçimi", "pending"],
+                selected_for_class: ["🗺️ V17 seçimi", "pending"],
+                v17_tariff_rejected: ["🗺️ V17 reddetti", "loss"],
                 eligible_not_selected: ["↔️ Daha güçlü market seçildi", "neutral"],
                 selector_v2_rejected: ["🧬 V16 reddetti", "loss"],
                 edge_below_minimum: ["📉 EDGE altı", "loss"],
-                odds_below_minimum: ["💸 Oran 1.40 altı", "loss"],
+                odds_below_minimum: ["💸 Oran 1.50 altı", "loss"],
                 shadow_probability: ["👁️ Gölge %60–69", "neutral"],
                 prematch_missing: ["🧭 Pre-match yok", "loss"],
                 prematch_total_missing: ["🧩 Pre toplam yok", "loss"],
