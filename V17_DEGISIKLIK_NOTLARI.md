@@ -13,7 +13,7 @@
 - Paylaşılan sinyal ve tam-stat CSV/JSON kayıtlarına tarife alanları eklendi.
 - Takım gücü, standings, API prediction, pre-match, canlı tempo ve taze veri
   doğrulaması korunarak V16 puanının girdileri olmaya devam eder.
-- Ayrı yapay zekâ kör-test özelliği V17.2 paketinde tamamen kaldırıldı.
+- Grok-only kör testi bağımsız ve karara etkisiz bırakıldı.
 
 Geriye dönük tekrar oynatma: 105 sonuçlanan sinyalde 90 kazanan / 15 kaybeden,
 %85,7 başarı, %+43,4 ROI ve 1,681 ortalama oran. Bunun 5 sinyali takip
