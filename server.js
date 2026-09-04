@@ -27,6 +27,7 @@ const {
     buildMarketShadowAssessment
 } = require('./shadow_power');
 const dinoSelectorV2 = require('./dino_selector_v2');
+const marketTariff = require('./market_tariff');
 const {
     GrokOnlyClient,
     GrokOnlyTracker,
@@ -41,7 +42,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v16.2-grok-only-blind-test-ubuntu-2026-08-31';
+const BUILD_VERSION = 'ml-v17.1-weekend-market-map-ubuntu-2026-09-04';
 
 app.use(cors());
 app.use(express.json());
@@ -235,7 +236,9 @@ const SIGNAL_RULES = Object.freeze({
     })
 });
 
-const TELEGRAM_MIN_MINUTE = 60;
+const DINO_V17_TARIFF_ENABLED =
+    String(process.env.DINO_V17_TARIFF_ENABLED || 'true').toLowerCase() !== 'false';
+const TELEGRAM_MIN_MINUTE = DINO_V17_TARIFF_ENABLED ? 25 : 60;
 const TELEGRAM_MAX_MINUTE = 80;
 const MIN_SIGNAL_ODD = 1.40;
 
@@ -248,6 +251,11 @@ const DINO_V2_SELECTOR_ENABLED =
     String(process.env.DINO_V2_SELECTOR_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V2_MIN_ODD = Number(process.env.DINO_V2_MIN_ODD) ||
     Number(dinoSelectorV2.MODEL.policy.defaultMinimumOdd);
+const ACTIVE_MIN_SIGNAL_ODD = DINO_V17_TARIFF_ENABLED
+    ? marketTariff.MINIMUM_ODD
+    : DINO_V2_SELECTOR_ENABLED
+        ? DINO_V2_MIN_ODD
+        : MIN_SIGNAL_ODD;
 
 // Legacy karar hattının pre-match kapılarıdır. V16 aktifken pre-match
 // verisi model girdisi ve denetim kaydı olarak kalır; tek başına Telegram
@@ -940,10 +948,16 @@ function fixtureGonderimKaydi(mac, sinyalTuru) {
 
     // dino_data.json silinse bile paylaşılan sinyal geçmişi ikinci bir
     // güvenlik katmanı olarak aynı türün yeniden gönderilmesini önler.
-    if (signalTracker.hasSignal(fixtureID, tur)) {
+    const gecmisSinyal = typeof signalTracker.findSignal === 'function'
+        ? signalTracker.findSignal(fixtureID, tur)
+        : null;
+    if (gecmisSinyal || signalTracker.hasSignal(fixtureID, tur)) {
         return {
-            sentAt: null,
-            market: null,
+            sentAt: gecmisSinyal?.sentAt
+                ? Date.parse(gecmisSinyal.sentAt)
+                : null,
+            market: gecmisSinyal?.market || null,
+            minute: gecmisSinyal?.minute ?? null,
             fromHistory: true
         };
     }
@@ -3112,6 +3126,16 @@ function sinyalTuruBelirle(mac, dinoYuzde) {
 function firsatAdayiDahaIyiMi(yeniAday, mevcutAday) {
     if (!mevcutAday) return true;
 
+    if (DINO_V17_TARIFF_ENABLED) {
+        const yeniOncelik = Number(yeniAday?.tarife_onceligi);
+        const mevcutOncelik = Number(mevcutAday?.tarife_onceligi);
+        if (Number.isFinite(yeniOncelik) && Number.isFinite(mevcutOncelik)) {
+            if (yeniOncelik !== mevcutOncelik) return yeniOncelik > mevcutOncelik;
+        } else if (Number.isFinite(yeniOncelik)) {
+            return true;
+        }
+    }
+
     const yeniSelector = Number(yeniAday?.selector_yuzde);
     const mevcutSelector = Number(mevcutAday?.selector_yuzde);
     if (Number.isFinite(yeniSelector) && Number.isFinite(mevcutSelector)) {
@@ -3208,10 +3232,10 @@ function adayDenetimKaydiOlustur({
         statsComplete: temelStatsTam(mac),
         liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
         minimumEdgeAtEvaluation: Number(state.globalMinEdge),
-        minimumOddAtEvaluation: DINO_V2_SELECTOR_ENABLED
-            ? DINO_V2_MIN_ODD
-            : MIN_SIGNAL_ODD,
-        minimumSignalMinuteAtEvaluation: TELEGRAM_MIN_MINUTE,
+        minimumOddAtEvaluation: ACTIVE_MIN_SIGNAL_ODD,
+        minimumSignalMinuteAtEvaluation: DINO_V17_TARIFF_ENABLED
+            ? selectorPolicy?.rule?.minuteLow ?? TELEGRAM_MIN_MINUTE
+            : TELEGRAM_MIN_MINUTE,
         selectorV2Enabled: DINO_V2_SELECTOR_ENABLED,
         selectorV2Probability: Number.isFinite(Number(selectorScore?.selectorProbability))
             ? Number(Number(selectorScore.selectorProbability).toFixed(1))
@@ -3219,12 +3243,22 @@ function adayDenetimKaydiOlustur({
         selectorV2RawProbability: Number.isFinite(Number(selectorScore?.selectorRawProbability))
             ? Number(Number(selectorScore.selectorRawProbability).toFixed(1))
             : null,
-        selectorV2Threshold: Number(dinoSelectorV2.MODEL.policy.threshold * 100),
-        selectorV2MinimumOdd: DINO_V2_MIN_ODD,
+        selectorV2Threshold: DINO_V17_TARIFF_ENABLED
+            ? selectorPolicy?.rule?.v16Minimum ?? null
+            : Number(dinoSelectorV2.MODEL.policy.threshold * 100),
+        selectorV2MinimumOdd: ACTIVE_MIN_SIGNAL_ODD,
         selectorV2Eligible: selectorPolicy?.eligible === true,
         selectorV2Reasons: Array.isArray(selectorPolicy?.reasons)
             ? selectorPolicy.reasons
             : [],
+        tariffEnabled: DINO_V17_TARIFF_ENABLED,
+        tariffVersion: DINO_V17_TARIFF_ENABLED ? marketTariff.VERSION : null,
+        tariffSlot: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.slot || null : null,
+        tariffRuleId: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.rule?.id || null : null,
+        tariffEdgeField: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.rule?.edgeField || null : null,
+        tariffV16Edge: DINO_V17_TARIFF_ENABLED && Number.isFinite(Number(selectorPolicy?.v16Edge))
+            ? Number(Number(selectorPolicy.v16Edge).toFixed(1))
+            : null,
         decision: 'evaluating',
         decisionDetail: null
     };
@@ -3234,12 +3268,43 @@ function adayDenetimKaydiOlustur({
 const MODEL_MARKET_PATTERN = /^(MS1|X|MS2|[0-4]\.5_(ALT|UST))$/;
 
 
+function tarifeGonderimDurumu(mac) {
+    const primary = fixtureGonderimKaydi(mac, 'strong');
+    const follow = fixtureGonderimKaydi(mac, 'surprise');
+    return {
+        primary,
+        follow,
+        slot: marketTariff.currentSlot(primary, follow)
+    };
+}
+
+
 function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
     if (!DINO_V2_SELECTOR_ENABLED) return true;
     const marketNames = [...new Set([
         ...Object.keys(mac?.canli_oranlar || {}),
         ...Object.keys(dino || {}).filter(key => MODEL_MARKET_PATTERN.test(key))
     ])];
+
+    if (DINO_V17_TARIFF_ENABLED) {
+        const tarifeDurumu = tarifeGonderimDurumu(mac);
+        if (!tarifeDurumu.slot) return false;
+        return marketNames.some(market => {
+            const oddsData = mac?.canli_oranlar?.[market];
+            const odds = oddsData && typeof oddsData === 'object'
+                ? Number(oddsData.oran)
+                : Number(oddsData);
+            return marketTariff.canPreselect({
+                slot: tarifeDurumu.slot,
+                market,
+                minute: mac?.dakika,
+                odds,
+                dinoProbability: dino?.[market],
+                previousPrimary: tarifeDurumu.primary
+            });
+        });
+    }
+
     const fullyVerifiedPlaceholder = {
         validation: { fullyVerified: true }
     };
@@ -3273,6 +3338,9 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
     const activeScanId = scanId || `scan-${Date.now()}`;
     const activeCapturedAt = capturedAt || new Date().toISOString();
     const selectorShadowContext = mac?._selectorShadowContext || null;
+    const tarifeDurumu = DINO_V17_TARIFF_ENABLED
+        ? tarifeGonderimDurumu(mac)
+        : null;
 
     for (const market of marketNames) {
         const oddsData = liveOdds[market];
@@ -3295,7 +3363,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
                 selectorShadowContext
             )
             : null;
-        const selectorPolicy = DINO_V2_SELECTOR_ENABLED
+        const legacySelectorPolicy = DINO_V2_SELECTOR_ENABLED
             ? dinoSelectorV2.policyCheck(
                 mac,
                 selectorScore,
@@ -3303,10 +3371,41 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
                 DINO_V2_MIN_ODD
             )
             : null;
-        const sinyalTuru = DINO_V2_SELECTOR_ENABLED
-            ? (selectorPolicy?.eligible ? 'strong' : null)
+        const selectorPolicy = DINO_V17_TARIFF_ENABLED
+            ? (
+                tarifeDurumu?.slot
+                    ? marketTariff.check({
+                        slot: tarifeDurumu.slot,
+                        market,
+                        minute: mac?.dakika,
+                        odds: piyasaOrani,
+                        dinoProbability: dinoYuzde,
+                        selectorProbability: selectorScore?.selectorProbability,
+                        previousPrimary: tarifeDurumu.primary
+                    })
+                    : {
+                        eligible: false,
+                        reasons: ['bu maç iki sinyal hakkını da kullandı'],
+                        slot: null,
+                        rule: null,
+                        priority: -Infinity
+                    }
+            )
+            : legacySelectorPolicy;
+        const sinyalTuru = DINO_V17_TARIFF_ENABLED
+            ? (
+                selectorPolicy?.eligible
+                    ? selectorPolicy.slot === 'follow' ? 'surprise' : 'strong'
+                    : null
+            )
+            : DINO_V2_SELECTOR_ENABLED
+                ? (selectorPolicy?.eligible ? 'strong' : null)
             : legacySinyalTuru;
-        const turEtiketi = DINO_V2_SELECTOR_ENABLED
+        const turEtiketi = DINO_V17_TARIFF_ENABLED
+            ? (selectorPolicy?.eligible
+                ? selectorPolicy.slot === 'follow' ? 'V17 TAKİP UYGUN' : 'V17 İLK UYGUN'
+                : 'V17 RED')
+            : DINO_V2_SELECTOR_ENABLED
             ? (selectorPolicy?.eligible ? 'V16 UYGUN' : 'V16 RED')
             : sinyalTuru === 'strong'
                 ? 'GÜÇLÜ'
@@ -3365,8 +3464,12 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
         }
 
         if (DINO_V2_SELECTOR_ENABLED && !selectorPolicy?.eligible) {
-            auditRecord.decision = 'selector_v2_rejected';
-            auditRecord.decisionDetail = `V16 ikinci katman reddetti: ${(selectorPolicy?.reasons || []).join(', ') || 'puan üretilemedi'}.`;
+            auditRecord.decision = DINO_V17_TARIFF_ENABLED
+                ? 'v17_tariff_rejected'
+                : 'selector_v2_rejected';
+            auditRecord.decisionDetail = DINO_V17_TARIFF_ENABLED
+                ? `V17 market tarifesi reddetti: ${(selectorPolicy?.reasons || []).join(', ') || 'uygun kural yok'}.`
+                : `V16 ikinci katman reddetti: ${(selectorPolicy?.reasons || []).join(', ') || 'puan üretilemedi'}.`;
             continue;
         }
 
@@ -3387,9 +3490,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             continue;
         }
 
-        const activeMinimumOdd = DINO_V2_SELECTOR_ENABLED
-            ? DINO_V2_MIN_ODD
-            : MIN_SIGNAL_ODD;
+        const activeMinimumOdd = ACTIVE_MIN_SIGNAL_ODD;
         if (piyasaOrani < activeMinimumOdd) {
             auditRecord.decision = 'odds_below_minimum';
             auditRecord.decisionDetail = `Canlı oran ${piyasaOrani}, minimum ${activeMinimumOdd.toFixed(2)} altında.`;
@@ -3465,6 +3566,13 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
                 ? Number(selectorScore.selectorRawProbability.toFixed(1))
                 : null,
             selector_model_surumu: dinoSelectorV2.MODEL.version,
+            tarife_surumu: DINO_V17_TARIFF_ENABLED ? marketTariff.VERSION : null,
+            tarife_yuvasi: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.slot : null,
+            tarife_kural_id: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.rule?.id : null,
+            tarife_onceligi: DINO_V17_TARIFF_ENABLED ? selectorPolicy?.priority : null,
+            v16_edge: Number.isFinite(Number(selectorPolicy?.v16Edge))
+                ? Number(selectorPolicy.v16Edge.toFixed(1))
+                : null,
             auditRecord
         };
 
@@ -3475,7 +3583,9 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
 
     for (const selected of Object.values(secilenler).filter(Boolean)) {
         selected.auditRecord.decision = 'selected_for_class';
-        selected.auditRecord.decisionDetail = DINO_V2_SELECTOR_ENABLED
+        selected.auditRecord.decisionDetail = DINO_V17_TARIFF_ENABLED
+            ? `V17 ${selected.tarife_yuvasi === 'follow' ? 'takip' : 'ilk'} sinyal haritasında uygun market seçildi (${selected.tarife_kural_id}).`
+            : DINO_V2_SELECTOR_ENABLED
             ? 'V16 ikinci katmanda gerçekleşme olasılığı en yüksek doğrulanmış market.'
             : 'Sınıfındaki en yüksek Dino ihtimalli uygun market.';
     }
@@ -3760,6 +3870,10 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
             selectorV2Probability: firsat?.selector_yuzde,
             selectorV2RawProbability: firsat?.selector_raw_yuzde,
             selectorV2ModelVersion: firsat?.selector_model_surumu,
+            tariffVersion: firsat?.tarife_surumu,
+            tariffSlot: firsat?.tarife_yuvasi,
+            tariffRuleId: firsat?.tarife_kural_id,
+            v16Edge: firsat?.v16_edge,
             prematchSource: mac?.prematch_source,
             prematchProbabilities: mac?.prematch_available
                 ? {
@@ -3777,7 +3891,7 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
         });
 
         addSystemLog(
-            `> 🗃️ Paylaşılan sinyal kaydedildi: ${kayit.match} | ${kayit.signalType === 'strong' ? 'GÜÇLÜ' : 'SÜRPRİZ'} | ${kayit.market}`
+            `> 🗃️ Paylaşılan sinyal kaydedildi: ${kayit.match} | ${kayit.tariffSlot === 'follow' ? 'V17 TAKİP' : kayit.tariffSlot === 'primary' ? 'V17 İLK' : kayit.signalType === 'strong' ? 'GÜÇLÜ' : 'SÜRPRİZ'} | ${kayit.market}`
         );
     } catch (error) {
         // Telegram gönderilmiş olsa bile takip dosyası hatası aynı mesajın
@@ -3885,9 +3999,9 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 : Number(oddsData);
             const selectedOdd = Number(firsat.oran);
 
-            if (!Number.isFinite(currentOdd) || currentOdd < DINO_V2_MIN_ODD) {
+            if (!Number.isFinite(currentOdd) || currentOdd < ACTIVE_MIN_SIGNAL_ODD) {
                 addSystemLog(
-                    `> ⛔ ${mac.mac_isim}: ${firsat.market} ikinci kontrolde kapandı veya oran ${currentOdd || '-'} ile minimumun altına indi.`
+                    `> ⛔ ${mac.mac_isim}: ${firsat.market} ikinci kontrolde kapandı veya oran ${currentOdd || '-'} ile ${ACTIVE_MIN_SIGNAL_ODD.toFixed(2)} minimumunun altına indi.`
                 );
                 return false;
             }
@@ -3988,17 +4102,27 @@ async function telegramSinyaliGonder(
     const ekCanliStats = telegramEkStatsSatirlari(mac);
 
     const gucluSinyal = firsat?.sinyal_turu === 'strong';
-    const sinyalBasligi = DINO_V2_SELECTOR_ENABLED
+    const sinyalBasligi = DINO_V17_TARIFF_ENABLED
+        ? firsat?.tarife_yuvasi === 'follow'
+            ? '🔁 DİNO V17 TAKİP SİNYALİ'
+            : '🟢 DİNO V17 İLK SİNYAL'
+        : DINO_V2_SELECTOR_ENABLED
         ? '🧬 DİNO V16 DOĞRULANMIŞ SİNYAL'
         : gucluSinyal
         ? '🟢 DİNO GÜÇLÜ SİNYAL'
         : '🟡 DİNO SÜRPRİZ SİNYAL';
-    const sinyalAciklamasi = DINO_V2_SELECTOR_ENABLED
+    const sinyalAciklamasi = DINO_V17_TARIFF_ENABLED
+        ? firsat?.tarife_yuvasi === 'follow'
+            ? 'Aynı maçta daha ileri dakikadaki ikinci market'
+            : 'Dondurulmuş market-dakika-EDGE ilk sinyali'
+        : DINO_V2_SELECTOR_ENABLED
         ? 'İkinci katman doğruluk sinyali'
         : gucluSinyal
         ? 'Doğruluk öncelikli güçlü sinyal'
         : 'Risk almak isteyenler için sürpriz sinyal';
-    const modelEtiketi = DINO_V2_SELECTOR_ENABLED
+    const modelEtiketi = DINO_V17_TARIFF_ENABLED
+        ? 'V16 olasılığı + markete özel V17 tarife haritası'
+        : DINO_V2_SELECTOR_ENABLED
         ? 'Dino + piyasa + pre-match + canlı tempo ikinci katmanı'
         : firsat?.model_varyanti === 'live_plus_prematch'
         ? 'Canlı istatistik + pre-match modeli'
@@ -4031,6 +4155,7 @@ async function telegramSinyaliGonder(
 💵 <b>Canlı Oran:</b> ${telegramHtml(firsat.oran)}
 🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
 🧬 <b>V16 Gerçekleşme Puanı:</b> %${telegramHtml(firsat.selector_yuzde ?? '-')}
+🗺️ <b>V17 Kuralı:</b> ${telegramHtml(firsat.tarife_kural_id || '-')} | <b>V16 EDGE:</b> ${telegramHtml(firsat.v16_edge ?? '-')}
 🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
 📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
 🧠 <b>Model:</b> ${telegramHtml(modelEtiketi)}${prematchSatiri}${prematchMarketSatiri}${liveOnlySatiri}${statsDogrulamaSatiri}
@@ -4216,7 +4341,7 @@ async function botuCalistir() {
                     prematchAvailable: mac?.prematch_available === true,
                     prematchSource: mac?.prematch_source || null,
                     minimumEdgeAtEvaluation: Number(state.globalMinEdge),
-                    minimumOddAtEvaluation: MIN_SIGNAL_ODD,
+                    minimumOddAtEvaluation: ACTIVE_MIN_SIGNAL_ODD,
                     decision: 'model_error',
                     decisionDetail: dino?.HATA || 'Model sonucu boş veya geçersiz.'
                 });
@@ -4376,11 +4501,13 @@ async function botuCalistir() {
             }
 
             for (const firsat of gonderilecekFirsatlar) {
-                const turEtiketi = firsat.sinyal_turu === 'strong'
+                const turEtiketi = DINO_V17_TARIFF_ENABLED
+                    ? firsat.tarife_yuvasi === 'follow' ? 'V17 TAKİP' : 'V17 İLK'
+                    : firsat.sinyal_turu === 'strong'
                     ? 'GÜÇLÜ'
                     : 'SÜRPRİZ';
                 addSystemLog(
-                    `> 🚨 TAZE ML VALUE: ${mac.mac_isim} | ${firsat.market} | +${DINO_V2_SELECTOR_ENABLED ? firsat.selector_yuzde : firsat.edge}% | ${DINO_V2_SELECTOR_ENABLED ? 'V16' : turEtiketi}`
+                    `> 🚨 TAZE ML VALUE: ${mac.mac_isim} | ${firsat.market} | %${DINO_V2_SELECTOR_ENABLED ? firsat.selector_yuzde : firsat.edge} | ${turEtiketi}`
                 );
             }
 
@@ -4411,7 +4538,9 @@ async function botuCalistir() {
                     firsat.auditRecord.decision = 'sent';
                     firsat.auditRecord.decisionDetail = 'Telegram API gönderimi başarılı ve sinyal geçmişine kaydedildi.';
                     onaylanan++;
-                    const turEtiketi = firsat.sinyal_turu === 'strong'
+                    const turEtiketi = DINO_V17_TARIFF_ENABLED
+                        ? firsat.tarife_yuvasi === 'follow' ? 'V17 TAKİP' : 'V17 İLK'
+                        : firsat.sinyal_turu === 'strong'
                         ? 'GÜÇLÜ'
                         : 'SÜRPRİZ';
                     addSystemLog(
@@ -4947,6 +5076,7 @@ function paylasilanSinyallerCsvOlustur(signals) {
         'minute', 'score', 'market', 'dino_probability', 'edge', 'odds',
         'bookmaker', 'market_probability', 'model_variant', 'live_only_probability',
         'selector_v2_probability', 'selector_v2_raw_probability', 'selector_v2_model_version',
+        'tariff_version', 'tariff_slot', 'tariff_rule_id', 'v16_edge',
         'prematch_source', 'prematch_home', 'prematch_draw', 'prematch_away',
         'prematch_market_support', 'prematch_market_source', 'stats_source',
         ...STATS_VALIDATION_CSV_HEADERS,
@@ -4969,6 +5099,7 @@ function paylasilanSinyallerCsvOlustur(signals) {
             signal.marketProbability, signal.modelVariant, signal.liveOnlyProbability,
             signal.selectorV2Probability, signal.selectorV2RawProbability,
             signal.selectorV2ModelVersion,
+            signal.tariffVersion, signal.tariffSlot, signal.tariffRuleId, signal.v16Edge,
             signal.prematchSource, signal.prematchProbabilities?.home,
             signal.prematchProbabilities?.draw, signal.prematchProbabilities?.away,
             signal.prematchMarketSupport, signal.prematchMarketSource, signal.statsSource,
@@ -5034,13 +5165,19 @@ app.get(
         const payload = signalTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
-            minimumSignalOdd: DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
+            minimumSignalOdd: ACTIVE_MIN_SIGNAL_ODD,
             currentMinimumEdge: state.globalMinEdge,
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
                 version: dinoSelectorV2.MODEL.version,
                 policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
                 edgeDecisionImpact: false
+            },
+            marketTariff: {
+                enabled: DINO_V17_TARIFF_ENABLED,
+                version: marketTariff.VERSION,
+                primaryRules: marketTariff.PRIMARY_RULES,
+                followRules: marketTariff.FOLLOW_RULES
             },
             precisionMode: {
                 ...PRECISION_MODE,
@@ -5221,6 +5358,8 @@ function adayGecmisiCsvOlustur(records) {
         'selector_v2_probability', 'selector_v2_raw_probability',
         'selector_v2_threshold', 'selector_v2_minimum_odd',
         'selector_v2_eligible', 'selector_v2_reasons',
+        'tariff_enabled', 'tariff_version', 'tariff_slot', 'tariff_rule_id',
+        'tariff_edge_field', 'tariff_v16_edge',
         'minimum_edge', 'minimum_odd', 'model_variant', 'live_only_probability',
         'prematch_probability_delta', 'prematch_available', 'prematch_source',
         'prematch_home', 'prematch_draw', 'prematch_away',
@@ -5247,6 +5386,8 @@ function adayGecmisiCsvOlustur(records) {
             record.selectorV2RawProbability, record.selectorV2Threshold,
             record.selectorV2MinimumOdd, record.selectorV2Eligible,
             Array.isArray(record.selectorV2Reasons) ? record.selectorV2Reasons.join(' | ') : null,
+            record.tariffEnabled, record.tariffVersion, record.tariffSlot,
+            record.tariffRuleId, record.tariffEdgeField, record.tariffV16Edge,
             record.minimumEdgeAtEvaluation,
             record.minimumOddAtEvaluation, record.modelVariant,
             record.liveOnlyProbability, record.prematchProbabilityDelta,
@@ -5306,12 +5447,18 @@ app.get(
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
             currentMinimumEdge: state.globalMinEdge,
-            minimumSignalOdd: DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
+            minimumSignalOdd: ACTIVE_MIN_SIGNAL_ODD,
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
                 version: dinoSelectorV2.MODEL.version,
                 policy: { ...dinoSelectorV2.MODEL.policy, activeMinimumOdd: DINO_V2_MIN_ODD },
                 edgeDecisionImpact: false
+            },
+            marketTariff: {
+                enabled: DINO_V17_TARIFF_ENABLED,
+                version: marketTariff.VERSION,
+                primaryRules: marketTariff.PRIMARY_RULES,
+                followRules: marketTariff.FOLLOW_RULES
             },
             precisionMode: {
                 ...PRECISION_MODE,
@@ -5776,7 +5923,17 @@ app.get(
                 state.globalMinEdge,
 
             minimumSignalOdd:
-                DINO_V2_SELECTOR_ENABLED ? DINO_V2_MIN_ODD : MIN_SIGNAL_ODD,
+                ACTIVE_MIN_SIGNAL_ODD,
+
+            marketTariff: {
+                enabled: DINO_V17_TARIFF_ENABLED,
+                version: marketTariff.VERSION,
+                minimumOdd: marketTariff.MINIMUM_ODD,
+                primaryRules: marketTariff.PRIMARY_RULES,
+                followRules: marketTariff.FOLLOW_RULES,
+                maximumSignalsPerFixture: 2,
+                underMarketsDisabled: true
+            },
 
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
@@ -5898,13 +6055,15 @@ app.listen(
 
 
         addSystemLog(
-            DINO_V2_SELECTOR_ENABLED
+            DINO_V17_TARIFF_ENABLED
+                ? `> 🗺️ V17 DONDURULMUŞ TARİFE AKTİF: ${marketTariff.VERSION} | oran ${marketTariff.MINIMUM_ODD.toFixed(2)}+ | bütün ALT marketleri kapalı | maç başına 1 ilk + uygun olursa 1 ileri dakika takip.`
+                : DINO_V2_SELECTOR_ENABLED
                 ? `> 🧬 V16 ikinci katman AKTİF: eşik %${dinoSelectorV2.MODEL.policy.threshold * 100} | dakika ${dinoSelectorV2.MODEL.policy.minimumMinute}-${dinoSelectorV2.MODEL.policy.maximumMinute} | oran ${DINO_V2_MIN_ODD}+ | EDGE kararı etkilemez.`
                 : `> 🎯 Legacy minimum EDGE: %${state.globalMinEdge}`
         );
 
         addSystemLog(
-            `> 💵 Minimum canlı oran: ${MIN_SIGNAL_ODD.toFixed(2)}`
+            `> 💵 Minimum canlı oran: ${ACTIVE_MIN_SIGNAL_ODD.toFixed(2)}`
         );
 
         addSystemLog(
@@ -5929,13 +6088,17 @@ app.listen(
         );
 
         addSystemLog(
-            DINO_V2_SELECTOR_ENABLED
+            DINO_V17_TARIFF_ENABLED
+                ? "> 🧠 Seçim kuralı: V16 puanı ve EDGE, her marketin dondurulmuş dakika penceresinde ayrı uygulanır; bütün ALT marketleri kapalıdır."
+                : DINO_V2_SELECTOR_ENABLED
                 ? "> 🧠 Seçim kuralı: Dino tek başına sınıf belirlemez; V16 bütün marketleri yeniden puanlar ve maç başına yalnız en güçlü doğrulanmış adayı seçer."
                 : "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 50–80. dakika | 🟢 Güçlü: %75+ ve 50–80. dakika."
         );
 
         addSystemLog(
-            DINO_V2_SELECTOR_ENABLED
+            DINO_V17_TARIFF_ENABLED
+                ? "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına en fazla 1 ilk + yalnız daha ileri dakikada ve farklı markette 1 takip sinyali."
+                : DINO_V2_SELECTOR_ENABLED
                 ? "> 🗃️ Paylaşılan sinyal takibi aktif: V16 maç başına en fazla 1 doğrulanmış sinyal kaydeder."
                 : "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
         );

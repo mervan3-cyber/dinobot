@@ -1,103 +1,73 @@
-# Ubuntu Kurulumu — Dino V16.2 + Grok-Only Kör Test
+# Ubuntu Kurulumu — Dino V17 Hafta Sonu Kör Testi
 
 Bu paket mevcut bot klasörünün üzerine kurulacak güncellemedir. `.env`,
 `dino_signal_history.json`, `dino_candidate_history.json` ve önbellek JSON
-dosyalarınızı silmeyin. ZIP içindeki dosyaları aynı dizin yapısıyla sunucuya
-kopyalayın.
+dosyalarınızı silmeyin. ZIP içindeki dosyaları aynı dizin yapısıyla kopyalayın.
 
-## V16 için zorunlu yeni dosyalar
+## Yeni karar sistemi
 
-- `server.js`
-- `dino_selector_v2.js`
-- `dino_selector_v2.json`
-- `signal_tracker.js`
-- `candidate_tracker.js`
-- `shadow_power.js`
-- `prematch_odds.js`
-- `grok_only.js`
-- `public/index.html`
-- `index.html`
-- `tahmin_yap.py`
-- `dino_live_models_all.json`
-- `package.json`
+V17, tek bir genel V16/EDGE sınırı kullanmaz. Her marketi kendi dondurulmuş
+dakika, V16 ve EDGE aralığında değerlendirir. Minimum canlı oran `1.50`dir.
+Bütün `*_ALT` marketleri kapalıdır.
 
-`dino_selector_v2.js` veya `dino_selector_v2.json` eksik olursa V16 başlamaz.
-Bu güvenli davranış yanlışlıkla eski karar sistemine dönülmesini önler.
+İlk sinyal haritası:
 
-## V16 nasıl karar verir?
+| Market | Dakika | Minimum V16 | EDGE |
+|---|---:|---:|---|
+| 0.5 ÜST | 45–74 | %50 | Dino EDGE -10…-5 |
+| 1.5 ÜST | 40–44 | %50 | V16 EDGE en fazla +4 |
+| 2.5 ÜST | 25–34 | %50 | Dino EDGE -2.5…+2 |
+| 3.5 ÜST | 25–80 | %60 | V16 EDGE -10…0 |
+| MS1 | 25–54 | %55 | V16 EDGE -2.5…+2 |
+| X | 61–70 | %50 | Dino EDGE 0…+2 |
 
-1. Eski Dino, bütün market olasılıklarını üretir.
-2. V16; Dino, canlı oran/piyasa, pre-match, skor, dakika ve canlı tempoyu
-   ikinci kez birlikte puanlar.
-3. Yalnız V16 puanı en az `%76`, dakika `60–80` ve oran en az `1.40` olan ön
-   adaylar değerlendirmeye geçer.
-4. `/teams/statistics`, `/standings` ve `/predictions` cevaplarında takım,
-   fixture, lig/sezon kimliği ve en az 5 ev/deplasman örneklemi doğrulanır.
-5. Güç bağlamının tam olmaması tek başına veto değildir; bulunan alanlar V16
-   girdisi ve denetim verisi olarak kullanılır.
-6. Telegram öncesinde fixture, canlı istatistik ve canlı oran yeniden çekilir;
-   Python ve V16 ikinci kez çalışır. Sonra 12 saniyelik ikinci doğrulamada skor,
-   canlı oran ve olay akışı kontrol edilir.
-7. Her maçtan en fazla bir market gönderilir.
+Takip sinyali haritası:
 
-EDGE JSON/CSV denetiminde saklanır fakat V16 Telegram kararını etkilemez.
-Pre-match desteği V16 model girdisidir; ayrıca sabit bir pre-destek barajı yoktur.
-`0.5 ALT`, `0.5 ÜST` ve `1.5 ALT` eğitim sonucuna göre V16 seçimine kapalıdır.
+| Market | Dakika | Minimum V16 | EDGE |
+|---|---:|---:|---|
+| 4.5 ÜST | 25–54 | %55 | Dino EDGE -10…-5 |
+| MS1 | 25–54 | %55 | V16 EDGE -2.5…+2 |
+| MS2 | 45–54 | %50 | V16 EDGE +2…+4 |
 
-## Oran ayarı
+Takip sinyali yalnız aynı maçta ilk sinyal başarıyla gönderilmişse, maç
+dakikası daha ilerideyse ve market ilk sinyalden farklıysa gönderilir. Maç
+başına en fazla bir ilk ve bir takip sinyali vardır. Aynı market tekrarlanmaz.
 
-Varsayılan doğruluk modu:
+`Dino EDGE`, Dino yüzdesi eksi oranın ham piyasa yüzdesidir. `V16 EDGE`, V16
+yüzdesi eksi oranın ham piyasa yüzdesidir. Paneldeki genel EDGE ayarı bu V17
+haritasını değiştirmez.
 
-    DINO_V2_MIN_ODD=1.40
+Takım gücü, standings, API prediction, pre-match ve canlı tempo V16 puanına
+girdi olmaya devam eder. Telegram öncesinde fixture, istatistik, oran ve olay
+akışı yeniden doğrulanır. Grok-only bölümü ayrı kör test olarak kalır ve V17
+kararını etkilemez.
 
-Kullanıcı isterse `.env` içinde `1.60` yapabilir:
+## Dosyalar
 
-    DINO_V2_MIN_ODD=1.60
+Yeni `market_tariff.js` dosyası zorunludur. `server.js`, `signal_tracker.js`,
+`market_tariff.js`, `dino_selector_v2.js`, `dino_selector_v2.json`,
+`candidate_tracker.js`, `shadow_power.js`, `prematch_odds.js`, `grok_only.js`,
+`tahmin_yap.py`, `dino_live_models_all.json`, `public/index.html`, `index.html`,
+`package.json` ve `package-lock.json` birlikte yüklenmelidir.
 
-Ancak eldeki kör testte `1.60` doğruluğu artırmadı; tersine uygun dokuz adayın
-yalnız dördü kazandı. Bu yüzden V16 doğruluk modunun varsayılanı `1.40`tır.
+## Ortam ayarları
 
-Güvenli geri dönüş için V16 kapatılabilir:
+V17 varsayılan olarak açıktır. Acil geri dönüş için:
 
-    DINO_V2_SELECTOR_ENABLED=false
+    DINO_V17_TARIFF_ENABLED=false
 
-Bu satır yalnız acil geri dönüş içindir; normal kullanımda eklenmemelidir.
+Normal kullanımda bu satırı eklemeyin. `DINO_V2_SELECTOR_ENABLED=true`
+kalmalıdır. V17 minimum oranı dondurulmuş `1.50`dir; eski `DINO_V2_MIN_ODD`
+değeri V17 açıkken Telegram sınırını değiştirmez.
 
-Diğer önerilen ortam ayarları:
+Diğer önerilen ayarlar:
 
     PYTHON_BIN=python3
     PREMATCH_BOOKMAKER_NAME=Bet365
     SHADOW_MIN_QUOTA_REMAINING=1500
 
-API, Telegram veya Gemini anahtarlarını ekran görüntüsünde ya da paylaşımda
-göstermeyin.
-
-## Sadece Yapay Zekâ kör testi
-
-Bu bölüm ana V16/Python/Telegram sisteminden tamamen ayrıdır. Yalnızca gerçek
-canlı istatistikleri tam olan `25–80` dakika maçlarını Grok'a yollar. Takım,
-lig ve fixture kimlikleri modele gönderilmez. Grok o anda açık olan 1X2 ve
-toplam gol marketlerinden oranı en az `1.50` olan tek bir marketi seçebilir
-veya pas geçebilir.
-
-`.env` dosyanıza, aldığınız OpenAI-uyumlu bağlantının bilgilerini ekleyin:
-
-    AI_BASE_URL=http://SUNUCU_ADRESI:PORT/v1
-    AI_API_KEY=BURAYA_GIZLI_ANAHTAR
-    AI_MODEL=grok-4.6
-    GROK_ONLY_ENABLED=true
-    GROK_ONLY_MIN_ODD=1.50
-
-İsteğe bağlı dayanıklılık ayarları:
-
-    GROK_ONLY_BATCH_SIZE=2
-    GROK_ONLY_TIMEOUT_MS=90000
-
-Anahtar hiçbir loga, panel cevabına veya JSON/CSV dışa aktarımına yazılmaz.
-Grok bağlantısı hata verirse yalnız bu kör-test turu hata kaydı alır; V16 ve
-Telegram taraması beklemez veya durmaz. Grok seçimi Telegram'a gönderilmez.
-Sonuçlar `dino_grok_only_history.json` dosyasında kalır ve paneldeki
-`Sadece Yapay Zekâ Kör Testi` bölümünden JSON/CSV indirilebilir.
+API, Telegram veya yapay zekâ anahtarlarını ekran görüntüsünde ya da
+paylaşımda göstermeyin.
 
 ## Başlatma
 
@@ -105,27 +75,24 @@ Sonuçlar `dino_grok_only_history.json` dosyasında kalır ve paneldeki
     pm2 restart BOT_SUREC_ADI --update-env
     pm2 save
 
-İlk kurulumda PM2 yoksa `node server.js` ile de başlatılabilir.
-
-## Doğru sürümü kontrol etme
-
 Başlangıç logunda şunlar görünmelidir:
 
-    ml-v16.2-grok-only-blind-test-ubuntu-2026-08-31
-    V16 ikinci katman AKTİF: eşik %76 | dakika 60-80 | oran 1.4+ | EDGE kararı etkilemez.
-    API güç bağlamı AÇIK ... | EKSİK BAĞLAM TEK BAŞINA VETO DEĞİL
+    ml-v17.1-weekend-market-map-ubuntu-2026-09-04
+    V17 DONDURULMUŞ TARİFE AKTİF
+    Minimum canlı oran: 1.50
 
-Panelde `Sadece Yapay Zekâ Kör Testi`, `V16 Makine Ayarları` ve
-`V16 Güç Bağlamı` kartları görünmelidir.
-Görünmüyorsa mutlaka `public/index.html` yanlış yere kopyalanmıştır.
+Panelde `V17 Dondurulmuş Tarife`, `İlk sinyal başarı` ve `Takip başarı`
+ifadeleri görünmelidir. Görünmüyorsa `public/index.html` yanlış yere
+kopyalanmıştır.
 
 ## Korunacak veri dosyaları
 
 - `dino_signal_history.json`: Telegram'a giden sinyaller ve sonuçları.
 - `dino_candidate_history.json`: gönderilmeyenler dahil bütün market anları.
-- `dino_prematch_cache.json`: fixture bazında pre-match önbelleği.
+- `dino_prematch_cache.json`: pre-match önbelleği.
 - `dino_shadow_power_cache.json`: takım/standings/prediction önbelleği.
-- `dino_grok_only_history.json`: Grok seçim/pas/hata kararları ve sonuçları.
+- `dino_grok_only_history.json`: ayrı Grok kör testi.
 
-Yeni JSON ve CSV dışa aktarımlarında `selectorV2Probability`, V16 red nedenleri,
-tam güç bağlamı ve sonuç alanları eğitim için saklanır.
+Yeni JSON/CSV kayıtlarında `tariffVersion`, `tariffSlot`, `tariffRuleId`, V16
+puanı, Dino EDGE, V16 EDGE ve sonuç alanları yer alır. Böylece yarınki kör test
+tarife değiştirilmeden denetlenebilir.

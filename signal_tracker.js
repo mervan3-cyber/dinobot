@@ -144,6 +144,14 @@ class SignalTracker {
         );
     }
 
+    findSignal(fixtureId, signalType) {
+        const fixture = Number(fixtureId);
+        const type = normalizeSignalType(signalType);
+        return this.data.signals.find(
+            signal => Number(signal.fixtureId) === fixture && signal.signalType === type
+        ) || null;
+    }
+
     recordSent(payload) {
         const fixtureId = Number(payload?.fixtureId);
         const signalType = normalizeSignalType(payload?.signalType);
@@ -179,6 +187,10 @@ class SignalTracker {
             selectorV2Probability: numberOrNull(payload.selectorV2Probability),
             selectorV2RawProbability: numberOrNull(payload.selectorV2RawProbability),
             selectorV2ModelVersion: payload.selectorV2ModelVersion || null,
+            tariffVersion: payload.tariffVersion || null,
+            tariffSlot: payload.tariffSlot || null,
+            tariffRuleId: payload.tariffRuleId || null,
+            v16Edge: numberOrNull(payload.v16Edge),
             prematchSource: payload.prematchSource || null,
             prematchProbabilities: payload.prematchProbabilities || null,
             prematchMarketSupport: numberOrNull(payload.prematchMarketSupport),
@@ -294,6 +306,11 @@ class SignalTracker {
             surprise: emptyBucket(),
             strong: emptyBucket()
         };
+        const byTariffSlot = {
+            primary: emptyBucket(),
+            follow: emptyBucket(),
+            legacy: emptyBucket()
+        };
         const byMarket = {};
         const uniqueFixtures = new Set();
 
@@ -304,6 +321,11 @@ class SignalTracker {
             const type = normalizeSignalType(signal.signalType);
             addToBucket(byType[type], signal);
 
+            const tariffSlot = signal.tariffSlot === 'primary' || signal.tariffSlot === 'follow'
+                ? signal.tariffSlot
+                : 'legacy';
+            addToBucket(byTariffSlot[tariffSlot], signal);
+
             const market = signal.market || 'Bilinmiyor';
             if (!byMarket[market]) byMarket[market] = emptyBucket();
             addToBucket(byMarket[market], signal);
@@ -312,6 +334,9 @@ class SignalTracker {
         finalizeBucket(overall);
         finalizeBucket(byType.surprise);
         finalizeBucket(byType.strong);
+        finalizeBucket(byTariffSlot.primary);
+        finalizeBucket(byTariffSlot.follow);
+        finalizeBucket(byTariffSlot.legacy);
         for (const bucket of Object.values(byMarket)) finalizeBucket(bucket);
 
         return {
@@ -319,6 +344,7 @@ class SignalTracker {
             uniqueFixtures: uniqueFixtures.size,
             overall,
             byType,
+            byTariffSlot,
             byMarket
         };
     }
