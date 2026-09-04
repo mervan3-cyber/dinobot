@@ -39,14 +39,13 @@ haritasını değiştirmez.
 
 Takım gücü, standings, API prediction, pre-match ve canlı tempo V16 puanına
 girdi olmaya devam eder. Telegram öncesinde fixture, istatistik, oran ve olay
-akışı yeniden doğrulanır. Grok-only bölümü ayrı kör test olarak kalır ve V17
-kararını etkilemez.
+akışı yeniden doğrulanır.
 
 ## Dosyalar
 
 Yeni `market_tariff.js` dosyası zorunludur. `server.js`, `signal_tracker.js`,
 `market_tariff.js`, `dino_selector_v2.js`, `dino_selector_v2.json`,
-`candidate_tracker.js`, `shadow_power.js`, `prematch_odds.js`, `grok_only.js`,
+`candidate_tracker.js`, `shadow_power.js`, `prematch_odds.js`,
 `tahmin_yap.py`, `dino_live_models_all.json`, `public/index.html`, `index.html`,
 `package.json` ve `package-lock.json` birlikte yüklenmelidir.
 
@@ -77,7 +76,7 @@ paylaşımda göstermeyin.
 
 Başlangıç logunda şunlar görünmelidir:
 
-    ml-v17.1-weekend-market-map-ubuntu-2026-09-04
+    ml-v17.3-operations-panel-ubuntu-2026-09-04
     V17 DONDURULMUŞ TARİFE AKTİF
     Minimum canlı oran: 1.50
 
@@ -91,8 +90,6 @@ kopyalanmıştır.
 - `dino_candidate_history.json`: gönderilmeyenler dahil bütün market anları.
 - `dino_prematch_cache.json`: pre-match önbelleği.
 - `dino_shadow_power_cache.json`: takım/standings/prediction önbelleği.
-- `dino_grok_only_history.json`: ayrı Grok kör testi.
-
 Yeni JSON/CSV kayıtlarında `tariffVersion`, `tariffSlot`, `tariffRuleId`, V16
 puanı, Dino EDGE, V16 EDGE ve sonuç alanları yer alır. Böylece yarınki kör test
 tarife değiştirilmeden denetlenebilir.
