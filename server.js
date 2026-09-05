@@ -28,6 +28,7 @@ const {
 } = require('./shadow_power');
 const dinoSelectorV2 = require('./dino_selector_v2');
 const marketTariff = require('./market_tariff');
+const dinoSelectorV18 = require('./dino_selector_v18');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -37,7 +38,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v17.3-operations-panel-ubuntu-2026-09-04';
+const BUILD_VERSION = 'ml-v18-shadow-comparison-ubuntu-2026-09-05';
 
 app.use(cors());
 app.use(express.json());
@@ -176,6 +177,14 @@ const CANDIDATE_HISTORY_FILE =
         'dino_candidate_history.json'
     );
 
+const V18_SHADOW_HISTORY_FILE =
+    process.env.DINO_V18_SHADOW_HISTORY_FILE
+        ? path.resolve(process.env.DINO_V18_SHADOW_HISTORY_FILE)
+        : path.join(
+            __dirname,
+            'dino_v18_shadow_history.json'
+        );
+
 const PREMATCH_CACHE_FILE =
     path.join(
         __dirname,
@@ -228,6 +237,11 @@ const ACTIVE_MIN_SIGNAL_ODD = DINO_V17_TARIFF_ENABLED
     : DINO_V2_SELECTOR_ENABLED
         ? DINO_V2_MIN_ODD
         : MIN_SIGNAL_ODD;
+
+// V18 yalnızca karşılaştırma için çalışır. Telegram kararını, mevcut V17
+// tarifesini ve fixture gönderim kilitlerini hiçbir şekilde değiştirmez.
+const DINO_V18_SHADOW_ENABLED =
+    String(process.env.DINO_V18_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 
 // Legacy karar hattının pre-match kapılarıdır. V16 aktifken pre-match
 // verisi model girdisi ve denetim kaydı olarak kalır; tek başına Telegram
@@ -339,6 +353,13 @@ const candidateTracker = new CandidateTracker({
     filePath: CANDIDATE_HISTORY_FILE,
     logger: message => addSystemLog(message),
     maxRecords: 50000
+});
+
+const v18ShadowTracker = new SignalTracker({
+    filePath: V18_SHADOW_HISTORY_FILE,
+    logger: message => addSystemLog(
+        String(message).replace('Paylaşılan sinyal', 'V18 gölge sinyal')
+    )
 });
 
 const prematchOddsCache = new PrematchOddsCache({
@@ -3837,6 +3858,79 @@ function paylasilanSinyaliKaydet(mac, firsat, yorum, telegramMesaji) {
 }
 
 
+function v18GolgeAdayiniKaydet(mac, dino, liveOnlyDino, capturedAt) {
+    if (!DINO_V18_SHADOW_ENABLED) return null;
+
+    const fixtureId = Number(mac?.fixture_id);
+    if (!Number.isFinite(fixtureId) || fixtureId <= 0) return null;
+    // Ayrı dosyada her maç için yalnız bir V18 adayı tutulur. Bu kontrol
+    // mevcut V17/Telegram gönderim kilitlerinden tamamen bağımsızdır.
+    if (v18ShadowTracker.hasSignal(fixtureId, 'strong')) return null;
+
+    const evaluation = dinoSelectorV18.evaluateFixture(
+        mac,
+        dino,
+        liveOnlyDino,
+        mac?._selectorShadowContext || null
+    );
+    const selected = evaluation.selected;
+    if (!selected?.score || !selected?.rule) return null;
+
+    const score = selected.score;
+    const oddsData = mac?.canli_oranlar?.[selected.market];
+    const liveOnlyProbability = Number(liveOnlyDino?.[selected.market]);
+    const record = v18ShadowTracker.recordSent({
+        fixtureId,
+        signalType: 'strong',
+        sentAt: capturedAt || new Date().toISOString(),
+        telegramMessageId: null,
+        match: mac?.mac_isim,
+        league: mac?.lig,
+        minute: mac?.dakika,
+        score: mac?.skor,
+        market: selected.market,
+        dinoProbability: Number(score.dinoProbability.toFixed(3)),
+        edge: Number(score.v18Edge.toFixed(3)),
+        odds: Number(score.odds.toFixed(3)),
+        bookmaker: oddsData && typeof oddsData === 'object'
+            ? oddsData.bookmaker || null
+            : null,
+        marketProbability: Number(score.liveProbability.toFixed(3)),
+        modelVariant: 'v18_shadow_only',
+        liveOnlyProbability: Number.isFinite(liveOnlyProbability)
+            ? liveOnlyProbability
+            : null,
+        selectorV2Probability: Number(score.v18Probability.toFixed(3)),
+        selectorV2RawProbability: Number(score.v18Probability.toFixed(3)),
+        selectorV2ModelVersion: dinoSelectorV18.MODEL.version,
+        tariffVersion: dinoSelectorV18.TARIFF.version,
+        tariffSlot: 'primary',
+        tariffRuleId: selected.rule.id,
+        v16Edge: Number(score.v18Edge.toFixed(3)),
+        prematchSource: mac?.prematch_source || null,
+        prematchProbabilities: mac?.prematch_available
+            ? {
+                home: mac.prematch_p_home,
+                draw: mac.prematch_p_draw,
+                away: mac.prematch_p_away
+            }
+            : null,
+        prematchMarketSupport: score.prematchSupport,
+        prematchMarketSource: prematchMarketKaynagi(mac, selected.market),
+        statsSource: mac?.stats_source || null,
+        statsValidation: mac?.stats_validation || null,
+        liveStats: paylasilanCanliStatsAnlikGoruntusu(mac),
+        shadowContext: mac?._selectorShadowContext || null,
+        analysis: null
+    });
+
+    addSystemLog(
+        `> 🧪 V18 GÖLGE ADAYI: ${record.match} | ${record.market} | V18 %${record.selectorV2Probability} | EDGE ${record.edge >= 0 ? '+' : ''}${record.edge} | oran ${record.odds} | Telegram'a etkisi yok.`
+    );
+    return record;
+}
+
+
 function gecerliGolOlaylariniAyikla(events) {
     return (Array.isArray(events) ? events : []).filter(event => {
         if (normalizeText(event?.type) !== 'goal') return false;
@@ -4288,6 +4382,23 @@ async function botuCalistir() {
                 }
             );
             candidateAuditRows.push(...degerlendirme.auditRecords);
+
+            // Challenger yalnız ilk düzenli tarama anını kaydeder. Mevcut
+            // V17 seçimleri olmasa bile çalışır; Telegram ve taze doğrulama
+            // akışının hiçbir kararını değiştirmez.
+            try {
+                v18GolgeAdayiniKaydet(
+                    mac,
+                    dino,
+                    liveOnlyDino,
+                    scanCapturedAt
+                );
+            } catch (error) {
+                addSystemLog(
+                    `> ⚠️ V18 gölge değerlendirmesi atlandı (${mac.mac_isim}): ${error.message}`
+                );
+            }
+
             const firsatlar = degerlendirme.selections;
             if (!Array.isArray(firsatlar) || firsatlar.length === 0) {
                 addSystemLog(
@@ -4705,9 +4816,11 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
 
     const signalFixtureIDs = signalTracker.unresolvedFixtureIds();
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
+    const v18ShadowFixtureIDs = v18ShadowTracker.unresolvedFixtureIds();
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
-        ...candidateFixtureIDs
+        ...candidateFixtureIDs,
+        ...v18ShadowFixtureIDs
     ])];
     if (fixtureIDs.length === 0) {
         return {
@@ -4715,7 +4828,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures: 0,
             resolvedSignals: 0,
             resolvedCandidates: 0,
-            message: 'Bekleyen paylaşılan sinyal veya aday yok.'
+            resolvedV18Shadow: 0,
+            message: 'Bekleyen paylaşılan sinyal, aday veya V18 gölge sinyali yok.'
         };
     }
 
@@ -4723,6 +4837,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     let checkedFixtures = 0;
     let resolvedSignals = 0;
     let resolvedCandidates = 0;
+    let resolvedV18Shadow = 0;
 
     try {
         for (
@@ -4745,12 +4860,13 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             for (const fixture of fixtures) {
                 resolvedSignals += signalTracker.settleFixture(fixture);
                 resolvedCandidates += candidateTracker.settleFixture(fixture);
+                resolvedV18Shadow += v18ShadowTracker.settleFixture(fixture);
             }
         }
 
-        if (resolvedSignals > 0 || resolvedCandidates > 0 || manuel) {
+        if (resolvedSignals > 0 || resolvedCandidates > 0 || resolvedV18Shadow > 0 || manuel) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedV18Shadow} V18 gölge sonuçlandı.`
             );
         }
 
@@ -4759,8 +4875,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures,
             resolvedSignals,
             resolvedCandidates,
-            message: resolvedSignals > 0 || resolvedCandidates > 0
-                ? `${resolvedSignals} sinyal ve ${resolvedCandidates} aday sonucu güncellendi.`
+            resolvedV18Shadow,
+            message: resolvedSignals > 0 || resolvedCandidates > 0 || resolvedV18Shadow > 0
+                ? `${resolvedSignals} sinyal, ${resolvedCandidates} aday ve ${resolvedV18Shadow} V18 gölge sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -4772,6 +4889,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             checkedFixtures,
             resolvedSignals,
             resolvedCandidates,
+            resolvedV18Shadow,
             message: error.message
         };
     } finally {
@@ -5140,6 +5258,137 @@ app.get(
             `attachment; filename="dino-paylasilan-sinyaller-${dosyaEtiketi}.csv"`
         );
         res.send(`\uFEFF${paylasilanSinyallerCsvOlustur(selection.items)}`);
+    }
+);
+
+
+function v18GolgeCsvOlustur(signals) {
+    const headers = [
+        'shadow_signal_id', 'fixture_id', 'captured_at', 'match', 'league',
+        'minute', 'score', 'market', 'v18_probability', 'v18_edge',
+        'dino_probability', 'market_probability', 'odds', 'bookmaker',
+        'model_version', 'tariff_version', 'rule_id',
+        'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
+    ];
+    const rows = signals.map(signal => {
+        const settlement = signal?.settlement || {};
+        return [
+            signal.signalId, signal.fixtureId, signal.sentAt, signal.match,
+            signal.league, signal.minute, signal.score, signal.market,
+            signal.selectorV2Probability, signal.edge, signal.dinoProbability,
+            signal.marketProbability, signal.odds, signal.bookmaker,
+            signal.selectorV2ModelVersion, signal.tariffVersion,
+            signal.tariffRuleId, settlement.result, settlement.profit,
+            settlement.finalScore, settlement.fixtureStatus,
+            settlement.resolvedAt
+        ].map(csvHucre).join(',');
+    });
+    return [headers.map(csvHucre).join(','), ...rows].join('\n');
+}
+
+
+function mevcutSinyalleriV18DonemineGoreSec(date) {
+    // Karşılaştırma dönemi ilk uygun V18 sinyalinde değil, gölge modunun
+    // sunucuda ilk kez çalışmaya başladığı anda başlar. Böylece V18'in sinyal
+    // bulamadığı saatler de sinyal adedi karşılaştırmasına dürüstçe dahil olur.
+    const shadowStart = v18ShadowTracker.data?.startedAt ||
+        v18ShadowTracker.data?.signals?.[0]?.sentAt || null;
+    return signalTracker.list(100000).filter(signal => {
+        if (shadowStart && new Date(signal.sentAt) < new Date(shadowStart)) return false;
+        return !date || turkiyeTarihAnahtari(signal.sentAt) === date;
+    });
+}
+
+
+app.get(
+    '/api/v18-shadow-history',
+    (req, res) => {
+        const allSignals = v18ShadowTracker.list(100000);
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            allSignals,
+            'sentAt'
+        );
+        if (!selection) return;
+        const currentPeriodSignals = mevcutSinyalleriV18DonemineGoreSec(null);
+        // Tarih menüsünde iki tarafın birleşimini göster. V18'in sıfır sinyal
+        // ürettiği ama mevcut sistemin sinyal verdiği bir gün gizlenmemeli.
+        selection.filter.availableDates = [...new Set([
+            ...selection.filter.availableDates,
+            ...currentPeriodSignals
+                .map(signal => turkiyeTarihAnahtari(signal?.sentAt))
+                .filter(Boolean)
+        ])].sort((left, right) => right.localeCompare(left));
+        const currentSignals = mevcutSinyalleriV18DonemineGoreSec(selection.date);
+        res.json({
+            enabled: DINO_V18_SHADOW_ENABLED,
+            decisionImpact: false,
+            modelVersion: dinoSelectorV18.MODEL.version,
+            tariffVersion: dinoSelectorV18.TARIFF.version,
+            filter: selection.filter,
+            summary: v18ShadowTracker.summary(selection.items),
+            currentSystemSummary: signalTracker.summary(currentSignals),
+            signals: v18ShadowTracker.list(req.query.limit, selection.items)
+        });
+    }
+);
+
+
+app.get(
+    '/api/v18-shadow-history/export',
+    (req, res) => {
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            v18ShadowTracker.list(100000),
+            'sentAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
+        const payload = v18ShadowTracker.exportPayload({
+            format: 'dino-v18-shadow-signals',
+            version: 1,
+            buildVersion: BUILD_VERSION,
+            decisionImpact: false,
+            model: {
+                version: dinoSelectorV18.MODEL.version,
+                trainingThrough: dinoSelectorV18.MODEL.trainingThrough
+            },
+            tariff: dinoSelectorV18.TARIFF,
+            historyFilter: selection.filter,
+            currentSystemSummary: signalTracker.summary(
+                mevcutSinyalleriV18DonemineGoreSec(selection.date)
+            ),
+            note: 'V18 yalnız gölge modunda çalışır; Telegram kararını etkilemez.'
+        }, selection.items);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-v18-golge-sinyaller-${dosyaEtiketi}.json"`
+        );
+        res.send(JSON.stringify(payload, null, 2));
+    }
+);
+
+
+app.get(
+    '/api/v18-shadow-history/export.csv',
+    (req, res) => {
+        const selection = gecmisSeciminiHazirla(
+            req,
+            res,
+            v18ShadowTracker.list(100000),
+            'sentAt'
+        );
+        if (!selection) return;
+        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="dino-v18-golge-sinyaller-${dosyaEtiketi}.csv"`
+        );
+        res.send(`\uFEFF${v18GolgeCsvOlustur(selection.items)}`);
     }
 );
 
@@ -5795,6 +6044,19 @@ app.get(
                 summary: candidateTracker.summary()
             },
 
+            v18ShadowTracking: {
+                enabled: DINO_V18_SHADOW_ENABLED,
+                decisionImpact: false,
+                modelVersion: dinoSelectorV18.MODEL.version,
+                trainingThrough: dinoSelectorV18.MODEL.trainingThrough,
+                tariffVersion: dinoSelectorV18.TARIFF.version,
+                minimumOdd: dinoSelectorV18.TARIFF.minimumOdd,
+                maximumOdd: dinoSelectorV18.TARIFF.maximumOdd,
+                markets: dinoSelectorV18.TARIFF.portfolioMarkets,
+                maximumSignalsPerFixture: 1,
+                summary: v18ShadowTracker.summary()
+            },
+
             nextRunTime:
                 nextRunTime,
 
@@ -5817,6 +6079,8 @@ signalTracker.load();
 
 candidateTracker.load();
 
+v18ShadowTracker.load();
+
 prematchOddsCache.load();
 
 shadowPowerCache.load();
@@ -5838,6 +6102,12 @@ app.listen(
 
         addSystemLog(
             `> 🧩 Sürüm: ${BUILD_VERSION}`
+        );
+
+        addSystemLog(
+            DINO_V18_SHADOW_ENABLED
+                ? `> 🧪 V18 GÖLGE MODU AÇIK: ${dinoSelectorV18.MODEL.version} + ${dinoSelectorV18.TARIFF.version} | karar etkisi YOK | Telegram YOK | maç başına en fazla 1 kayıt.`
+                : '> 🧪 V18 gölge modu kapalı.'
         );
 
 

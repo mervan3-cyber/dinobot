@@ -1,0 +1,273 @@
+{
+  "format": "dino-v18-market-tariff",
+  "version": "v18.0-challenger-2026-09-05",
+  "status": "challenger-not-production",
+  "selectedBeforeFinalHoldout": true,
+  "modelArtifact": "dino_selector_v18.json",
+  "modelFamilySelectionDates": [
+    "2026-08-29",
+    "2026-08-30",
+    "2026-08-31"
+  ],
+  "ruleDiscoveryDates": [
+    "2026-08-29",
+    "2026-08-30",
+    "2026-08-31"
+  ],
+  "ruleConfirmationDates": [
+    "2026-09-01",
+    "2026-09-02",
+    "2026-09-03"
+  ],
+  "finalHoldoutDate": "2026-09-04",
+  "minimumOdd": 1.5,
+  "maximumOdd": 4.0,
+  "altMarketsEnabled": false,
+  "portfolioMarkets": [
+    "0.5_UST",
+    "2.5_UST",
+    "MS2",
+    "X"
+  ],
+  "primaryRules": [
+    {
+      "market": "0.5_UST",
+      "minuteLow": 25,
+      "minuteHigh": 64,
+      "probabilityMinimum": 45,
+      "edgeLow": 2.5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18C-05UST"
+    },
+    {
+      "market": "2.5_UST",
+      "minuteLow": 45,
+      "minuteHigh": 64,
+      "probabilityMinimum": 60,
+      "edgeLow": 5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18C-25UST"
+    },
+    {
+      "market": "MS2",
+      "minuteLow": 25,
+      "minuteHigh": 44,
+      "probabilityMinimum": 65,
+      "edgeLow": 5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18C-MS2"
+    },
+    {
+      "market": "X",
+      "minuteLow": 75,
+      "minuteHigh": 80,
+      "probabilityMinimum": 65,
+      "edgeLow": 5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18C-X"
+    }
+  ],
+  "followPolicy": {
+    "enabled": false,
+    "reason": "Only five second-signal observations existed; evidence is insufficient for production.",
+    "maximumSignalsPerFixture": 1
+  },
+  "audit": {
+    "discovery": {
+      "signals": 49,
+      "fixtures": 49,
+      "wins": 44,
+      "losses": 5,
+      "hitRate": 89.8,
+      "wilson80Lower": 82.9,
+      "profit": 24.664,
+      "roi": 50.3,
+      "averageOdds": 1.674,
+      "maximumLossStreak": 1,
+      "maximumDrawdown": 1.0,
+      "byDay": {
+        "2026-08-29": {
+          "signals": 23,
+          "wins": 20,
+          "losses": 3,
+          "hitRate": 87.0,
+          "profit": 11.271,
+          "roi": 49.0
+        },
+        "2026-08-30": {
+          "signals": 17,
+          "wins": 16,
+          "losses": 1,
+          "hitRate": 94.1,
+          "profit": 9.415,
+          "roi": 55.4
+        },
+        "2026-08-31": {
+          "signals": 9,
+          "wins": 8,
+          "losses": 1,
+          "hitRate": 88.9,
+          "profit": 3.978,
+          "roi": 44.2
+        }
+      },
+      "byMarket": {
+        "0.5_UST": {
+          "signals": 8,
+          "wins": 7,
+          "losses": 1,
+          "hitRate": 87.5,
+          "roi": 36.3
+        },
+        "2.5_UST": {
+          "signals": 25,
+          "wins": 22,
+          "losses": 3,
+          "hitRate": 88.0,
+          "roi": 57.5
+        },
+        "MS2": {
+          "signals": 8,
+          "wins": 8,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 55.0
+        },
+        "X": {
+          "signals": 8,
+          "wins": 7,
+          "losses": 1,
+          "hitRate": 87.5,
+          "roi": 37.4
+        }
+      }
+    },
+    "validation": {
+      "signals": 18,
+      "fixtures": 18,
+      "wins": 16,
+      "losses": 2,
+      "hitRate": 88.9,
+      "wilson80Lower": 76.0,
+      "profit": 7.918,
+      "roi": 44.0,
+      "averageOdds": 1.631,
+      "maximumLossStreak": 1,
+      "maximumDrawdown": 1.0,
+      "byDay": {
+        "2026-09-01": {
+          "signals": 1,
+          "wins": 1,
+          "losses": 0,
+          "hitRate": 100.0,
+          "profit": 0.525,
+          "roi": 52.5
+        },
+        "2026-09-02": {
+          "signals": 8,
+          "wins": 6,
+          "losses": 2,
+          "hitRate": 75.0,
+          "profit": 1.464,
+          "roi": 18.3
+        },
+        "2026-09-03": {
+          "signals": 9,
+          "wins": 9,
+          "losses": 0,
+          "hitRate": 100.0,
+          "profit": 5.929,
+          "roi": 65.9
+        }
+      },
+      "byMarket": {
+        "0.5_UST": {
+          "signals": 5,
+          "wins": 5,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 56.0
+        },
+        "2.5_UST": {
+          "signals": 4,
+          "wins": 3,
+          "losses": 1,
+          "hitRate": 75.0,
+          "roi": 30.6
+        },
+        "MS2": {
+          "signals": 5,
+          "wins": 4,
+          "losses": 1,
+          "hitRate": 80.0,
+          "roi": 27.7
+        },
+        "X": {
+          "signals": 4,
+          "wins": 4,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 62.7
+        }
+      }
+    },
+    "holdout": {
+      "signals": 3,
+      "fixtures": 3,
+      "wins": 3,
+      "losses": 0,
+      "hitRate": 100.0,
+      "wilson80Lower": 64.6,
+      "profit": 1.65,
+      "roi": 55.0,
+      "averageOdds": 1.55,
+      "maximumLossStreak": 0,
+      "maximumDrawdown": 0.0,
+      "byDay": {
+        "2026-09-04": {
+          "signals": 3,
+          "wins": 3,
+          "losses": 0,
+          "hitRate": 100.0,
+          "profit": 1.65,
+          "roi": 55.0
+        }
+      },
+      "byMarket": {
+        "0.5_UST": {
+          "signals": 1,
+          "wins": 1,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 55.0
+        },
+        "2.5_UST": {
+          "signals": 1,
+          "wins": 1,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 60.0
+        },
+        "X": {
+          "signals": 1,
+          "wins": 1,
+          "losses": 0,
+          "hitRate": 100.0,
+          "roi": 50.0
+        }
+      }
+    }
+  }
+}

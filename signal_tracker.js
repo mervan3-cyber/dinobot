@@ -58,7 +58,10 @@ function emptyBucket() {
         voids: 0,
         hitRate: null,
         profit: 0,
-        roi: null
+        roi: null,
+        averageOdds: null,
+        _oddsTotal: 0,
+        _oddsCount: 0
     };
 }
 
@@ -72,11 +75,21 @@ function finalizeBucket(bucket) {
     bucket.roi = staked > 0
         ? Number(((bucket.profit / staked) * 100).toFixed(1))
         : null;
+    bucket.averageOdds = bucket._oddsCount > 0
+        ? Number((bucket._oddsTotal / bucket._oddsCount).toFixed(3))
+        : null;
+    delete bucket._oddsTotal;
+    delete bucket._oddsCount;
     return bucket;
 }
 
 function addToBucket(bucket, signal) {
     bucket.total++;
+    const odds = numberOrNull(signal?.odds);
+    if (odds !== null) {
+        bucket._oddsTotal += odds;
+        bucket._oddsCount++;
+    }
 
     const result = signal?.settlement?.result || null;
     if (!result) {
@@ -100,6 +113,7 @@ class SignalTracker {
         this.logger = logger;
         this.data = {
             version: HISTORY_VERSION,
+            startedAt: null,
             updatedAt: null,
             signals: []
         };
@@ -115,6 +129,7 @@ class SignalTracker {
             const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
             this.data = {
                 version: HISTORY_VERSION,
+                startedAt: parsed?.startedAt || null,
                 updatedAt: parsed?.updatedAt || null,
                 signals: Array.isArray(parsed?.signals) ? parsed.signals : []
             };
@@ -123,6 +138,7 @@ class SignalTracker {
             this.logger(`> ⚠️ Sinyal geçmişi yüklenemedi: ${error.message}`);
             this.data = {
                 version: HISTORY_VERSION,
+                startedAt: null,
                 updatedAt: null,
                 signals: []
             };
@@ -132,6 +148,9 @@ class SignalTracker {
     save() {
         const directory = path.dirname(this.filePath);
         fs.mkdirSync(directory, { recursive: true });
+        if (!this.data.startedAt) {
+            this.data.startedAt = new Date().toISOString();
+        }
         this.data.updatedAt = new Date().toISOString();
         fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
     }
@@ -340,6 +359,7 @@ class SignalTracker {
         for (const bucket of Object.values(byMarket)) finalizeBucket(bucket);
 
         return {
+            startedAt: this.data.startedAt,
             updatedAt: this.data.updatedAt,
             uniqueFixtures: uniqueFixtures.size,
             overall,
