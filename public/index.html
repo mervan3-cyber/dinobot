@@ -276,6 +276,63 @@
             grid-template-columns: repeat(6, minmax(0, 1fr));
         }
 
+        .v18-comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .v18-arm-card {
+            padding: 12px;
+            border: 1px solid #34404c;
+            border-radius: 12px;
+            background: #151a1f;
+        }
+
+        .v18-arm-card.a { border-color: rgba(100,181,246,.52); }
+        .v18-arm-card.b { border-color: rgba(104,214,109,.55); }
+
+        .v18-arm-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 9px;
+            font-weight: 850;
+        }
+
+        .v18-arm-metrics {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .v18-arm-metric {
+            padding: 8px;
+            border-radius: 8px;
+            background: #101419;
+        }
+
+        .v18-arm-metric span { display:block; color:#8d99a7; font-size:.66rem; }
+        .v18-arm-metric strong { display:block; margin-top:3px; color:#f3f6f8; font-size:.94rem; }
+
+        .v18-table-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .v18-table-panel {
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #303a44;
+            border-radius: 11px;
+            background: #11161b;
+        }
+
+        .v18-table-panel h4 { margin: 0 0 8px; }
+
         .tracker-actions {
             display: flex;
             gap: 7px;
@@ -1158,6 +1215,8 @@
             .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .tariff-columns { grid-template-columns: 1fr; }
             .decision-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .v18-comparison-grid,
+            .v18-table-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 640px) {
@@ -1173,6 +1232,7 @@
             .tariff-rule { grid-template-columns: 1fr 1fr; }
             .tracker-actions { justify-content: flex-start; }
             .section-title { align-items: flex-start; flex-direction: column; }
+            .v18-arm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1559,95 +1619,76 @@
         <div class="card" id="section-v18-shadow" style="border-color:rgba(100,181,246,.48);">
             <div class="section-title">
                 <div>
-                    <h3>🧪 V18 Gölge Karşılaştırması</h3>
-                    <p class="muted" id="v18-shadow-updated" style="margin-top:4px;">Yeni model mevcut sistemi etkilemeden aynı tam-stat maçları izler.</p>
+                    <h3>🧪 V18-A / V18-B Gölge Karşılaştırması</h3>
+                    <p class="muted" id="v18-shadow-updated" style="margin-top:4px;">İki tarife aynı canlı maç havuzunda ve ayrı kayıtlarla ölçülür.</p>
                 </div>
                 <div class="tracker-actions">
-                    <input class="table-search" id="v18-shadow-search" type="search" placeholder="Maç veya market ara…" aria-label="V18 gölge tablosunda ara" oninput="filterTableRows(this.value, 'v18-shadow-rows')">
+                    <input class="table-search" id="v18-shadow-search" type="search" placeholder="Maç veya market ara…" aria-label="V18-A/B gölge tablolarında ara" oninput="filterV18ShadowTables(this.value)">
                     <button id="v18-shadow-refresh-btn" type="button" style="background:var(--success);" onclick="refreshV18ShadowResults()">Sonuçları Kontrol Et</button>
-                    <button type="button" style="background:var(--info);" onclick="downloadV18ShadowExport('json')">V18 JSON</button>
-                    <button type="button" style="background:#59636d;" onclick="downloadV18ShadowExport('csv')">V18 CSV</button>
+                    <button type="button" style="background:var(--info);" onclick="downloadV18ShadowExport('a', 'json')">A JSON</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadV18ShadowExport('a', 'csv')">A CSV</button>
+                    <button type="button" style="background:var(--success);" onclick="downloadV18ShadowExport('b', 'json')">B JSON</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadV18ShadowExport('b', 'csv')">B CSV</button>
                 </div>
             </div>
 
             <div class="history-filter">
                 <div class="history-filter-copy">
-                    <strong>📅 Karşılaştırma görünümü</strong>
-                    <span class="muted">İki sistem aynı Türkiye tarihi ve aynı test dönemi üzerinden karşılaştırılır.</span>
+                    <strong>📅 Ortak test görünümü</strong>
+                    <span class="muted">Mevcut, A ve B aynı Türkiye tarihi ve B'nin devreye girdiği ortak başlangıç üzerinden karşılaştırılır.</span>
                 </div>
-                <select id="v18-shadow-date" class="history-date-select" aria-label="V18 gölge tarihi" onchange="changeV18ShadowDate(this.value)">
-                    <option value="">🗂️ Tüm Test Dönemi</option>
+                <select id="v18-shadow-date" class="history-date-select" aria-label="V18-A/B gölge tarihi" onchange="changeV18ShadowDate(this.value)">
+                    <option value="">🗂️ Tüm Ortak Test Dönemi</option>
                 </select>
             </div>
 
-            <div class="metrics signal-metrics">
-                <div class="metric info">
-                    <span class="metric-label">Mevcut sinyal</span>
-                    <span class="metric-value" id="v18-current-total">0</span>
+            <div class="v18-comparison-grid">
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>Mevcut V17</span><span class="mini-badge bg-warning">TELEGRAM</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="v18-current-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / K</span><strong id="v18-current-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="v18-current-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="v18-current-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="v18-current-average-odds">-</strong></div>
+                    </div>
                 </div>
-                <div class="metric success">
-                    <span class="metric-label">Mevcut K / K</span>
-                    <span class="metric-value" id="v18-current-win-loss">0 / 0</span>
+                <div class="v18-arm-card a">
+                    <div class="v18-arm-title"><span>V18-A · Dar tarife</span><span class="mini-badge bg-info" id="v18-a-mode-badge">GÖLGE</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="v18-a-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / K</span><strong id="v18-a-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="v18-a-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="v18-a-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="v18-a-average-odds">-</strong></div>
+                    </div>
                 </div>
-                <div class="metric info">
-                    <span class="metric-label">Mevcut başarı</span>
-                    <span class="metric-value" id="v18-current-hit-rate">-</span>
-                </div>
-                <div class="metric info">
-                    <span class="metric-label">Mevcut ROI</span>
-                    <span class="metric-value" id="v18-current-roi">-</span>
-                </div>
-                <div class="metric info">
-                    <span class="metric-label">Mevcut ort. oran</span>
-                    <span class="metric-value" id="v18-current-average-odds">-</span>
-                </div>
-                <div class="metric info">
-                    <span class="metric-label">V18 gölge sinyal</span>
-                    <span class="metric-value" id="v18-shadow-total">0</span>
-                </div>
-                <div class="metric success">
-                    <span class="metric-label">V18 K / K</span>
-                    <span class="metric-value" id="v18-shadow-win-loss">0 / 0</span>
-                </div>
-                <div class="metric success">
-                    <span class="metric-label">V18 başarı</span>
-                    <span class="metric-value" id="v18-shadow-hit-rate">-</span>
-                </div>
-                <div class="metric success">
-                    <span class="metric-label">V18 ROI</span>
-                    <span class="metric-value" id="v18-shadow-roi">-</span>
-                </div>
-                <div class="metric success">
-                    <span class="metric-label">V18 ort. oran</span>
-                    <span class="metric-value" id="v18-shadow-average-odds">-</span>
+                <div class="v18-arm-card b">
+                    <div class="v18-arm-title"><span>V18-B · Geniş tarife</span><span class="mini-badge bg-success" id="v18-b-mode-badge">GÖLGE</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="v18-b-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / K</span><strong id="v18-b-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="v18-b-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="v18-b-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="v18-b-average-odds">-</strong></div>
+                    </div>
                 </div>
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V18 yalnız 0.5 ÜST, 2.5 ÜST, MS2 ve X tarifesini izler; oran 1.50–4.00, ALT kapalı ve maç başına tek gölge sinyaldir.</p>
+                <p class="muted">A: 0.5/2.5 ÜST, MS2, X. B: aynı çekirdek + 4.5 ÜST ve daha sıkı/geniş MS2. İkisinde de oran 1.50–4.00, bütün ALT marketleri kapalı ve maç başına en fazla 1 sinyal.</p>
                 <span class="mini-badge bg-info" id="v18-shadow-mode-badge">KARARA ETKİSİ YOK</span>
             </div>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Tarih (TSİ)</th>
-                            <th>Maç</th>
-                            <th>Dk.</th>
-                            <th>Market</th>
-                            <th>V18</th>
-                            <th>Dino</th>
-                            <th>V18 EDGE</th>
-                            <th>Oran</th>
-                            <th>Sonuç</th>
-                            <th>Final</th>
-                        </tr>
-                    </thead>
-                    <tbody id="v18-shadow-rows">
-                        <tr><td colspan="10" class="empty-row">Henüz V18 gölge sinyali yok.</td></tr>
-                    </tbody>
-                </table>
+            <div class="v18-table-grid">
+                <div class="v18-table-panel">
+                    <h4>🔵 V18-A kayıtları</h4>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V18</th><th>Dino</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="v18-a-shadow-rows"><tr><td colspan="10" class="empty-row">Henüz V18-A sinyali yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel">
+                    <h4>🟢 V18-B kayıtları</h4>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V18</th><th>Dino</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="v18-b-shadow-rows"><tr><td colspan="10" class="empty-row">Henüz V18-B sinyali yok.</td></tr></tbody></table></div>
+                </div>
             </div>
         </div>
 
@@ -2713,51 +2754,28 @@
             link.remove();
         }
 
-        function renderV18ShadowHistory(data) {
-            const v18 = data?.summary?.overall || {};
-            const current = data?.currentSystemSummary?.overall || {};
-            document.getElementById("v18-current-total").textContent = current.total ?? 0;
-            document.getElementById("v18-current-win-loss").textContent = `${current.wins ?? 0} / ${current.losses ?? 0}`;
-            document.getElementById("v18-current-hit-rate").textContent = formatPercent(current.hitRate);
-            document.getElementById("v18-current-roi").textContent = formatPercent(current.roi);
-            document.getElementById("v18-current-average-odds").textContent = Number.isFinite(Number(current.averageOdds))
-                ? Number(current.averageOdds).toFixed(3)
+        function setV18Summary(prefix, summary) {
+            const values = summary?.overall || {};
+            document.getElementById(`${prefix}-total`).textContent = values.total ?? 0;
+            document.getElementById(`${prefix}-win-loss`).textContent = `${values.wins ?? 0} / ${values.losses ?? 0}`;
+            document.getElementById(`${prefix}-hit-rate`).textContent = formatPercent(values.hitRate);
+            document.getElementById(`${prefix}-roi`).textContent = formatPercent(values.roi);
+            document.getElementById(`${prefix}-average-odds`).textContent = Number.isFinite(Number(values.averageOdds))
+                ? Number(values.averageOdds).toFixed(3)
                 : "-";
-            document.getElementById("v18-shadow-total").textContent = v18.total ?? 0;
-            document.getElementById("v18-shadow-win-loss").textContent = `${v18.wins ?? 0} / ${v18.losses ?? 0}`;
-            document.getElementById("v18-shadow-hit-rate").textContent = formatPercent(v18.hitRate);
-            document.getElementById("v18-shadow-roi").textContent = formatPercent(v18.roi);
-            document.getElementById("v18-shadow-average-odds").textContent = Number.isFinite(Number(v18.averageOdds))
-                ? Number(v18.averageOdds).toFixed(3)
-                : "-";
+        }
 
-            const badge = document.getElementById("v18-shadow-mode-badge");
-            badge.textContent = data?.enabled === false ? "GÖLGE KAPALI" : "KARARA ETKİSİ YOK";
-            badge.className = `mini-badge ${data?.enabled === false ? "bg-danger" : "bg-info"}`;
-            const selectedDate = data?.filter?.date || "";
-            const viewLabel = selectedDate
-                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
-                : "Tüm Test Dönemi";
-            document.getElementById("v18-shadow-updated").textContent = data?.summary?.updatedAt
-                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(data.summary.updatedAt)} · Telegram ve mevcut karar etkisi yok`
-                : `Görünüm: ${viewLabel} · İlk uygun V18 adayı bekleniyor`;
-            syncHistoryDateOptions("v18-shadow-date", data?.filter, selectedDate);
-            const dateSelect = document.getElementById("v18-shadow-date");
-            if (dateSelect?.options?.[0]) {
-                dateSelect.options[0].textContent = "🗂️ Tüm Test Dönemi";
-            }
-
-            const body = document.getElementById("v18-shadow-rows");
+        function renderV18ArmRows(bodyId, signals, label, selectedDate) {
+            const body = document.getElementById(bodyId);
             body.replaceChildren();
-            const signals = Array.isArray(data?.signals) ? data.signals : [];
-            if (signals.length === 0) {
+            if (!Array.isArray(signals) || signals.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
                 cell.colSpan = 10;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
-                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde V18 gölge sinyali yok.`
-                    : "Henüz V18 gölge sinyali yok.";
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${label} sinyali yok.`
+                    : `Henüz ${label} sinyali yok.`;
                 row.appendChild(cell);
                 body.appendChild(row);
                 return;
@@ -2767,11 +2785,9 @@
                 const row = document.createElement("tr");
                 const resultInfo = signalResultInfo(signal?.settlement?.result);
                 const values = [
-                    formatDateTime(signal.sentAt),
-                    signal.match || "-",
+                    formatDateTime(signal.sentAt), signal.match || "-",
                     signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
-                    marketDisplayName(signal.market),
-                    formatPercent(signal.selectorV2Probability),
+                    marketDisplayName(signal.market), formatPercent(signal.selectorV2Probability),
                     formatPercent(signal.dinoProbability),
                     Number.isFinite(Number(signal.edge))
                         ? `%${Number(signal.edge) >= 0 ? "+" : ""}${Number(signal.edge).toFixed(1)}`
@@ -2783,14 +2799,12 @@
                     cell.textContent = String(value);
                     row.appendChild(cell);
                 }
-
                 const resultCell = document.createElement("td");
                 const resultBadge = document.createElement("span");
                 resultBadge.className = `result-label ${resultInfo.className}`;
                 resultBadge.textContent = resultInfo.text;
                 resultCell.appendChild(resultBadge);
                 row.appendChild(resultCell);
-
                 const finalCell = document.createElement("td");
                 finalCell.textContent = signal?.settlement?.finalScore || "-";
                 row.appendChild(finalCell);
@@ -2798,13 +2812,50 @@
             }
         }
 
+        function renderV18ShadowHistory(data) {
+            setV18Summary("v18-current", data?.currentSystemSummary);
+            setV18Summary("v18-a", data?.v18A?.summary);
+            setV18Summary("v18-b", data?.v18B?.summary);
+
+            for (const [key, arm] of [["a", data?.v18A], ["b", data?.v18B]]) {
+                const badge = document.getElementById(`v18-${key}-mode-badge`);
+                badge.textContent = arm?.enabled === false ? "KAPALI" : "GÖLGE";
+                badge.className = `mini-badge ${arm?.enabled === false ? "bg-danger" : key === "a" ? "bg-info" : "bg-success"}`;
+            }
+            const bothOff = data?.v18A?.enabled === false && data?.v18B?.enabled === false;
+            const modeBadge = document.getElementById("v18-shadow-mode-badge");
+            modeBadge.textContent = bothOff ? "İKİ KOL KAPALI" : "KARARA ETKİSİ YOK";
+            modeBadge.className = `mini-badge ${bothOff ? "bg-danger" : "bg-info"}`;
+
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
+            const updatedCandidates = [data?.v18A?.summary?.updatedAt, data?.v18B?.summary?.updatedAt]
+                .filter(Boolean)
+                .sort();
+            const lastUpdated = updatedCandidates.at(-1);
+            document.getElementById("v18-shadow-updated").textContent = lastUpdated
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · A/B karar ve Telegram hattından bağımsız`
+                : `Görünüm: ${viewLabel} · İlk uygun V18-A/B adayı bekleniyor`;
+            syncHistoryDateOptions("v18-shadow-date", data?.filter, selectedDate);
+            const dateSelect = document.getElementById("v18-shadow-date");
+            if (dateSelect?.options?.[0]) dateSelect.options[0].textContent = "🗂️ Tüm Ortak Test Dönemi";
+
+            renderV18ArmRows("v18-a-shadow-rows", data?.v18A?.signals, "V18-A", selectedDate);
+            renderV18ArmRows("v18-b-shadow-rows", data?.v18B?.signals, "V18-B", selectedDate);
+        }
+
+        function filterV18ShadowTables(value) {
+            filterTableRows(value, "v18-a-shadow-rows");
+            filterTableRows(value, "v18-b-shadow-rows");
+        }
+
         async function fetchV18ShadowHistory() {
             try {
                 const data = await apiFetch(
-                    historyApiPath("/api/v18-shadow-history", 100, v18ShadowDate)
+                    historyApiPath("/api/v18-shadow-comparison", 100, v18ShadowDate)
                 );
                 renderV18ShadowHistory(data || {});
-                applyTableSearch("v18-shadow-search", "v18-shadow-rows");
+                filterV18ShadowTables(document.getElementById("v18-shadow-search")?.value || "");
             } catch (_) {
                 // Challenger uç noktası ana panelin çalışmasını engellemez.
             }
@@ -2839,10 +2890,13 @@
             }
         }
 
-        function downloadV18ShadowExport(format) {
+        function downloadV18ShadowExport(arm, format) {
             const suffix = format === "csv" ? "/export.csv" : "/export";
+            const base = String(arm).toLowerCase() === "b"
+                ? "/api/v18-b-shadow-history"
+                : "/api/v18-shadow-history";
             const link = document.createElement("a");
-            link.href = `${BACKEND_URL}/api/v18-shadow-history${suffix}${historyExportQuery(v18ShadowDate)}`;
+            link.href = `${BACKEND_URL}${base}${suffix}${historyExportQuery(v18ShadowDate)}`;
             link.target = "_blank";
             link.rel = "noopener";
             document.body.appendChild(link);
