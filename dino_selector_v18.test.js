@@ -1,13 +1,22 @@
 'use strict';
 
 const assert = require('assert/strict');
+const path = require('path');
 const v18 = require('./dino_selector_v18');
+const v18BTariff = v18.loadTariff(path.join(__dirname, 'market_tariff_v18_b.json'));
 
 assert.equal(v18.MODEL.trainingThrough, '2026-09-04');
 assert.equal(v18.TARIFF.status, 'challenger-not-production');
 assert.equal(v18.TARIFF.altMarketsEnabled, false);
 assert.equal(v18.TARIFF.followPolicy.maximumSignalsPerFixture, 1);
 assert.deepEqual(v18.TARIFF.portfolioMarkets, ['0.5_UST', '2.5_UST', 'MS2', 'X']);
+assert.equal(v18BTariff.status, 'challenger-shadow-only');
+assert.equal(v18BTariff.altMarketsEnabled, false);
+assert.equal(v18BTariff.followPolicy.maximumSignalsPerFixture, 1);
+assert.deepEqual(
+    v18BTariff.portfolioMarkets,
+    ['0.5_UST', '2.5_UST', 'MS2', 'X', '4.5_UST']
+);
 
 const baseMatch = {
     dakika: 45,
@@ -74,5 +83,29 @@ assert.equal(v18.checkRule(
     { odds: 1.6, v18Probability: 65, v18Edge: -1 },
     rule
 ).eligible, false, 'V18 tarifesinde negatif edge seçilmemeli');
+
+const b45 = v18.ruleFor('4.5_UST', v18BTariff);
+assert.equal(v18.checkRule(
+    { dakika: 60 },
+    { odds: 1.5, v18Probability: 50, v18Edge: 0 },
+    b45
+).eligible, true, 'V18-B 4.5 ÜST alt sınırları dahil olmalı');
+assert.equal(v18.checkRule(
+    { dakika: 59 },
+    { odds: 1.8, v18Probability: 70, v18Edge: 5 },
+    b45
+).eligible, false, 'V18-B 4.5 ÜST 60. dakikadan önce açılmamalı');
+
+const bMs2 = v18.ruleFor('MS2', v18BTariff);
+assert.equal(v18.checkRule(
+    { dakika: 54 },
+    { odds: 1.7, v18Probability: 65, v18Edge: 10 },
+    bMs2
+).eligible, true, 'V18-B MS2 genişletilmiş aralığı çalışmalı');
+assert.equal(v18.checkRule(
+    { dakika: 54 },
+    { odds: 1.7, v18Probability: 70, v18Edge: 9.9 },
+    bMs2
+).eligible, false, 'V18-B MS2 için sıkı +10 EDGE korunmalı');
 
 console.log('V18 shadow runtime tests passed.');

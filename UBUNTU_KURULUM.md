@@ -1,9 +1,9 @@
-# Ubuntu Kurulumu — Dino V18 Gölge Karşılaştırması
+# Ubuntu Kurulumu — Dino V18-A / V18-B Gölge Karşılaştırması
 
 Bu paket mevcut bot klasörünün üzerine kurulacak tam güncellemedir. Üretimdeki
-V17 karar sistemi ve Telegram akışı aynen kalır. V18 aynı tam-stat maçları kendi
-modeliyle ayrıca değerlendirir, ayrı dosyaya kaydeder ve **hiçbir mesaj
-göndermez**.
+V17 karar sistemi ve Telegram akışı aynen kalır. V18-A ile V18-B aynı tam-stat
+maçları aynı modelle, farklı tarifeler ve farklı geçmiş dosyaları üzerinden
+değerlendirir; **hiçbir Telegram mesajı göndermez**.
 
 ## Kurulumdan önce
 
@@ -16,18 +16,19 @@ içindeki boş örneklerle değiştirmeyin:
 - `dino_prematch_cache.json`
 - `dino_shadow_power_cache.json`
 
-V18 ilk çalışmada `dino_v18_shadow_history.json` dosyasını otomatik oluşturur.
-Daha sonraki güncellemelerde bu dosyayı da koruyun.
+V18-A ilk çalışmada `dino_v18_shadow_history.json`, V18-B ise
+`dino_v18_b_shadow_history.json` dosyasını otomatik oluşturur. Daha sonraki
+güncellemelerde iki dosyayı da koruyun.
 İndirme paketi bu kalıcı JSON dosyalarını özellikle içermez; mevcut sunucu
 kayıtlarının üzerine boş veri yazılmaz.
 
-## V18 gölge sistemi
+## V18-A / V18-B gölge sistemi
 
-V18; mevcut taramada zaten alınmış canlı istatistik, skor, oran, pre-match ve
+İki V18 kolu; mevcut taramada zaten alınmış canlı istatistik, skor, oran, pre-match ve
 takım bağlamını kullanır. Ayrı bir canlı maç taraması başlatmaz. Sonuç kontrolü
 de mevcut toplu sonuç sorgusuna katılır.
 
-Sabit kör-test tarifesi şöyledir:
+V18-A dar tarife şöyledir:
 
 | Market | Dakika | Minimum V18 | V18 EDGE | Oran |
 |---|---:|---:|---:|---:|
@@ -36,10 +37,19 @@ Sabit kör-test tarifesi şöyledir:
 | MS2 | 25–44 | %65 | +5…+15 | 1.50–4.00 |
 | X | 75–80 | %65 | +5…+15 | 1.50–4.00 |
 
+V18-B, A'nın 0.5/2.5 ÜST ve X kurallarını aynen tutar; şu iki farkı uygular:
+
+| Market | Dakika | Minimum V18 | V18 EDGE | Oran |
+|---|---:|---:|---:|---:|
+| MS2 | 25–54 | %65 | +10…+15 | 1.50–4.00 |
+| 4.5 ÜST | 60–74 | %50 | 0…+10 | 1.50–4.00 |
+
 - Bütün ALT marketleri kapalıdır.
-- Maç başına en fazla bir V18 gölge kaydı vardır.
+- Her kolda maç başına en fazla bir V18 gölge kaydı vardır.
 - İkinci sinyal yeterli örnek oluşmadığı için kapalıdır.
-- Aynı anda birden çok kural geçerse öncelik: `MS2`, `2.5_UST`, `0.5_UST`, `X`.
+- A'nın aynı-an önceliği: `MS2`, `2.5_UST`, `0.5_UST`, `X`.
+- B'nin aynı-an önceliği geçmişte dondurulan güven sırasıdır: `MS2`,
+  `0.5_UST`, `2.5_UST`, `4.5_UST`, `X`.
 - `V18 EDGE`, V18 olasılığı eksi canlı oranın normalize edilmiş piyasa
   olasılığıdır. Eski Dino/V16 EDGE ile aynı ölçü değildir.
 
@@ -58,6 +68,7 @@ Paketi komple yükleyin. Özellikle şu dosyalar zorunludur:
 - `dino_selector_v18.test.js`
 - `v18_shadow_tracker.test.js`
 - `market_tariff_v18.json`
+- `market_tariff_v18_b.json`
 - `public/index.html`
 - `index.html`
 - `package.json`
@@ -67,10 +78,14 @@ Paketteki diğer çalışma dosyalarını da aynı dizin yapısıyla kopyalayın
 
 ## Ortam ayarı
 
-V18 gölge modu varsayılan olarak açıktır. Normal kullanımda `.env` dosyasına
+İki V18 gölge kolu varsayılan olarak açıktır. A'yı kapatmak için `.env` dosyasına
 yeni satır eklemek gerekmez. Gerekirse yalnız gölge kaydını kapatmak için:
 
     DINO_V18_SHADOW_ENABLED=false
+
+B'yi ayrı kapatmak için:
+
+    DINO_V18_B_SHADOW_ENABLED=false
 
 Bu ayar V17 veya Telegram'ı kapatmaz. Yeniden açmak için satırı silin ya da
 değeri `true` yapın.
@@ -85,14 +100,14 @@ Süreç adınız `dinobot` değilse kendi PM2 süreç adınızı kullanın.
 
 Başlangıç logunda aşağıdakiler görünmelidir:
 
-    ml-v18-shadow-comparison-ubuntu-2026-09-05
-    V18 GÖLGE MODU AÇIK
+    ml-v18-ab-shadow-comparison-ubuntu-2026-09-05
+    V18-A/B GÖLGE
     karar etkisi YOK
     Telegram YOK
 
-Panelde üst menüde `V18 Gölge` bölümü görünür. Bu bölümde V17 ile V18 aynı
-gölge dönemi ve seçilen Türkiye tarihi için yan yana gösterilir. V18 JSON ve CSV
-dosyaları buradan indirilebilir.
+Panelde üst menüde `V18 Gölge` bölümü görünür. Bu bölümde V17, V18-A ve V18-B
+B'nin devreye girdiği ortak test başlangıcı ve seçilen Türkiye tarihi için yan
+yana gösterilir. A ve B JSON/CSV dosyaları ayrı indirilebilir.
 
 ## Sonuçların yorumu
 

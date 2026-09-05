@@ -29,6 +29,12 @@
     "MS2",
     "X"
   ],
+  "marketPriority": {
+    "MS2": 4,
+    "2.5_UST": 3,
+    "0.5_UST": 2,
+    "X": 1
+  },
   "primaryRules": [
     {
       "market": "0.5_UST",

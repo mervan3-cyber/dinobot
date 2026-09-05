@@ -23,6 +23,11 @@ const RULE_PRIORITY = Object.freeze({
 });
 
 
+function loadTariff(filePath) {
+    return JSON.parse(fs.readFileSync(path.resolve(filePath), 'utf8'));
+}
+
+
 function numeric(value) {
     if (value === null || value === undefined || value === '') return Number.NaN;
     const parsed = Number(value);
@@ -330,8 +335,8 @@ function scoreMarket(mac, market, dino, liveOnlyDino, shadowContext = null) {
 }
 
 
-function ruleFor(market) {
-    return TARIFF.primaryRules.find(rule => rule.market === market) || null;
+function ruleFor(market, tariff = TARIFF) {
+    return tariff.primaryRules.find(rule => rule.market === market) || null;
 }
 
 
@@ -356,18 +361,19 @@ function checkRule(mac, score, rule) {
 }
 
 
-function evaluateFixture(mac, dino, liveOnlyDino, shadowContext = null) {
+function evaluateFixture(mac, dino, liveOnlyDino, shadowContext = null, tariff = TARIFF) {
     const evaluations = [];
-    for (const market of TARIFF.portfolioMarkets) {
-        const rule = ruleFor(market);
+    for (const market of tariff.portfolioMarkets) {
+        const rule = ruleFor(market, tariff);
         const score = scoreMarket(mac, market, dino, liveOnlyDino, shadowContext);
         const policy = checkRule(mac, score, rule);
         evaluations.push({ market, rule, score, policy });
     }
 
+    const priority = tariff.marketPriority || RULE_PRIORITY;
     const eligible = evaluations.filter(item => item.policy.eligible);
     eligible.sort((left, right) =>
-        (RULE_PRIORITY[right.market] || 0) - (RULE_PRIORITY[left.market] || 0) ||
+        (priority[right.market] || 0) - (priority[left.market] || 0) ||
         right.score.v18Probability - left.score.v18Probability ||
         right.score.v18Edge - left.score.v18Edge
     );
@@ -379,6 +385,8 @@ module.exports = {
     MODEL,
     TARIFF,
     RULE_PRIORITY,
+    loadTariff,
+    ruleFor,
     scoreMarket,
     checkRule,
     evaluateFixture,

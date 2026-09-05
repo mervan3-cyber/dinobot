@@ -1,0 +1,104 @@
+{
+  "format": "dino-v18-market-tariff",
+  "version": "v18.0-b-shadow-2026-09-05",
+  "label": "V18-B",
+  "status": "challenger-shadow-only",
+  "decisionImpact": false,
+  "modelArtifact": "dino_selector_v18.json",
+  "derivedFrom": "V18-A plus confirmed 4.5_UST and stricter expanded MS2",
+  "minimumOdd": 1.5,
+  "maximumOdd": 4.0,
+  "altMarketsEnabled": false,
+  "portfolioMarkets": [
+    "0.5_UST",
+    "2.5_UST",
+    "MS2",
+    "X",
+    "4.5_UST"
+  ],
+  "marketPriority": {
+    "MS2": 75.3,
+    "0.5_UST": 66.0,
+    "2.5_UST": 64.6,
+    "4.5_UST": 60.2,
+    "X": 56.6
+  },
+  "primaryRules": [
+    {
+      "market": "0.5_UST",
+      "minuteLow": 25,
+      "minuteHigh": 64,
+      "probabilityMinimum": 45,
+      "edgeLow": 2.5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18B-05UST"
+    },
+    {
+      "market": "2.5_UST",
+      "minuteLow": 45,
+      "minuteHigh": 64,
+      "probabilityMinimum": 60,
+      "edgeLow": 5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18B-25UST"
+    },
+    {
+      "market": "MS2",
+      "minuteLow": 25,
+      "minuteHigh": 54,
+      "probabilityMinimum": 65,
+      "edgeLow": 10,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18B-MS2"
+    },
+    {
+      "market": "X",
+      "minuteLow": 75,
+      "minuteHigh": 80,
+      "probabilityMinimum": 65,
+      "edgeLow": 5,
+      "edgeHigh": 15,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18B-X"
+    },
+    {
+      "market": "4.5_UST",
+      "minuteLow": 60,
+      "minuteHigh": 74,
+      "probabilityMinimum": 50,
+      "edgeLow": 0,
+      "edgeHigh": 10,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4.0,
+      "edgeField": "v18Edge",
+      "id": "V18B-45UST"
+    }
+  ],
+  "followPolicy": {
+    "enabled": false,
+    "reason": "Second-signal sample is insufficient; both shadow arms stay at one signal per fixture.",
+    "maximumSignalsPerFixture": 1
+  },
+  "historicalAudit": {
+    "dates": "2026-08-29 through 2026-09-04",
+    "signals": 89,
+    "wins": 81,
+    "losses": 8,
+    "hitRate": 91.0,
+    "roi": 51.1,
+    "averageOdds": 1.664,
+    "maximumLossStreak": 2,
+    "warning": "Optimized historical result, not an independent future guarantee. Validate only in shadow mode."
+  }
+}
