@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node market_tariff.test.js && node dino_selector_v18.test.js && node v18_shadow_tracker.test.js"
+    "test": "node market_tariff.test.js && node hybrid_tariff.test.js && node dino_selector_v18.test.js && node v18_shadow_tracker.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",

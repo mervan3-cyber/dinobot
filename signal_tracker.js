@@ -186,7 +186,7 @@ class SignalTracker {
 
         const sentAt = payload.sentAt || new Date().toISOString();
         const record = {
-            signalId: `${fixtureId}-${signalType}-${Date.now()}`,
+            signalId: `${fixtureId}-${signalType}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             fixtureId,
             signalType,
             sentAt,
@@ -206,6 +206,11 @@ class SignalTracker {
             selectorV2Probability: numberOrNull(payload.selectorV2Probability),
             selectorV2RawProbability: numberOrNull(payload.selectorV2RawProbability),
             selectorV2ModelVersion: payload.selectorV2ModelVersion || null,
+            v18Probability: numberOrNull(payload.v18Probability),
+            v18Edge: numberOrNull(payload.v18Edge),
+            decisionModel: payload.decisionModel || null,
+            decisionProbability: numberOrNull(payload.decisionProbability),
+            decisionEdge: numberOrNull(payload.decisionEdge),
             tariffVersion: payload.tariffVersion || null,
             tariffSlot: payload.tariffSlot || null,
             tariffRuleId: payload.tariffRuleId || null,
