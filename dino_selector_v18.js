@@ -6,26 +6,7 @@ const path = require('path');
 const MODEL_PATH = process.env.DINO_V18_MODEL_PATH
     ? path.resolve(process.env.DINO_V18_MODEL_PATH)
     : path.join(__dirname, 'dino_selector_v18.json');
-const TARIFF_PATH = process.env.DINO_V18_TARIFF_PATH
-    ? path.resolve(process.env.DINO_V18_TARIFF_PATH)
-    : path.join(__dirname, 'market_tariff_v18.json');
 const MODEL = JSON.parse(fs.readFileSync(MODEL_PATH, 'utf8'));
-const TARIFF = JSON.parse(fs.readFileSync(TARIFF_PATH, 'utf8'));
-
-// Aynı tarama anında birden fazla market uygunsa geçmişteki kural
-// güvenilirliği daha yüksek olan market öne alınır. Bu sıra kör testten sonra
-// değiştirilmez ve maç başına yalnız bir gölge sinyal tutulur.
-const RULE_PRIORITY = Object.freeze({
-    MS2: 4,
-    '2.5_UST': 3,
-    '0.5_UST': 2,
-    X: 1
-});
-
-
-function loadTariff(filePath) {
-    return JSON.parse(fs.readFileSync(path.resolve(filePath), 'utf8'));
-}
 
 
 function numeric(value) {
@@ -335,61 +316,9 @@ function scoreMarket(mac, market, dino, liveOnlyDino, shadowContext = null) {
 }
 
 
-function ruleFor(market, tariff = TARIFF) {
-    return tariff.primaryRules.find(rule => rule.market === market) || null;
-}
-
-
-function checkRule(mac, score, rule) {
-    const reasons = [];
-    const minute = numeric(mac?.dakika);
-    if (!rule) reasons.push('v18_rule_missing');
-    if (!score) reasons.push('v18_score_missing');
-    if (rule && (!Number.isFinite(minute) || minute < rule.minuteLow || minute > rule.minuteHigh)) {
-        reasons.push('v18_minute_outside');
-    }
-    if (rule && score && (score.odds < rule.minimumOdd || score.odds > rule.maximumOdd)) {
-        reasons.push('v18_odds_outside');
-    }
-    if (rule && score && score.v18Probability < rule.probabilityMinimum) {
-        reasons.push('v18_probability_below');
-    }
-    if (rule && score && (score.v18Edge < rule.edgeLow || score.v18Edge > rule.edgeHigh)) {
-        reasons.push('v18_edge_outside');
-    }
-    return { eligible: reasons.length === 0, reasons };
-}
-
-
-function evaluateFixture(mac, dino, liveOnlyDino, shadowContext = null, tariff = TARIFF) {
-    const evaluations = [];
-    for (const market of tariff.portfolioMarkets) {
-        const rule = ruleFor(market, tariff);
-        const score = scoreMarket(mac, market, dino, liveOnlyDino, shadowContext);
-        const policy = checkRule(mac, score, rule);
-        evaluations.push({ market, rule, score, policy });
-    }
-
-    const priority = tariff.marketPriority || RULE_PRIORITY;
-    const eligible = evaluations.filter(item => item.policy.eligible);
-    eligible.sort((left, right) =>
-        (priority[right.market] || 0) - (priority[left.market] || 0) ||
-        right.score.v18Probability - left.score.v18Probability ||
-        right.score.v18Edge - left.score.v18Edge
-    );
-    return { selected: eligible[0] || null, evaluations };
-}
-
-
 module.exports = {
     MODEL,
-    TARIFF,
-    RULE_PRIORITY,
-    loadTariff,
-    ruleFor,
     scoreMarket,
-    checkRule,
-    evaluateFixture,
     _internal: {
         numeric,
         scoreParts,

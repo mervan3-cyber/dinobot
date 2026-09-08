@@ -1,10 +1,10 @@
 {
   "name": "dino-backend",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node market_tariff.test.js && node hybrid_tariff.test.js && node dino_selector_v18.test.js && node v18_shadow_tracker.test.js"
+    "test": "node market_tariff.test.js && node hybrid_tariff.test.js && node core_shadow_tariff.test.js && node dino_selector_v18.test.js && node test_lab_tracker.test.js && node test_lab_server_contract.test.js && node test_lab_panel_contract.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",
