@@ -291,6 +291,11 @@
         }
 
         .v18-arm-card.active { border-color: rgba(255,177,59,.55); }
+        .v18-arm-card.v20 {
+            grid-column: 1 / -1;
+            border-color: rgba(66,223,152,.58);
+            background: linear-gradient(135deg, rgba(22,55,45,.66), rgba(17,28,31,.96));
+        }
         .v18-arm-card.core { border-color: rgba(100,181,246,.58); }
         .v18-arm-card.legacy { border-color: rgba(177,137,255,.52); }
         .v18-arm-card.observation { border-color: rgba(255,211,79,.55); }
@@ -334,6 +339,11 @@
         }
 
         .v18-table-panel h4 { margin: 0; }
+        .v18-table-panel.v20 {
+            grid-column: 1 / -1;
+            border-color: rgba(66,223,152,.4);
+            background: linear-gradient(145deg, rgba(18,39,34,.48), rgba(14,19,24,.96));
+        }
         .v18-table-panel.core { border-color: rgba(100,181,246,.38); }
         .v18-table-panel.legacy { border-color: rgba(177,137,255,.34); }
         .v18-table-panel.observation { border-color: rgba(255,211,79,.38); }
@@ -1667,7 +1677,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
-                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">Aktif V19 ile üç bağımsız gölge kolu aynı Türkiye tarihinde ölçülür.</p>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">Aktif V19, deneysel V20 ve bağımsız gölge kolları aynı Türkiye tarihinde ölçülür.</p>
                 </div>
                 <div class="tracker-actions">
                     <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
@@ -1678,7 +1688,7 @@
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
-                    <span class="muted">V19, yeni çekirdek, eski V17 ve hibrit gözlem aynı tarih filtresiyle adil biçimde karşılaştırılır.</span>
+                    <span class="muted">V20 dahil bütün test kolları aynı tarih filtresiyle karşılaştırılır; yalnız V19 Telegram kararı verir.</span>
                 </div>
                 <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
                     <option value="">🗂️ Tüm Ortak Test Dönemi</option>
@@ -1694,6 +1704,16 @@
                         <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v19-hit-rate">-</strong></div>
                         <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v19-roi">-</strong></div>
                         <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v19-average-odds">-</strong></div>
+                    </div>
+                </div>
+                <div class="v18-arm-card v20">
+                    <div class="v18-arm-title"><span>🧠 V20 · Yeni Model</span><span class="mini-badge bg-info" id="testlab-v20-mode-badge">DENEYSEL GÖLGE</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v20-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v20-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v20-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v20-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v20-average-odds">-</strong></div>
                     </div>
                 </div>
                 <div class="v18-arm-card core">
@@ -1728,6 +1748,12 @@
                 </div>
             </div>
 
+            <div class="test-lab-rules" id="test-lab-v20-rules" aria-label="V20 deneysel politika bilgisi">
+                <span class="test-lab-rule">V20 · deneysel gölge</span>
+                <span class="test-lab-rule">Taze doğrulama zorunlu · Telegram'a etkisi yok</span>
+                <span class="test-lab-rule">Maç başına en fazla 1 sinyal</span>
+            </div>
+
             <div class="test-lab-rules" id="test-lab-core-rules" aria-label="Yeni çekirdek kuralları">
                 <span class="test-lab-rule">MS2 · 25–54. dk · V18 ≥ %65 · EDGE ≥ +10</span>
                 <span class="test-lab-rule">2.5 ÜST · 50–80. dk · V18 %55–64,9 · EDGE +5…+10</span>
@@ -1735,8 +1761,8 @@
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">Yalnız V19 Telegram'a gönderir. Yeni çekirdek ile Legacy V17 taze skor–istatistik doğrulamasından geçer; hibrit kol ham gözlem olarak tutulur. Bütün ALT marketleri kapalıdır.</p>
-                <span class="mini-badge bg-info">3 BAĞIMSIZ TEST KOLU</span>
+                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. Bütün ALT marketleri kapalıdır.</p>
+                <span class="mini-badge bg-info">4 BAĞIMSIZ TEST KOLU</span>
             </div>
 
             <div class="v18-table-grid">
@@ -1746,6 +1772,13 @@
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v19','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v19','csv')">CSV</button></div>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v19-rows"><tr><td colspan="9" class="empty-row">Henüz V19 sinyali yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v20">
+                    <div class="test-lab-table-title">
+                        <h4>🧠 V20 · deneysel taze-doğrulamalı gölge</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v20','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v20','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Olasılık</th><th>Ham EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v20-rows"><tr><td colspan="9" class="empty-row">Henüz V20 gölge sinyali yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel core">
                     <div class="test-lab-table-title">
@@ -1931,6 +1964,7 @@
             refresh: "/api/test-lab-results/refresh",
             exports: Object.freeze({
                 v19: "/api/signal-history",
+                v20: "/api/v20-shadow-history",
                 core: "/api/two-rule-core-shadow-history",
                 v17: "/api/v17-legacy-shadow-history",
                 observation: "/api/hybrid-observation-history"
@@ -2843,23 +2877,30 @@
             link.remove();
         }
 
+        function testLabNumber(value) {
+            if (value === null || value === undefined || String(value).trim() === "") return NaN;
+            return Number(value);
+        }
+
         function setTestLabSummary(prefix, summary) {
             const values = summary?.overall || summary || {};
-            const total = values.total ?? values.signalCount ?? values.count ?? 0;
+            const total = values.total ?? values.signalCount ?? values.signals ?? values.count ?? 0;
             const wins = values.wins ?? values.won ?? 0;
             const losses = values.losses ?? values.lost ?? 0;
-            const averageOdds = values.averageOdds ?? values.avgOdds;
+            const averageOdds = values.averageOdds ?? values.avgOdds ?? values.meanOdds;
             document.getElementById(`${prefix}-total`).textContent = total;
             document.getElementById(`${prefix}-win-loss`).textContent = `${wins} / ${losses}`;
             document.getElementById(`${prefix}-hit-rate`).textContent = formatPercent(values.hitRate ?? values.successRate);
-            document.getElementById(`${prefix}-roi`).textContent = formatPercent(values.roi);
-            document.getElementById(`${prefix}-average-odds`).textContent = Number.isFinite(Number(averageOdds))
+            document.getElementById(`${prefix}-roi`).textContent = formatPercent(values.roi ?? values.roiPercent);
+            document.getElementById(`${prefix}-average-odds`).textContent = Number.isFinite(testLabNumber(averageOdds))
                 ? Number(averageOdds).toFixed(3)
                 : "-";
         }
 
         function testLabProbability(signal) {
-            return signal?.decisionProbability
+            return signal?.v20Probability
+                ?? signal?.probability
+                ?? signal?.decisionProbability
                 ?? signal?.selectorV18Probability
                 ?? signal?.v18Probability
                 ?? signal?.selectorV2Probability
@@ -2867,9 +2908,11 @@
                 ?? signal?.dinoProbability;
         }
 
-        function testLabEdge(signal) {
-            const value = signal?.decisionEdge ?? signal?.v18Edge ?? signal?.v16Edge ?? signal?.edge;
-            return Number.isFinite(Number(value))
+        function testLabEdge(signal, v20Only = false) {
+            const value = v20Only
+                ? signal?.v20Edge ?? signal?.decisionEdge
+                : signal?.v20Edge ?? signal?.edgeRaw ?? signal?.rawEdge ?? signal?.decisionEdge ?? signal?.v18Edge ?? signal?.v16Edge ?? signal?.edge;
+            return Number.isFinite(testLabNumber(value))
                 ? `%${Number(value) >= 0 ? "+" : ""}${Number(value).toFixed(1)}`
                 : "-";
         }
@@ -2903,15 +2946,20 @@
                     typeCell.appendChild(typeBadge);
                     row.appendChild(typeCell);
                 }
-                const probability = testLabProbability(signal);
+                const probability = options.probabilityOnly
+                    ? signal.v20Probability ?? signal.decisionProbability
+                    : testLabProbability(signal);
                 const modelName = String(signal.decisionModel || options.modelName || "MODEL").toUpperCase();
+                const probabilityText = options.probabilityOnly
+                    ? formatPercent(testLabNumber(probability))
+                    : `${modelName} ${formatPercent(probability)}`;
                 const values = [
                     formatDateTime(signal.sentAt), signal.match || "-",
                     signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
                     marketDisplayName(signal.market),
-                    `${modelName} ${formatPercent(probability)}`,
-                    testLabEdge(signal),
-                    Number.isFinite(Number(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                    probabilityText,
+                    testLabEdge(signal, options.probabilityOnly),
+                    Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
                 for (const value of values) {
                     const cell = document.createElement("td");
@@ -2935,9 +2983,46 @@
             const badge = document.getElementById(id);
             if (!badge) return;
             const disabled = arm?.enabled === false;
-            const labels = { active: "TELEGRAM", fresh: "TAZE DOĞRULAMA", raw: "HAM GÖZLEM", shadow: "GÖLGE" };
-            badge.textContent = disabled ? "KAPALI" : labels[mode] || labels.shadow;
-            badge.className = `mini-badge ${disabled ? "bg-danger" : mode === "active" || mode === "raw" ? "bg-warning" : "bg-info"}`;
+            const unavailable = !arm || arm.available === false;
+            const labels = { active: "TELEGRAM", fresh: "TAZE DOĞRULAMA", raw: "HAM GÖZLEM", shadow: "GÖLGE", experimental: "DENEYSEL GÖLGE" };
+            badge.textContent = disabled ? "KAPALI" : unavailable ? "HAZIR DEĞİL" : labels[mode] || labels.shadow;
+            badge.className = `mini-badge ${disabled || unavailable ? "bg-danger" : mode === "active" || mode === "raw" ? "bg-warning" : "bg-info"}`;
+        }
+
+        function renderV20Rules(arm) {
+            const container = document.getElementById("test-lab-v20-rules");
+            if (!container) return;
+            container.replaceChildren();
+            const add = text => {
+                const chip = document.createElement("span");
+                chip.className = "test-lab-rule";
+                chip.textContent = text;
+                container.appendChild(chip);
+            };
+            if (!arm || arm.available === false || arm.enabled === false) {
+                add(arm?.enabled === false ? "V20 deneysel gölge kapalı" : arm?.reason || arm?.message || "V20 model/politika dosyası henüz hazır değil");
+                add("Karara ve Telegram'a etkisi yok");
+                return;
+            }
+            const policy = arm?.policy || {};
+            const rawProbability = policy.minimumProbability ?? policy.minProbability;
+            const rawEdge = policy.minimumEdge ?? policy.minRawEdge;
+            const minimumOdds = policy.minimumOdds ?? policy.minOdds;
+            const maximumOdds = policy.maximumOdds ?? policy.maxOdds ?? 4;
+            const asPercent = value => {
+                const parsed = testLabNumber(value);
+                if (!Number.isFinite(parsed)) return null;
+                return Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+            };
+            const probability = asPercent(rawProbability);
+            const edge = asPercent(rawEdge);
+            const policyParts = [];
+            if (Number.isFinite(probability)) policyParts.push(`olasılık ≥ %${probability.toFixed(0)}`);
+            if (Number.isFinite(edge)) policyParts.push(`ham EDGE ≥ %${edge >= 0 ? "+" : ""}${edge.toFixed(0)}`);
+            if (Number.isFinite(testLabNumber(minimumOdds))) policyParts.push(`oran ${Number(minimumOdds).toFixed(2)}–${Number(maximumOdds).toFixed(2)}`);
+            add(`${arm?.label || "V20 Yeni Model"}${arm?.modelVersion ? ` · ${arm.modelVersion}` : ""}`);
+            add(policyParts.length ? policyParts.join(" · ") : "Kilitli deneysel politika bekleniyor");
+            add("Taze doğrulama zorunlu · maç başına en fazla 1 · Telegram kapalı");
         }
 
         function coreRuleLabel(rule) {
@@ -2988,11 +3073,13 @@
 
         function renderTestLabHistory(data) {
             setTestLabSummary("testlab-v19", data?.activeV19?.summary);
+            setTestLabSummary("testlab-v20", data?.v20Shadow?.summary);
             setTestLabSummary("testlab-core", data?.coreShadow?.summary);
             setTestLabSummary("testlab-v17", data?.legacyV17?.summary);
             setTestLabSummary("testlab-observation", data?.hybridObservation?.summary);
 
             setTestLabModeBadge("testlab-v19-mode-badge", data?.activeV19, "active");
+            setTestLabModeBadge("testlab-v20-mode-badge", data?.v20Shadow, "experimental");
             setTestLabModeBadge("testlab-core-mode-badge", data?.coreShadow, "fresh");
             setTestLabModeBadge("testlab-v17-mode-badge", data?.legacyV17, "fresh");
             setTestLabModeBadge("testlab-observation-mode-badge", data?.hybridObservation, "raw");
@@ -3001,6 +3088,7 @@
             const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
             const updatedCandidates = [
                 data?.activeV19?.summary?.updatedAt,
+                data?.v20Shadow?.summary?.updatedAt,
                 data?.coreShadow?.summary?.updatedAt,
                 data?.legacyV17?.summary?.updatedAt,
                 data?.hybridObservation?.summary?.updatedAt,
@@ -3009,7 +3097,7 @@
                 .sort();
             const lastUpdated = updatedCandidates.at(-1);
             document.getElementById("test-lab-updated").textContent = lastUpdated
-                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · üç gölge kolu Telegram hattından bağımsız`
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · dört test kolu Telegram hattından bağımsız`
                 : `Görünüm: ${viewLabel} · Test Lab ilk uygun adayı bekliyor`;
             const availableDates = Array.isArray(data?.dateOptions)
                 ? data.dateOptions
@@ -3019,7 +3107,9 @@
             if (dateSelect?.options?.[0]) dateSelect.options[0].textContent = "🗂️ Tüm Ortak Test Dönemi";
 
             renderCoreRules(data?.coreShadow?.rules);
+            renderV20Rules(data?.v20Shadow);
             renderTestLabRows("testlab-v19-rows", data?.activeV19?.signals, { label: "V19", modelName: "V19" }, selectedDate);
+            renderTestLabRows("testlab-v20-rows", data?.v20Shadow?.signals, { label: "V20 gölge", modelName: "V20", probabilityOnly: true }, selectedDate);
             renderTestLabRows("testlab-core-rows", data?.coreShadow?.signals, { label: "yeni çekirdek", modelName: "V18" }, selectedDate);
             renderTestLabRows("testlab-v17-rows", data?.legacyV17?.signals, { label: "Legacy V17", modelName: "V16", showSignalType: true }, selectedDate);
             renderTestLabRows("testlab-observation-rows", data?.hybridObservation?.signals, { label: "hibrit gözlem", modelName: "V19" }, selectedDate);
@@ -3027,6 +3117,7 @@
 
         function filterTestLabTables(value) {
             filterTableRows(value, "testlab-v19-rows");
+            filterTableRows(value, "testlab-v20-rows");
             filterTableRows(value, "testlab-core-rows");
             filterTableRows(value, "testlab-v17-rows");
             filterTableRows(value, "testlab-observation-rows");
@@ -3040,7 +3131,12 @@
                 renderTestLabHistory(data || {});
                 filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
             } catch (_) {
-                // Test Lab geçici olarak cevap vermezse ana panel çalışmaya devam eder.
+                document.getElementById("test-lab-updated").textContent = "Test Lab verisi alınamadı; görünen kayıtlar son başarılı yanıttan kalmıştır. Tarih filtresi henüz uygulanmamış olabilir.";
+                const badge = document.getElementById("testlab-v20-mode-badge");
+                if (badge) {
+                    badge.textContent = "BAĞLANTI YOK";
+                    badge.className = "mini-badge bg-danger";
+                }
             }
         }
 
