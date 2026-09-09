@@ -1,117 +1,60 @@
-# Ubuntu Kurulumu — Dino V18-A / V18-B Gölge Karşılaştırması
+# V20 bağımsız gölge — mevcut Ubuntu kurulumunu güncelleme
 
-Bu paket mevcut bot klasörünün üzerine kurulacak tam güncellemedir. Üretimdeki
-V17 karar sistemi ve Telegram akışı aynen kalır. V18-A ile V18-B aynı tam-stat
-maçları aynı modelle, farklı tarifeler ve farklı geçmiş dosyaları üzerinden
-değerlendirir; **hiçbir Telegram mesajı göndermez**.
+Bu paket **V20'yi Telegram'a geçirmez**. Mevcut V19 karar hattı ve eski V17 / hibrit karşılaştırmaları korunur. V20, aynı veri akışından ayrı tahmin üretip yalnız test laboratuvarına kaydeder. Kod henüz sunucunuza yüklenmedi.
 
-## Kurulumdan önce
+## Önce koruyun
 
-Sunucudaki `.env` ile aşağıdaki geçmiş/önbellek dosyalarını silmeyin veya ZIP
-içindeki boş örneklerle değiştirmeyin:
+Mevcut uygulama klasörünüzün bir yedeğini alın. Özellikle `.env`, `dino_data.json`, sinyal/aday/gölge geçmişleri, API önbellekleri ve varsa `v20_snapshot_archive` korunmalı. ZIP bunları içermez; yeni kodu açarken mevcut klasörü silmeyin veya boş klasörle değiştirmeyin.
 
-- `dino_signal_history.json`
-- `dino_candidate_history.json`
-- `dino_data.json`
-- `dino_prematch_cache.json`
-- `dino_shadow_power_cache.json`
+Paket tam kod güncellemesidir; **yalnız index.html kopyalamak yeterli değildir**. ZIP'in kökünde server.js, public/, model JSON'ları ve testler bulunur. Bunları mevcut dinobot uygulama dizinine açın. Eski Node/Python/PM2 ve API anahtarı ayarlarınızı koruyun. Python tarafında kullanılan modüller standart kütüphanedendir; V20 eğitimi için yerelde kullanılan NumPy/scikit-learn sunucuda gerekmez.
 
-V18-A ilk çalışmada `dino_v18_shadow_history.json`, V18-B ise
-`dino_v18_b_shadow_history.json` dosyasını otomatik oluşturur. Daha sonraki
-güncellemelerde iki dosyayı da koruyun.
-İndirme paketi bu kalıcı JSON dosyalarını özellikle içermez; mevcut sunucu
-kayıtlarının üzerine boş veri yazılmaz.
+## Kontrol ve başlatma
 
-## V18-A / V18-B gölge sistemi
+Uygulama dizininizde (mevcut kurulumunuz `/root/dinobot` ise):
 
-İki V18 kolu; mevcut taramada zaten alınmış canlı istatistik, skor, oran, pre-match ve
-takım bağlamını kullanır. Ayrı bir canlı maç taraması başlatmaz. Sonuç kontrolü
-de mevcut toplu sonuç sorgusuna katılır.
+```bash
+cd /root/dinobot
+npm ci --omit=dev
+npm test
+```
 
-V18-A dar tarife şöyledir:
+Her iki komut da başarılıysa:
 
-| Market | Dakika | Minimum V18 | V18 EDGE | Oran |
-|---|---:|---:|---:|---:|
-| 0.5 ÜST | 25–64 | %45 | +2.5…+15 | 1.50–4.00 |
-| 2.5 ÜST | 45–64 | %60 | +5…+15 | 1.50–4.00 |
-| MS2 | 25–44 | %65 | +5…+15 | 1.50–4.00 |
-| X | 75–80 | %65 | +5…+15 | 1.50–4.00 |
+```bash
+pm2 restart dinobot
+pm2 save
+pm2 logs dinobot --lines 40 --nostream
+```
 
-V18-B, A'nın 0.5/2.5 ÜST ve X kurallarını aynen tutar; şu iki farkı uygular:
+Bu güncelleme için .env değişikliği zorunlu değil. Ortam değişkenini kendiniz değiştirirseniz PM2 yeniden başlatırken `--update-env` gerekebilir. Node/Python komutları sunucudaki mevcut kurulumunuzdan çalışır; yerel doğrulamada Node v24.19.0 kullanıldı. Paket üzerinde 10 çevrimdışı test grubu ve sözdizimi kontrolleri yapıldı; gerçek Ubuntu açılışı, npm indirmesi ve gerçek API/Telegram çağrıları yerelde test edilmedi.
 
-| Market | Dakika | Minimum V18 | V18 EDGE | Oran |
-|---|---:|---:|---:|---:|
-| MS2 | 25–54 | %65 | +10…+15 | 1.50–4.00 |
-| 4.5 ÜST | 60–74 | %50 | 0…+10 | 1.50–4.00 |
+Başlangıç sürümü: `ml-v20-independent-shadow-ubuntu-2026-09-09`.
 
-- Bütün ALT marketleri kapalıdır.
-- Her kolda maç başına en fazla bir V18 gölge kaydı vardır.
-- İkinci sinyal yeterli örnek oluşmadığı için kapalıdır.
-- A'nın aynı-an önceliği: `MS2`, `2.5_UST`, `0.5_UST`, `X`.
-- B'nin aynı-an önceliği geçmişte dondurulan güven sırasıdır: `MS2`,
-  `0.5_UST`, `2.5_UST`, `4.5_UST`, `X`.
-- `V18 EDGE`, V18 olasılığı eksi canlı oranın normalize edilmiş piyasa
-  olasılığıdır. Eski Dino/V16 EDGE ile aynı ölçü değildir.
+Paneli sert yenileyin. Test laboratuvarında V20 modelinin yüklü ve gölge modunun açık olduğunu görün. Model/politika dosyası okunamazsa V20 hata gösterir; başka bir modele sessizce geçmez. Henüz sinyal olmaması tek başına arıza değildir: adaylarda V20 yüzdesi ve ret gerekçeleri de izlenebilir.
 
-Bu kurallar yalnızca karşılaştırma içindir. V17 tarifesi, Telegram seçimi,
-gönderim kilitleri ve mevcut panel ayarları değiştirilmez.
+## V20'nin sabit kuralları
 
-## Zorunlu yeni/değişen dosyalar
+- ALT kapalı. 0.5/1.5/2.5/3.5/4.5 ÜST ve MS1/X/MS2 aday olabilir.
+- Dakika 25–80; oran 1.50–4.00.
+- V20 olasılığı en az %70 ve V20 ham EDGE en az +10 yüzde puan.
+- EDGE = V20 olasılığı − 100/oran. 1.50 oranda bu iki koşul birlikte yaklaşık %76,67 gerektirir.
+- Maç başına en fazla 1 gölge sinyal. İkinci sinyal üretim paketinde kapalı.
+- Canlı istatistik ve oran tekrar kontrol edilir; son fixture skor/statü/kimlik kontrolü de geçmelidir. Başarısız veya bayat veriyle V20 sinyali yazılmaz.
 
-Bu sürümde yalnız `index.html` değil, sunucu ve model tarafı da değişmiştir.
-Paketi komple yükleyin. Özellikle şu dosyalar zorunludur:
+Model canlı fiyatın ima ettiği olasılığı canlı istatistiklerle düzeltir; Dino/V16/V18 olasılıklarını kullanmaz. Pre-match, API takım/tahmin bağlamı ve xG seçenekleri incelendi, bu veride yeterli/tutarlı ek katkı doğrulanamadığından final modelde yok. Bu özellikler eski kollarda mevcut davranışlarıyla bulunabilir.
 
-- `server.js`
-- `signal_tracker.js`
-- `dino_selector_v18.js`
-- `dino_selector_v18.json`
-- `dino_selector_v18.test.js`
-- `v18_shadow_tracker.test.js`
-- `market_tariff_v18.json`
-- `market_tariff_v18_b.json`
-- `public/index.html`
-- `index.html`
-- `package.json`
-- `package-lock.json`
+## Kalıcılık ve API yükü
 
-Paketteki diğer çalışma dosyalarını da aynı dizin yapısıyla kopyalayın.
+V20 gölge varsayılan açıktır. İstenirse `DINO_V20_SHADOW_ENABLED=false` ile yalnız bu kol kapatılabilir. Özel konum gerekirse `DINO_V20_SHADOW_HISTORY_FILE` ve `DINO_V20_SNAPSHOT_ARCHIVE_DIR` kullanılabilir; dizin uygulama kullanıcısı için yazılabilir olmalıdır.
 
-## Ortam ayarı
+Yeni gölge geçmişi `dino_v20_shadow_history.json` dosyasındadır. Restart sonrasında maç başına sinyal hakkı buradan korunur. Dosyayı silmek aynı maça yeniden sinyal verilmesine yol açabilir.
 
-İki V18 gölge kolu varsayılan olarak açıktır. A'yı kapatmak için `.env` dosyasına
-yeni satır eklemek gerekmez. Gerekirse yalnız gölge kaydını kapatmak için:
+Tam-stat tarama anları ayrıca `v20_snapshot_archive` altında Türkiye gününe göre eklemeli JSONL arşivlenir. Panelin kayıt sınırı eski anları çıkarsa da bu anlar arşivde kalır. Disk kullanımını düzenli kontrol edin ve arşivi yedekleyin. Panelden çıkarılmış bir maç sonradan biterse arşivin final sonucu ayrıca tamamlanmaya ihtiyaç duyabilir; bütün arşiv etiketlerinin otomatik tamamlandığını varsaymayın.
 
-    DINO_V18_SHADOW_ENABLED=false
+V20 uygun adayı için taze istatistik/oran ve son fixture kontrolü ek API isteği doğurabilir; günlük maliyet aday sayısına bağlıdır. Kaynakların yerel alınma zamanları kaydedilir. Sağlayıcının gerçek yayın gecikmesi bilinmediğinden bu kontroller kusursuz eşzamanlılık veya her fiyatın oynanabilirliğini garanti etmez.
 
-B'yi ayrı kapatmak için:
+## Sonuçları nasıl değerlendirelim?
 
-    DINO_V18_B_SHADOW_ENABLED=false
+Geliştirme döneminin başarısı bağımsız başarı kanıtı değildir. 8 Eylül ayrılmış örneği yalnız 2 sinyal verdi: 1 kazanan / 1 kaybeden, teorik ROI −%16,7. V20'nin üstünlüğü henüz doğrulanmadı. Sonuçlara göre eşikleri günlük oynatmadan yeni canlı günlerin V20 JSON'unu, tam-stat arşivini ve mevcut V19 sonuçlarını birlikte değerlendirin.
 
-Bu ayar V17 veya Telegram'ı kapatmaz. Yeniden açmak için satırı silin ya da
-değeri `true` yapın.
-
-## Başlatma
-
-    npm install
-    pm2 restart dinobot --update-env
-    pm2 save
-
-Süreç adınız `dinobot` değilse kendi PM2 süreç adınızı kullanın.
-
-Başlangıç logunda aşağıdakiler görünmelidir:
-
-    ml-v18-ab-shadow-comparison-ubuntu-2026-09-05
-    V18-A/B GÖLGE
-    karar etkisi YOK
-    Telegram YOK
-
-Panelde üst menüde `V18 Gölge` bölümü görünür. Bu bölümde V17, V18-A ve V18-B
-B'nin devreye girdiği ortak test başlangıcı ve seçilen Türkiye tarihi için yan
-yana gösterilir. A ve B JSON/CSV dosyaları ayrı indirilebilir.
-
-## Sonuçların yorumu
-
-Gölge sistemi canlı Telegram kararını değiştirmediği için güvenli A/B
-karşılaştırmasıdır. Birkaç sinyal sonucuyla tarife değiştirmeyin; sinyal sayısı,
-isabet, ortalama oran ve ROI birlikte değerlendirilmelidir. Geçiş kararı ayrıca
-yeni günlerde görülmemiş maçlarla doğrulandıktan sonra verilmelidir.
+Ayrıntılı eğitim/test raporu paketteki `V20_INCELEME_VE_KURULUM_2026-09-09.md` dosyasındadır. Belirli bir günlük başarı veya azami kayıp sayısı taahhüt edilmez.

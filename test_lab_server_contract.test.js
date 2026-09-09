@@ -10,6 +10,8 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'dino-test-lab-
 process.env.DINO_CORE_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'core.json');
 process.env.DINO_LEGACY_V17_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v17.json');
 process.env.DINO_HYBRID_OBSERVATION_HISTORY_FILE = path.join(temporaryDirectory, 'observation.json');
+process.env.DINO_V20_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v20.json');
+process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
 
 const originalLoad = Module._load;
 const originalSetInterval = global.setInterval;
@@ -66,7 +68,16 @@ try {
     global.setTimeout = () => ({ unref() {} });
     global.setImmediate = () => ({ unref() {} });
 
-    require('./server');
+    // Keep the real local dependencies, while placing every server-owned
+    // history/config/cache path under this test's temporary directory.
+    const serverPath = path.join(__dirname, 'server.js');
+    const isolatedServer = new Module(serverPath, module);
+    isolatedServer.filename = serverPath;
+    isolatedServer.paths = module.paths;
+    isolatedServer._compile(
+        fs.readFileSync(serverPath, 'utf8'),
+        path.join(temporaryDirectory, 'server.js')
+    );
 
     const requiredGetRoutes = [
         '/api/test-lab-comparison',

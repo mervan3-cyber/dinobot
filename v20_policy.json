@@ -1,0 +1,13 @@
+{
+  "version": "v20-policy-2026-09-09",
+  "mode": "shadow",
+  "maxSignalsPerFixture": 1,
+  "policy": {
+    "minimumProbability": 0.7,
+    "minimumEdge": 0.1,
+    "minimumOdds": 1.5,
+    "maximumOdds": 4.0,
+    "minimumMinute": 25,
+    "maximumMinute": 80
+  }
+}

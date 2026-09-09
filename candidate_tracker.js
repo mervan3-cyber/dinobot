@@ -8,6 +8,7 @@ const {
 } = require('./signal_tracker');
 
 const HISTORY_VERSION = 2;
+const SNAPSHOT_ARCHIVE_VERSION = 1;
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
 const VOID_STATUSES = new Set(['CANC', 'ABD', 'AWD', 'WO']);
 
@@ -73,17 +74,164 @@ function finalizeResultBucket(bucket) {
 }
 
 
+function turkeyDate(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    const safeDate = Number.isFinite(date.getTime()) ? date : new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Istanbul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(safeDate);
+    const part = type => parts.find(item => item.type === type)?.value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+
+function firstDefined(rows, getter) {
+    for (const row of rows) {
+        const value = getter(row);
+        if (value !== null && value !== undefined) return value;
+    }
+    return null;
+}
+
+
 class CandidateTracker {
-    constructor({ filePath, logger = () => {}, maxRecords = 50000 }) {
+    constructor({
+        filePath,
+        logger = () => {},
+        maxRecords = 50000,
+        snapshotArchiveDirectory = null
+    }) {
         this.filePath = filePath;
         this.logger = logger;
         this.maxRecords = Math.max(1000, Number(maxRecords) || 50000);
+        this.snapshotArchiveDirectory = snapshotArchiveDirectory
+            ? path.resolve(snapshotArchiveDirectory)
+            : null;
         this.data = {
             version: HISTORY_VERSION,
             updatedAt: null,
             shadowContexts: {},
             records: []
         };
+    }
+
+
+    appendArchiveRows(rows, capturedAt = new Date().toISOString()) {
+        if (!this.snapshotArchiveDirectory || !Array.isArray(rows) || rows.length === 0) {
+            return 0;
+        }
+
+        fs.mkdirSync(this.snapshotArchiveDirectory, { recursive: true });
+        const byDate = new Map();
+        for (const row of rows) {
+            const date = turkeyDate(row?.capturedAt || capturedAt);
+            if (!byDate.has(date)) byDate.set(date, []);
+            byDate.get(date).push(JSON.stringify(row));
+        }
+
+        for (const [date, lines] of byDate) {
+            const filePath = path.join(
+                this.snapshotArchiveDirectory,
+                `v20-training-${date}.jsonl`
+            );
+            fs.appendFileSync(filePath, `${lines.join('\n')}\n`, 'utf8');
+        }
+        return rows.length;
+    }
+
+
+    archiveSnapshotBatch(records) {
+        if (!this.snapshotArchiveDirectory || !Array.isArray(records) || records.length === 0) {
+            return 0;
+        }
+
+        const groups = new Map();
+        for (const record of records) {
+            const key = `${record?.scanId || record?.capturedAt}:${Number(record?.fixtureId)}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(record);
+        }
+
+        const archivedAt = new Date().toISOString();
+        const snapshots = [];
+        for (const [snapshotId, rows] of groups) {
+            const base = rows.find(row => row?.statsComplete === true) || rows[0];
+            if (!base || !Number.isFinite(Number(base.fixtureId))) continue;
+            const snapshotContext = firstDefined(rows, row => row?.snapshotContext) || null;
+            const shadowContext = firstDefined(
+                rows,
+                row => this.shadowContextFor(row)
+            );
+            snapshots.push({
+                recordType: 'snapshot',
+                schemaVersion: SNAPSHOT_ARCHIVE_VERSION,
+                archivedAt,
+                snapshotId,
+                scanId: base.scanId || null,
+                capturedAt: base.capturedAt || archivedAt,
+                fixtureId: Number(base.fixtureId),
+                match: base.match || null,
+                league: base.league || null,
+                minute: numberOrNull(base.minute),
+                score: base.score || null,
+                statusShort: base.statusShort || null,
+                statsSource: base.statsSource || null,
+                statsComplete: base.statsComplete === true,
+                liveStats: base.liveStats || null,
+                dataQuality: base.dataQuality || snapshotContext?.dataQuality || null,
+                liveOdds: snapshotContext?.liveOdds || null,
+                prematch: snapshotContext?.prematch || null,
+                shadowContext,
+                markets: rows
+                    .filter(row => row?.market)
+                    .map(row => ({
+                        market: row.market,
+                        odds: numberOrNull(row.odds),
+                        bookmaker: row.bookmaker || null,
+                        marketProbability: numberOrNull(row.marketProbability),
+                        dinoProbability: numberOrNull(row.dinoProbability),
+                        liveOnlyProbability: numberOrNull(row.liveOnlyProbability),
+                        selectorV2Probability: numberOrNull(row.selectorV2Probability),
+                        v18Probability: numberOrNull(row.v18Probability),
+                        v18Edge: numberOrNull(row.v18Edge),
+                        v20Probability: numberOrNull(row.v20Probability),
+                        v20Edge: numberOrNull(row.v20Edge),
+                        v20ExpectedValue: numberOrNull(row.v20ExpectedValue),
+                        v20Eligible: row.v20Eligible === true,
+                        v20ModelVersion: row.v20ModelVersion || null,
+                        prematchMarketSupport: numberOrNull(row.prematchMarketSupport),
+                        decision: row.decision || null
+                    }))
+            });
+        }
+
+        return this.appendArchiveRows(snapshots, archivedAt);
+    }
+
+
+    archiveSettlement({
+        fixtureId,
+        fixtureStatus,
+        finalHome,
+        finalAway,
+        finalScore,
+        resolvedAt
+    }) {
+        return this.appendArchiveRows([{
+            recordType: 'settlement',
+            schemaVersion: SNAPSHOT_ARCHIVE_VERSION,
+            archivedAt: new Date().toISOString(),
+            capturedAt: resolvedAt || new Date().toISOString(),
+            fixtureId: Number(fixtureId),
+            fixtureStatus: fixtureStatus || null,
+            finalHome: numberOrNull(finalHome),
+            finalAway: numberOrNull(finalAway),
+            finalScore: finalScore || null,
+            resolvedAt: resolvedAt || new Date().toISOString()
+        }], resolvedAt);
     }
 
 
@@ -167,6 +315,7 @@ class CandidateTracker {
 
         const existingIds = new Set(this.data.records.map(record => record.recordId));
         let added = 0;
+        const addedRecords = [];
 
         for (const payload of incoming) {
             if (!payload.recordId || existingIds.has(payload.recordId)) continue;
@@ -180,7 +329,7 @@ class CandidateTracker {
                 delete normalized.shadowContext;
             }
 
-            this.data.records.push({
+            const storedRecord = {
                 ...normalized,
                 settlement: payload.settlement || {
                     result: null,
@@ -191,12 +340,21 @@ class CandidateTracker {
                     fixtureStatus: null,
                     resolvedAt: null
                 }
-            });
+            };
+            this.data.records.push(storedRecord);
+            addedRecords.push(storedRecord);
             existingIds.add(payload.recordId);
             added++;
         }
 
         if (added > 0) {
+            try {
+                // Archive while every incoming context is still available;
+                // ring-buffer trimming may remove older rows in this batch.
+                this.archiveSnapshotBatch(addedRecords);
+            } catch (error) {
+                this.logger(`> ⚠️ V20 günlük eğitim arşivi yazılamadı: ${error.message}`);
+            }
             this.trim();
             this.save();
         }
@@ -291,7 +449,27 @@ class CandidateTracker {
             changed++;
         }
 
-        if (changed > 0) this.save();
+        if (changed > 0) {
+            this.save();
+            try {
+                const resolved = this.data.records.find(record =>
+                    Number(record?.fixtureId) === fixtureId &&
+                    record?.settlement?.resolvedAt
+                )?.settlement;
+                this.archiveSettlement({
+                    fixtureId,
+                    fixtureStatus: shortStatus || null,
+                    finalHome,
+                    finalAway,
+                    finalScore: finalHome !== null && finalAway !== null
+                        ? `${finalHome}-${finalAway}`
+                        : null,
+                    resolvedAt: resolved?.resolvedAt || new Date().toISOString()
+                });
+            } catch (error) {
+                this.logger(`> ⚠️ V20 sonuç arşivi yazılamadı: ${error.message}`);
+            }
+        }
         return changed;
     }
 
