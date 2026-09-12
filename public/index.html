@@ -1738,7 +1738,7 @@
                     </div>
                 </div>
                 <div class="v18-arm-card v21">
-                    <div class="v18-arm-title"><span>🟡 V21 · ÜST / ALT</span><span class="mini-badge bg-warning" id="testlab-v21-mode-badge">TAZE DOĞRULAMA</span></div>
+                    <div class="v18-arm-title"><span>🟡 V21 · ÜST · 3/3</span><span class="mini-badge bg-warning" id="testlab-v21-mode-badge">TAZE DOĞRULAMA</span></div>
                     <div class="v18-arm-metrics">
                         <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v21-total">0</strong></div>
                         <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v21-win-loss">0 / 0</strong></div>
@@ -1749,10 +1749,10 @@
                 </div>
             </div>
 
-            <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 ÜST ALT kuralları">
-                <span class="test-lab-rule">V21 · ÜST / ALT · Pre &gt; %50</span>
-                <span class="test-lab-rule">Dino / V16 / V18: en az 2 model &gt; %50 · eksik puan onay değildir</span>
-                <span class="test-lab-rule">Kayıt EDGE ≤ +1 · negatiflerde alt sınır yok</span>
+            <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 yalnız ÜST 3/3 kuralları">
+                <span class="test-lab-rule">V21 · Yalnız ÜST · Pre &gt; %50</span>
+                <span class="test-lab-rule">Dino / V16 / V18: üçü de &gt; %50 · eksik model varsa sinyal yok</span>
+                <span class="test-lab-rule">−5 ≤ Kayıt EDGE ≤ 0 · iki uç dahil</span>
                 <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · Maç başına 1 · Telegram yok</span>
                 <span class="test-lab-rule">Aynı anda birden çok aday: onay sayısı ↓, oran ↑, market adı</span>
             </div>
@@ -1770,7 +1770,7 @@
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. V21’de ÜST ve ALT açıktır; diğer lab politikaları değişmedi.</p>
+                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. V21 yalnız ÜST ve 3/3 onay ister; diğer lab politikaları değişmedi.</p>
                 <span class="mini-badge bg-info">5 BAĞIMSIZ TEST KOLU</span>
             </div>
 
@@ -1805,9 +1805,10 @@
                 </div>
                 <div class="v18-table-panel v21">
                     <div class="test-lab-table-title">
-                        <h4>🟡 V21 · ÜST / ALT · 2/3 onay</h4>
-                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v21','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v21','csv')">CSV</button></div>
+                        <h4>🟡 V21 · ÜST · 3/3 · EDGE −5…0</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v21','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v21','csv')">CSV</button><button type="button" onclick="downloadTestLabExport('v21','json','previous')" title="Önceki V21 tarifelerinin tüm tarihlerdeki kayıtları">Eski V21 JSON</button></div>
                     </div>
+                    <p class="muted" id="testlab-v21-cohort-note">Yeni 3/3 ÜST dönemi · eski V21 sonuçları bu tabloya dahil değildir.</p>
                     <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v21-rows"><tr><td colspan="10" class="empty-row">Henüz V21 sinyali yok.</td></tr></tbody></table></div>
                 </div>
             </div>
@@ -3101,6 +3102,12 @@
             setTestLabModeBadge("testlab-core-mode-badge", data?.coreShadow, "fresh");
             setTestLabModeBadge("testlab-v17-mode-badge", data?.legacyV17, "fresh");
             setTestLabModeBadge("testlab-v21-mode-badge", data?.v21Shadow, "fresh");
+            const v21CohortNote = document.getElementById("testlab-v21-cohort-note");
+            if (v21CohortNote) {
+                const start = data?.v21Shadow?.startedAt;
+                const archiveCount = Number(data?.v21Shadow?.archivedRecords) || 0;
+                v21CohortNote.textContent = `Yeni 3/3 ÜST dönemi · ${start ? "İlk sinyal: " + formatDateTime(start) : "İlk uygun canlı sinyal bekleniyor"} · ${archiveCount} eski kayıt ayrı arşivde; aşağıdaki sayılara dahil değil.`;
+            }
 
             const selectedDate = data?.date || data?.filter?.date || "";
             const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
@@ -3187,7 +3194,7 @@
             }
         }
 
-        function downloadTestLabExport(arm, format) {
+        function downloadTestLabExport(arm, format, cohort = "current") {
             const suffix = format === "csv" ? "/export.csv" : "/export";
             const base = TEST_LAB_API.exports[String(arm).toLowerCase()];
             if (!base) {
@@ -3196,7 +3203,10 @@
             }
             const link = document.createElement("a");
             const params = new URLSearchParams({ scope: "test-lab" });
-            if (testLabDate) params.set("date", testLabDate);
+            if (String(arm).toLowerCase() === "v21" && cohort === "previous") {
+                params.delete("scope");
+                params.set("cohort", "previous");
+            } else if (testLabDate) params.set("date", testLabDate);
             link.href = `${BACKEND_URL}${base}${suffix}?${params.toString()}`;
             link.target = "_blank";
             link.rel = "noopener";
