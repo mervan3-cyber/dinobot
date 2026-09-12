@@ -42,11 +42,14 @@ try {
     assert.equal(resumed21.data.signals[0].voteCount, 3);
     const underMac = { ...mac, fixture_id: 2, dakika: 60, canli_oranlar: { '3.5_ALT': { oran: 1.8 } } };
     const under = lab.record('v21', { mac: underMac, dino: { '3.5_ALT': 54 } });
-    assert.equal(under.voteCount, 2);
-    assert.equal(under.v18Probability, null);
-    assert.equal(under.modelVotes.v18, false);
+    assert.equal(under, null, 'New V21 never records ALT');
+    const archivedUnder = v21Tracker.recordSent({ fixtureId: 2, signalType: 'strong', market: '3.5_ALT',
+        odds: 1.8, tariffVersion: 'v21-consensus-shadow-2026-09-12' });
     v21Tracker.settleFixture({ fixture: { id: 2, status: { short: 'FT' } }, goals: { home: 2, away: 1 }, score: { fulltime: { home: 2, away: 1 } } });
-    assert.equal(under.settlement.result, 'W');
+    assert.equal(archivedUnder.settlement.result, 'W', 'Old ALT continues settling without being relabelled');
+    const resumedArchive = tracker('v21');
+    assert.equal(createIndependentLab({ ...options, v21Tracker: resumedArchive }).record('v21', {
+        mac: { ...mac, fixture_id: 2 }, dino }), null, 'Old version keeps fixture lock after restart');
     assert.equal(lab.select('v21', { mac: { ...underMac, fixture_id: 3, skor: '4-0' }, dino: { '3.5_ALT': 54 } }), null);
     assert.equal(lab.select('v21', { mac: { ...mac, fixture_id: 3 }, dino: { ...dino, MODEL_VARYANTI: 'score_only' } }), null);
     // Deterministic choice is fixed before observing any settlement.
@@ -61,5 +64,5 @@ try {
     assert.equal(v19Tracker.findSignal(99, 'strong').importedFromSharedHistory, true);
     assert.equal(v19Tracker.hasSignal(100, 'strong'), false);
     assert.equal(shared.data.signals.length, 2);
-    console.log('Independent V19/V21 fresh validation, priority, ALT settlement, restart locks and idempotent history import passed.');
+    console.log('Independent V19/V21 fresh validation, priority, archived ALT settlement, cross-version restart locks and history import passed.');
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }

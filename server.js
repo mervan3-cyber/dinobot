@@ -30,6 +30,7 @@ const dinoSelectorV2 = require('./dino_selector_v2');
 const marketTariff = require('./active_tariff');
 const v19Tariff = require('./hybrid_tariff');
 const v21Tariff = require('./v21_tariff');
+const v21History = require('./v21_history');
 const { createIndependentLab, importV19History } = require('./independent_lab');
 const legacyV17Tariff = require('./market_tariff');
 const dinoSelectorV18 = require('./dino_selector_v18');
@@ -45,7 +46,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v21-lab-over-telegram-ubuntu-2026-09-12';
+const BUILD_VERSION = 'ml-v21-1-over-3of3-edge-m5-0-ubuntu-2026-09-13';
 
 app.use(cors());
 app.use(express.json());
@@ -6486,9 +6487,11 @@ function testLabOrtakKarsilastirmaBaslangici() {
 }
 
 
-function testLabDonemineGoreSec(tracker, date) {
+function testLabDonemineGoreSec(tracker, date, cohort = 'current') {
     const comparisonStart = testLabOrtakKarsilastirmaBaslangici();
-    return tracker.list(100000).filter(signal => {
+    const signals = tracker === v21ShadowTracker
+        ? v21History.select(tracker.list(100000), cohort) : tracker.list(100000);
+    return signals.filter(signal => {
         if (comparisonStart && new Date(signal.sentAt) < new Date(comparisonStart)) return false;
         return !date || turkiyeTarihAnahtari(signal.sentAt) === date;
     });
@@ -6552,12 +6555,12 @@ app.get(
             },
             activeV19,
             v21Shadow: {
-                enabled: DINO_V21_SHADOW_ENABLED, label: 'V21 · ÜST/ALT uzlaşma',
+                enabled: DINO_V21_SHADOW_ENABLED, label: 'V21 · ÜST · 3/3 · EDGE −5…0',
                 decisionImpact: false, telegram: false, validationMode: 'fresh-required',
                 tariffVersion: v21Tariff.VERSION, policy: v21Tariff.POLICY,
-                startedAt: v21ShadowTracker.data.startedAt,
+                ...v21History.metadata(v21ShadowTracker.data.signals),
                 maximumSignalsPerFixture: 1,
-                summary: v21ShadowTracker.summary(testLabDonemineGoreSec(v21ShadowTracker, selection.date)),
+                summary: v21History.summary(v21ShadowTracker, testLabDonemineGoreSec(v21ShadowTracker, selection.date)),
                 signals: v21ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v21ShadowTracker, selection.date))
             },
             // Geçici istemci uyumluluğu: yeni panel activeV19 anahtarını kullanır.
@@ -6613,20 +6616,28 @@ app.post(
 );
 
 
+function labHistorySignals(req, tracker) {
+    if (req.query.scope === 'test-lab') return testLabDonemineGoreSec(tracker, null, req.query.cohort);
+    const signals = tracker.list(100000);
+    return tracker === v21ShadowTracker ? v21History.select(signals, req.query.cohort) : signals;
+}
+
 function labHistoryResponse(req, res, tracker, metadata) {
     const selection = gecmisSeciminiHazirla(
         req,
         res,
-        tracker.list(100000),
+        tracker === v21ShadowTracker ? labHistorySignals(req, tracker) : tracker.list(100000),
         'sentAt'
     );
     if (!selection) return;
     res.json({
         ...metadata,
+        ...(tracker === v21ShadowTracker ? v21History.metadata(tracker.data.signals, req.query.cohort) : {}),
         decisionImpact: false,
         telegram: false,
         filter: selection.filter,
-        summary: tracker.summary(selection.items),
+        summary: tracker === v21ShadowTracker
+            ? v21History.summary(tracker, selection.items, req.query.cohort) : tracker.summary(selection.items),
         signals: tracker.list(req.query.limit, selection.items)
     });
 }
@@ -6773,9 +6784,7 @@ app.get(
 
 
 function labJsonExport(req, res, tracker, options) {
-    const exportSignals = req.query.scope === 'test-lab'
-        ? testLabDonemineGoreSec(tracker, null)
-        : tracker.list(100000);
+    const exportSignals = labHistorySignals(req, tracker);
     const selection = gecmisSeciminiHazirla(req, res, exportSignals, 'sentAt');
     if (!selection) return;
     const dosyaEtiketi = gecmisDosyaEtiketi(selection);
@@ -6790,28 +6799,30 @@ function labJsonExport(req, res, tracker, options) {
         tariffVersion: options.tariffVersion,
         rules: options.rules,
         historyFilter: selection.filter,
-        note: options.note
+        note: options.note,
+        ...(tracker === v21ShadowTracker ? v21History.metadata(tracker.data.signals, req.query.cohort) : {})
     }, selection.items);
+    if (tracker === v21ShadowTracker) payload.summary = v21History.summary(tracker, selection.items, req.query.cohort);
+    const cohortSuffix = tracker === v21ShadowTracker && req.query.cohort === 'previous' ? '-previous' : '';
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader(
         'Content-Disposition',
-        `attachment; filename="${options.filePrefix}-${dosyaEtiketi}.json"`
+        `attachment; filename="${options.filePrefix}${cohortSuffix}-${dosyaEtiketi}.json"`
     );
     res.send(JSON.stringify(payload, null, 2));
 }
 
 
 function labCsvExport(req, res, tracker, filePrefix) {
-    const exportSignals = req.query.scope === 'test-lab'
-        ? testLabDonemineGoreSec(tracker, null)
-        : tracker.list(100000);
+    const exportSignals = labHistorySignals(req, tracker);
     const selection = gecmisSeciminiHazirla(req, res, exportSignals, 'sentAt');
     if (!selection) return;
     const dosyaEtiketi = gecmisDosyaEtiketi(selection);
+    const cohortSuffix = tracker === v21ShadowTracker && req.query.cohort === 'previous' ? '-previous' : '';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
         'Content-Disposition',
-        `attachment; filename="${filePrefix}-${dosyaEtiketi}.csv"`
+        `attachment; filename="${filePrefix}${cohortSuffix}-${dosyaEtiketi}.csv"`
     );
     res.send(`\uFEFF${v18GolgeCsvOlustur(selection.items)}`);
 }
@@ -7550,7 +7561,8 @@ app.get(
                 v21Shadow: {
                     enabled: DINO_V21_SHADOW_ENABLED, telegram: false,
                     validationMode: 'fresh-required', tariffVersion: v21Tariff.VERSION,
-                    policy: v21Tariff.POLICY, summary: v21ShadowTracker.summary()
+                    policy: v21Tariff.POLICY, ...v21History.metadata(v21ShadowTracker.data.signals),
+                    summary: v21History.summary(v21ShadowTracker)
                 },
                 coreShadow: {
                     enabled: DINO_CORE_SHADOW_ENABLED,
@@ -7655,7 +7667,7 @@ app.listen(
 
         addSystemLog(
             DINO_V17_TARIFF_ENABLED
-                ? `> 🧭 TELEGRAM: V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST | ortak maç kilidi | V19/V17 tüm mevcut marketleri labda korunur | V21 ÜST/ALT yalnız lab.`
+                ? `> 🧭 TELEGRAM: V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST | ortak maç kilidi | V19/V17 tüm mevcut marketleri labda korunur | V21 ÜST 3/3, EDGE −5…0 yalnız lab.`
                 : DINO_V2_SELECTOR_ENABLED
                 ? `> 🧬 V16 ikinci katman AKTİF: eşik %${dinoSelectorV2.MODEL.policy.threshold * 100} | dakika ${dinoSelectorV2.MODEL.policy.minimumMinute}-${dinoSelectorV2.MODEL.policy.maximumMinute} | oran ${DINO_V2_MIN_ODD}+ | EDGE kararı etkilemez.`
                 : `> 🎯 Legacy minimum EDGE: %${state.globalMinEdge}`
@@ -7688,7 +7700,7 @@ app.listen(
 
         addSystemLog(
             DINO_V17_TARIFF_ENABLED
-                ? "> 🧠 Telegram: V19 mevcut ÜST pencereleri + Legacy V17 2.5 ÜST. V21 ÜST/ALT uzlaşması yalnız labda."
+                ? "> 🧠 Telegram: V19 mevcut ÜST pencereleri + Legacy V17 2.5 ÜST. V21 yalnız ÜST, 3/3 >%50, Pre >%50, EDGE −5…0; yalnız labda."
                 : DINO_V2_SELECTOR_ENABLED
                 ? "> 🧠 Seçim kuralı: Dino tek başına sınıf belirlemez; V16 bütün marketleri yeniden puanlar ve maç başına yalnız en güçlü doğrulanmış adayı seçer."
                 : "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 50–80. dakika | 🟢 Güçlü: %75+ ve 50–80. dakika."

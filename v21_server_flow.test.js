@@ -57,23 +57,35 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     let match = mac(101, '3.5_ALT', 60);
     api.setup(match, dino('3.5_ALT'), dino('3.5_ALT'));
     await api.botuCalistir();
-    assert.equal(api.v21ShadowTracker.findSignal(101, 'strong').market, '3.5_ALT');
-    assert.equal(deliveries.length, 0, 'V21-only ALT must never send Telegram');
+    assert.equal(api.v21ShadowTracker.hasSignal(101, 'strong'), false, 'ALT excluded from new V21');
+    assert.equal(deliveries.length, 0, 'ALT must never send Telegram');
     assert.equal(api.signalTracker.data.signals.length, 0);
+
+    match = mac(108, '2.5_UST', 60);
+    api.setup(match, dino('2.5_UST'), dino('2.5_UST'));
+    await api.botuCalistir();
+    assert.equal(api.v21ShadowTracker.findSignal(108, 'strong').voteCount, 3);
+    assert.equal(api.v21ShadowTracker.findSignal(108, 'strong').tariffRuleId, 'V21-3OF3-PRE50-EM5-E0');
+    assert.equal(deliveries.length, 0, 'V21-only OVER must remain lab-only');
 
     match = mac(102, '2.5_UST', 60);
     api.setup(match, dino('2.5_UST'), dino('2.5_UST', 40));
     await api.botuCalistir();
-    // Dino loses one vote, but V16+V18 still approve: the 2-of-3 policy passes.
-    assert.equal(api.v21ShadowTracker.hasSignal(102, 'strong'), true);
+    assert.equal(api.v21ShadowTracker.hasSignal(102, 'strong'), false, 'Fresh 2-of-3 cannot pass the new 3-of-3 rule');
     match = mac(103, '3.5_ALT', 60);
     api.setup(match, dino('3.5_ALT'), dino('3.5_ALT', 40));
     await api.botuCalistir();
     assert.equal(api.v21ShadowTracker.hasSignal(103, 'strong'), false, 'Fresh policy failure must block the initially eligible ALT');
-    match = mac(104, '3.5_ALT', 60);
-    api.setup(match, dino('3.5_ALT'), dino('3.5_ALT'), false);
+    match = mac(104, '2.5_UST', 60);
+    api.setup(match, dino('2.5_UST'), dino('2.5_UST'), false);
     await api.botuCalistir();
     assert.equal(api.v21ShadowTracker.hasSignal(104, 'strong'), false, 'Fresh validation failure must block recording');
+    for (const [id, freshProbability] of [[109, 55.7], [110, 50.4]]) {
+        match = mac(id, '2.5_UST', 60);
+        api.setup(match, dino('2.5_UST'), dino('2.5_UST', freshProbability));
+        await api.botuCalistir();
+        assert.equal(api.v21ShadowTracker.hasSignal(id, 'strong'), false, 'Fresh EDGE outside -5/0 blocks initial approval');
+    }
 
     match = mac(105, 'MS1', 30);
     api.setup(match, dino('MS1', 55), dino('MS1', 55));
@@ -116,6 +128,46 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
         assert.ok(lines.length > 1);
         assert.equal(lines[0].split(',').length, lines[1].split(',').length, 'CSV columns must align');
     }
+
+    // Old and new rules on the SAME calendar day must not mix in summary/list/export.
+    const policy = localRequire('./v21_tariff');
+    const oldVersion = localRequire('./v21_history').LEGACY_VERSION;
+    const archived = api.v21ShadowTracker.recordSent({ fixtureId: 901, signalType: 'strong',
+        sentAt: '2026-09-13T00:00:00Z', market: '3.5_ALT', odds: 1.8, tariffVersion: oldVersion });
+    api.v21ShadowTracker.recordSent({ fixtureId: 902, signalType: 'strong',
+        sentAt: '2026-09-13T00:01:00Z', market: '2.5_UST', odds: 1.8, tariffVersion: policy.VERSION });
+    function get(route, query={}) {
+        let body, headers={};
+        routes.get(route)({query},{json(v){body=v;},send(v){body=v;},setHeader(k,v){headers[k]=v;},status(){return this;}});
+        return { body, headers };
+    }
+    const historyPath='/api/v21-consensus-shadow-history';
+    const current = JSON.parse(get(historyPath+'/export').body);
+    assert(current.signals.every(s=>s.tariffVersion===policy.VERSION));
+    assert(!current.signals.some(s=>s.fixtureId===901));
+    assert.equal(current.rules.minimumVotes,3);
+    const previous = get(historyPath+'/export',{cohort:'previous'});
+    const oldExport=JSON.parse(previous.body);
+    assert.equal(oldExport.signals.length,1);
+    assert.equal(oldExport.signals[0].signalId,archived.signalId);
+    assert.equal(oldExport.rules.minimumVotes,2);
+    assert.equal(oldExport.tariffVersion,oldVersion);
+    assert.equal(oldExport.summary.overall.total,1);
+    assert.match(previous.headers['Content-Disposition'],/-previous-/);
+    for(const cohort of ['current','previous']) {
+        const dated=get(historyPath,{date:'2026-09-13',cohort}).body;
+        assert(dated.signals.every(s=>cohort==='current'?s.tariffVersion===policy.VERSION:s.tariffVersion!==policy.VERSION));
+        const csv=get(historyPath+'/export.csv',{cohort}).body;
+        assert.equal(csv.includes(oldVersion),cohort==='previous');
+    }
+    const comparison=get('/api/test-lab-comparison').body.v21Shadow;
+    assert(comparison.signals.every(s=>s.tariffVersion===policy.VERSION));
+    assert.equal(comparison.archivedRecords,1);
+    assert.equal(comparison.summary.overall.total,current.signals.length);
+    const status=get('/api/status').body.testLabTracking.v21Shadow;
+    assert.equal(status.summary.overall.total,current.signals.length);
+    assert.equal(api.v21ShadowTracker.hasSignal(901,'strong'),true,'Reporting filters do not erase fixture locks');
+    assert.equal(api.v21ShadowTracker.data.signals.find(s=>s.fixtureId===901).tariffVersion,oldVersion);
     console.log('V21 server scan/fresh recheck, V19 lab isolation, Telegram union+dedup, final family guard and exports passed (offline).');
 })().catch(error => { console.error(error); process.exitCode = 1; })
     .finally(() => fs.rmSync(root, { recursive: true, force: true }));

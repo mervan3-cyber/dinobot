@@ -6,28 +6,37 @@ const v19 = require('./hybrid_tariff');
 const v17 = require('./market_tariff');
 
 const candidate = { market: '2.5_UST', minute: 45, odds: 1.8,
-    dinoProbability: 54, selectorProbability: 57, v18Probability: 47, prematchSupport: 62 };
+    dinoProbability: 54, selectorProbability: 57, v18Probability: 60, prematchSupport: 62 };
 assert.equal(v21.check(candidate).eligible, true);
-assert.equal(v21.check(candidate).voteCount, 2);
-for (const field of ['prematchSupport', 'selectorProbability']) {
+assert.equal(v21.check(candidate).voteCount, 3);
+for (const field of ['prematchSupport', 'dinoProbability', 'selectorProbability', 'v18Probability']) {
     assert.equal(v21.check({ ...candidate, [field]: 50 }).eligible, false, `${field}: exactly 50 is not above 50`);
     for (const missing of [null, undefined, '', true, NaN, Infinity, -1, 101])
         assert.equal(v21.check({ ...candidate, [field]: missing }).eligible, false, `${field}: missing/invalid cannot approve`);
 }
 const under = { ...candidate, market: '3.5_ALT', v18Probability: null };
-assert.equal(v21.check(under).eligible, true, 'Dino + V16 approve ALT; absent V18 is not fabricated');
+assert.equal(v21.check(under).eligible, false, 'ALT is excluded; missing V18 is not fabricated');
 assert.deepEqual(v21.check(under).votes, { dino: true, v16: true, v18: false });
 assert.equal(v21.check({ ...under, dinoProbability: 50 }).eligible, false);
-const edgeBoundary = { ...candidate, odds: 2, dinoProbability: 51 };
-assert.equal(v21.check(edgeBoundary).eligible, true, '+1 inclusive');
-assert.equal(v21.check({ ...edgeBoundary, dinoProbability: 51.1 }).eligible, false);
-assert.equal(v21.check({ ...candidate, dinoProbability: 0, v18Probability: 60 }).eligible, true, 'No lower EDGE bound');
-for (const market of ['MS1', 'X', 'MS2', '2_UST', 'ANY']) assert.equal(v21.check({ ...candidate, market }).eligible, false);
+const edgeBoundary = { ...candidate, odds: 1.6, dinoProbability: 62.5 };
+assert.equal(v21.check(edgeBoundary).eligible, true, '0 inclusive');
+assert.equal(v21.check({ ...edgeBoundary, dinoProbability: 57.5 }).eligible, true, '-5 inclusive');
+assert.equal(v21.check({ ...edgeBoundary, dinoProbability: 57.4 }).eligible, false, '-5.1 rejected');
+assert.equal(v21.check({ ...edgeBoundary, dinoProbability: 62.6 }).eligible, false, '+0.1 rejected');
+assert.equal(v21.check({ ...edgeBoundary, dinoProbability: 62.54 }).recordedEdge, 0, 'Same rounded EDGE as full-stat');
+assert.equal(v21.check({ ...candidate, dinoProbability: 0, v18Probability: 60 }).eligible, false);
+assert.equal(v21.canPreselect({ ...candidate, dinoProbability: 50 }), false, 'Mandatory Dino checked before fresh requests');
+for (const market of ['MS1', 'X', 'MS2', '2_UST', 'ANY', '0.5_ALT', '2.5_ALT', '4.5_ALT']) assert.equal(v21.check({ ...candidate, market }).eligible, false);
 for (const minute of [24, 81, null]) assert.equal(v21.check({ ...candidate, minute }).eligible, false);
 for (const minute of [25, 80]) assert.equal(v21.check({ ...candidate, minute }).eligible, true);
 for (const odds of [1.49, 4.01, null]) assert.equal(v21.check({ ...candidate, odds }).eligible, false);
-for (const odds of [1.5, 4]) assert.equal(v21.check({ ...candidate, odds, dinoProbability: 0, v18Probability: 60 }).eligible, true);
+assert.equal(v21.check({ ...candidate, odds: 1.5, dinoProbability: 63 }).eligible, true);
+assert.equal(v21.check({ ...candidate, odds: 4 }).reasons.includes('oran 1.50–4.00 dışında'), false, 'Odds cap stays 4 even though other gates make high odds ineligible');
+assert.equal(v21.check({ ...candidate, prematchSupport: 99 }).eligible, true, 'No new pre ceiling');
 assert.equal(v21.canPreselect({ ...candidate, selectorProbability: null }), true, 'Cheap gate does not decide model votes');
+assert.equal(v21.check({ ...candidate, v18Probability: 47 }).eligible, false, 'Former 2-of-3 signal no longer passes');
+assert.equal(v21.check({ ...candidate, v18Probability: 50.001 }).eligible, true, 'Strict >50 on raw model values');
+assert.equal(v21.check({ ...candidate, dinoProbability: 51, odds: 2 }).eligible, false, 'Former +1 boundary no longer passes');
 
 const overlap = { slot: 'primary', market: '2.5_UST', minute: 30, odds: 1.8,
     dinoProbability: 55, selectorProbability: 60, v18Probability: 60, v18Edge: 5 };

@@ -1,5 +1,7 @@
 # V21 — ileri test ve ÜST Telegram yönlendiricisi
 
+> ARŞİV NOTU: Bu dosya 12 Eylül'deki eski 2/3 ÜST/ALT kuralını anlatır. Güncel 13 Eylül dar ÜST denemesi için `V21_1_DEGISIKLIKLER_2026-09-13.md` dosyasını kullanın.
+
 Build: `ml-v21-lab-over-telegram-ubuntu-2026-09-12` · Uygulama: 2.1.0
 
 Bu sürüm kullanıcının belirlediği kuralı uygular; yeniden eğitim, geçmiş günleri yeniden oynatma veya sonuçlara bakıp eşik arama yapılmadı. Testlerin geçmesi kârlılık kanıtı değildir. Gerçek sunucuya dağıtım ve gerçek Telegram gönderimi yerelde yapılmadı.

@@ -116,8 +116,10 @@ try {
     assert.equal(comparison?.activeV19?.telegram, false);
     assert.equal(comparison?.activeV19?.validationMode, 'fresh-required');
     assert.equal(comparison?.v21Shadow?.validationMode, 'fresh-required');
-    assert.equal(comparison?.v21Shadow?.policy.edgeHigh, 1);
-    assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 2);
+    assert.equal(comparison?.v21Shadow?.policy.edgeHigh, 0);
+    assert.equal(comparison?.v21Shadow?.policy.edgeLow, -5);
+    assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 3);
+    assert.deepEqual(comparison?.v21Shadow?.policy.markets, ['UST']);
     assert.deepEqual(
         comparison?.coreShadow?.rules?.map(rule => rule.market),
         ['MS2', '2.5_UST']

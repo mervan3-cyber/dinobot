@@ -1,11 +1,11 @@
 'use strict';
 
-const VERSION = 'v21-consensus-shadow-2026-09-12';
+const VERSION = 'v21-over-consensus-3of3-edge-m5-0-2026-09-13';
 const POLICY = Object.freeze({
-    version: VERSION, markets: ['UST', 'ALT'], minuteLow: 25, minuteHigh: 80,
+    version: VERSION, markets: ['UST'], minuteLow: 25, minuteHigh: 80,
     minimumOdd: 1.50, maximumOdd: 4.00, probabilityThreshold: 50,
-    prematchThreshold: 50, minimumVotes: 2, edgeHigh: 1,
-    edgeField: 'recordedEdge', edgeLow: null, maximumSignalsPerFixture: 1,
+    prematchThreshold: 50, minimumVotes: 3, edgeHigh: 0,
+    edgeField: 'recordedEdge', edgeLow: -5, maximumSignalsPerFixture: 1,
     selectionOrder: 'votes-desc, odds-asc, market-asc', telegram: false
 });
 const finite = value => value === null || value === undefined || value === '' ||
@@ -36,17 +36,19 @@ function inspect(args) {
 function check(args, { preselect = false } = {}) {
     const values = inspect(args);
     const reasons = [];
-    if (!/^\d+\.5_(UST|ALT)$/.test(String(args.market))) reasons.push('yalnız yarım gollü ÜST/ALT');
+    if (!/^\d+\.5_UST$/.test(String(args.market))) reasons.push('yalnız yarım gollü ÜST');
     if (values.minute === null || values.minute < POLICY.minuteLow || values.minute > POLICY.minuteHigh)
         reasons.push('dakika 25–80 dışında');
     if (values.odds === null || values.odds < POLICY.minimumOdd || values.odds > POLICY.maximumOdd)
         reasons.push('oran 1.50–4.00 dışında');
     if (values.prematchSupport === null || values.prematchSupport <= POLICY.prematchThreshold)
         reasons.push('Pre destek %50 üzerinde değil veya eksik');
-    if (values.recordedEdge === null || values.recordedEdge > POLICY.edgeHigh)
-        reasons.push('kayıt EDGE +1 üzerinde veya eksik');
+    if (values.recordedEdge === null || values.recordedEdge < POLICY.edgeLow || values.recordedEdge > POLICY.edgeHigh)
+        reasons.push('kayıt EDGE −5…0 dışında veya eksik');
+    // Dino is now mandatory; reject cheaply before requesting fresh stats/models.
+    if (!values.votes.dino) reasons.push('Dino %50 üzerinde değil veya eksik');
     if (!preselect && values.voteCount < POLICY.minimumVotes)
-        reasons.push('Dino/V16/V18 modellerinden en az ikisi %50 üzerinde değil');
+        reasons.push('Dino/V16/V18 modellerinin üçü de %50 üzerinde değil veya eksik');
     return { ...values, eligible: !reasons.length, reasons, rule: POLICY, slot: 'primary' };
 }
 

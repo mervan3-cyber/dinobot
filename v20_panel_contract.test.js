@@ -166,6 +166,14 @@ async function run() {
     context.renderTestLabHistory({ activeV19: { enabled: true }, v21Shadow: { enabled: true } });
     assert.equal(byId('testlab-v19-mode-badge').textContent, 'TAZE DOĞRULAMA');
     assert.equal(byId('testlab-v21-mode-badge').textContent, 'TAZE DOĞRULAMA');
+    context.renderTestLabHistory({ v21Shadow: { enabled: true, archivedRecords: 129,
+        startedAt: '2026-09-13T00:01:00Z', summary: {overall:{total:1,wins:0,losses:0}},
+        signals: [{...signal,decisionModel:'consensus',dinoProbability:54,selectorV2Probability:57,
+            v18Probability:60,voteCount:3,decisionEdge:-1.6,prematchMarketSupport:65}] } });
+    assert.match(byId('testlab-v21-cohort-note').textContent,/129 eski kayıt/);
+    assert.match(byId('testlab-v21-cohort-note').textContent,/İlk sinyal/);
+    assert.equal(byId('testlab-v21-total').textContent,'1');
+    assert.match(byId('testlab-v21-rows').children[0].children[4].textContent,/3\/3 onay/);
     for (const [arm, endpoint] of [['v19', 'v19-independent-shadow'], ['v21', 'v21-consensus-shadow']]) {
         context.downloadTestLabExport(arm, 'json');
         assert.match(anchors.at(-1).href, new RegExp(`/api/${endpoint}-history/export`));
@@ -189,6 +197,11 @@ async function run() {
     context.apiFetch = async endpoint => { requested.push(endpoint); return data; };
     await context.changeTestLabDate('2026-09-10');
     assert.equal(requested.at(-1), '/api/test-lab-comparison?limit=100&date=2026-09-10');
+    context.downloadTestLabExport('v21','json','previous');
+    assert.equal(anchors.at(-1).href,'https://offline.test/api/v21-consensus-shadow-history/export?cohort=previous',
+        'Archive button includes all previous dates, not current-cohort/common-period/date filters');
+    context.downloadTestLabExport('v21','json');
+    assert.equal(anchors.at(-1).href,'https://offline.test/api/v21-consensus-shadow-history/export?scope=test-lab&date=2026-09-10');
     for (const [format, suffix] of [['json', '/export'], ['csv', '/export.csv']]) {
         context.downloadTestLabExport('v20', format);
         const anchor = anchors.at(-1);
