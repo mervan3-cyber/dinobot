@@ -17,13 +17,16 @@ for (const requiredText of [
     '/api/two-rule-core-shadow-history',
     '/api/v17-legacy-shadow-history',
     'TAZE DOĞRULAMA',
-    'HAM GÖZLEM',
+    '/api/v21-consensus-shadow-history',
+    '/api/v19-independent-shadow-history',
+    'Pre destek',
     'scope: "test-lab"'
 ]) {
     assert.match(publicPanel, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 
 const scripts = [...publicPanel.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+assert.doesNotMatch(publicPanel, /HAM GÖZLEM|hybrid-observation|Hibrit Gözlem/);
 assert.ok(scripts.length > 0, 'Panel JavaScript bloğu bulunamadı.');
 for (const [, source] of scripts) {
     new vm.Script(source);

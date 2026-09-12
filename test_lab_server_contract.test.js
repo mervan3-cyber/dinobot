@@ -9,7 +9,8 @@ const Module = require('module');
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'dino-test-lab-contract-'));
 process.env.DINO_CORE_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'core.json');
 process.env.DINO_LEGACY_V17_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v17.json');
-process.env.DINO_HYBRID_OBSERVATION_HISTORY_FILE = path.join(temporaryDirectory, 'observation.json');
+process.env.DINO_V19_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v19.json');
+process.env.DINO_V21_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v21.json');
 process.env.DINO_V20_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v20.json');
 process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
 
@@ -87,8 +88,12 @@ try {
         '/api/v17-legacy-shadow-history',
         '/api/v17-legacy-shadow-history/export',
         '/api/v17-legacy-shadow-history/export.csv',
-        '/api/hybrid-observation-history/export',
-        '/api/hybrid-observation-history/export.csv'
+        '/api/v19-independent-shadow-history',
+        '/api/v19-independent-shadow-history/export',
+        '/api/v19-independent-shadow-history/export.csv',
+        '/api/v21-consensus-shadow-history',
+        '/api/v21-consensus-shadow-history/export',
+        '/api/v21-consensus-shadow-history/export.csv'
     ];
     for (const route of requiredGetRoutes) {
         assert.ok(routes.get.has(route), `GET route eksik: ${route}`);
@@ -106,7 +111,13 @@ try {
     assert.ok(comparison?.activeV19?.summary);
     assert.equal(comparison?.coreShadow?.validationMode, 'fresh-required');
     assert.equal(comparison?.legacyV17?.validationMode, 'fresh-required');
-    assert.equal(comparison?.hybridObservation?.validationMode, 'raw-observation');
+    assert.equal(comparison?.hybridObservation, undefined);
+    assert.equal(routes.get.has('/api/hybrid-observation-history/export'), false);
+    assert.equal(comparison?.activeV19?.telegram, false);
+    assert.equal(comparison?.activeV19?.validationMode, 'fresh-required');
+    assert.equal(comparison?.v21Shadow?.validationMode, 'fresh-required');
+    assert.equal(comparison?.v21Shadow?.policy.edgeHigh, 1);
+    assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 2);
     assert.deepEqual(
         comparison?.coreShadow?.rules?.map(rule => rule.market),
         ['MS2', '2.5_UST']
@@ -116,6 +127,8 @@ try {
     routes.get.get('/api/status')({}, { json(value) { status = value; } });
     assert.ok(status?.testLabTracking?.coreShadow);
     assert.ok(status?.testLabTracking?.legacyV17);
+    assert.ok(status?.testLabTracking?.v19Shadow);
+    assert.ok(status?.testLabTracking?.v21Shadow);
     assert.equal(status?.v18ShadowTracking, undefined);
 
     console.log('Test Lab server contract tests passed.');

@@ -105,7 +105,7 @@ const data = {
 async function run() {
     context.renderTestLabHistory(data);
     const cells = byId('testlab-v20-rows').children[0].children;
-    assert.equal(cells.length, 9);
+    assert.equal(cells.length, 10);
     assert.match(cells[0].textContent, /10\.09\.2026/);
     assert.equal(cells[1].textContent, signal.match);
     assert.equal(cells[1].children.length, 0, 'Match text must not become HTML.');
@@ -113,9 +113,10 @@ async function run() {
     assert.equal(cells[3].textContent, '2.5 ÜST');
     assert.equal(cells[4].textContent, '%77.3');
     assert.equal(cells[5].textContent, '%+8.4');
-    assert.equal(cells[6].textContent, '1.610');
-    assert.equal(cells[7].textContent, '✅ Kazandı');
-    assert.equal(cells[8].textContent, '2-1');
+    assert.equal(cells[6].textContent, '-');
+    assert.equal(cells[7].textContent, '1.610');
+    assert.equal(cells[8].textContent, '✅ Kazandı');
+    assert.equal(cells[9].textContent, '2-1');
     assert.equal(byId('testlab-v20-total').textContent, '2');
     assert.equal(byId('testlab-v20-win-loss').textContent, '1 / 1');
     assert.equal(byId('testlab-v20-hit-rate').textContent, '%50.0');
@@ -136,17 +137,43 @@ async function run() {
     const missing = { ...signal, v20Probability: null, v20Edge: null, odds: null, settlement: {} };
     context.renderTestLabRows('testlab-v20-rows', [missing], { probabilityOnly: true }, '');
     const missingCells = byId('testlab-v20-rows').children[0].children;
-    assert.deepEqual(missingCells.slice(4, 7).map(cell => cell.textContent), ['-', '-', '-']);
-    assert.equal(missingCells[7].textContent, '⏳ Bekliyor');
-    assert.equal(missingCells[8].textContent, '-');
+    assert.deepEqual(missingCells.slice(4, 8).map(cell => cell.textContent), ['-', '-', '-', '-']);
+    assert.equal(missingCells[8].textContent, '⏳ Bekliyor');
+    assert.equal(missingCells[9].textContent, '-');
     context.setTestLabSummary('testlab-v20', { overall: { averageOdds: null } });
     assert.equal(byId('testlab-v20-average-odds').textContent, '-');
     assert.equal(context.testLabEdge({ v20Edge: 0 }, true), '%+0.0');
     assert.equal(context.testLabEdge({ v20Edge: -2.5 }, true), '%-2.5');
 
+    // Pre is visible on all Lab arms and in shared tracking; absent is not zero.
+    for (const [pre, expected] of [[null, '-'], [undefined, '-'], [0, '%0.0'], [62.5, '%62.5']]) {
+        context.renderTestLabRows('testlab-v21-rows', [{ ...signal,
+            v20Probability: null, v20Edge: null, decisionModel: 'consensus',
+            dinoProbability: 54, selectorV2Probability: 57, v18Probability: null,
+            voteCount: 2, decisionProbability: null, decisionEdge: -1.6,
+            prematchMarketSupport: pre
+        }], { consensus: true }, '');
+        const consensusCells = byId('testlab-v21-rows').children[0].children;
+        assert.equal(consensusCells.length, 10);
+        assert.match(consensusCells[4].textContent, /2\/3 onay/);
+        assert.match(consensusCells[4].textContent, /V18 -/);
+        assert.equal(consensusCells[6].textContent, expected);
+        context.renderSignalHistory({ signals: [{ ...signal, prematchMarketSupport: pre }] });
+        const sharedCells = byId('signal-history-rows').children[0].children;
+        assert.equal(sharedCells.length, 10);
+        assert.equal(sharedCells[6].textContent, expected);
+    }
+    context.renderTestLabHistory({ activeV19: { enabled: true }, v21Shadow: { enabled: true } });
+    assert.equal(byId('testlab-v19-mode-badge').textContent, 'TAZE DOĞRULAMA');
+    assert.equal(byId('testlab-v21-mode-badge').textContent, 'TAZE DOĞRULAMA');
+    for (const [arm, endpoint] of [['v19', 'v19-independent-shadow'], ['v21', 'v21-consensus-shadow']]) {
+        context.downloadTestLabExport(arm, 'json');
+        assert.match(anchors.at(-1).href, new RegExp(`/api/${endpoint}-history/export`));
+    }
+
     for (const [result, label] of [['L', '❌ Kaybetti'], ['PUSH', '↩️ İade'], ['VOID', '🚫 Geçersiz']]) {
         context.renderTestLabRows('testlab-v20-rows', [{ ...signal, settlement: { result, finalScore: '1-1' } }], { probabilityOnly: true }, '');
-        assert.equal(byId('testlab-v20-rows').children[0].children[7].textContent, label);
+        assert.equal(byId('testlab-v20-rows').children[0].children[8].textContent, label);
     }
 
     context.renderTestLabHistory({});

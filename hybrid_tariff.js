@@ -3,7 +3,7 @@
 // V19, V17'nin başarılı canlı pencerelerini V18'in yalnız doğrulanan
 // challenger pencereleriyle birleştirir. Bütün ALT marketleri kapalıdır.
 // Aynı maçta en fazla bir ilk ve daha ileri dakikada farklı bir takip sinyali
-// üretilebilir. 0.5/1.5/3.5 ÜST ise karar vermeden ayrı gözlemde tutulur.
+// üretilebilir. Bu politika tüm mevcut marketleriyle bağımsız labda korunur.
 const VERSION = 'v19.0-hybrid-live-2026-09-07';
 const MINIMUM_ODD = 1.50;
 const MAXIMUM_ODD = 2.00;
@@ -56,30 +56,6 @@ const FOLLOW_RULES = Object.freeze([
     }),
 ]);
 
-const OBSERVATION_RULES = Object.freeze([
-    Object.freeze({
-        id: 'H-S-05O-V18', market: '0.5_UST', decisionModel: 'v18',
-        minuteLow: 55, minuteHigh: 64, probabilityMinimum: 60,
-        probabilityMaximum: 74.9, edgeField: 'v18Edge', edgeLow: 5,
-        edgeHigh: 15, minimumOdd: 1.60, maximumOdd: MAXIMUM_ODD,
-        priority: 60,
-    }),
-    Object.freeze({
-        id: 'H-S-15O-V16', market: '1.5_UST', decisionModel: 'v16',
-        minuteLow: 40, minuteHigh: 44, probabilityMinimum: 50,
-        probabilityMaximum: 70, edgeField: 'v16Edge', edgeLow: -100,
-        edgeHigh: 2.5, minimumOdd: 1.60, maximumOdd: MAXIMUM_ODD,
-        priority: 55,
-    }),
-    Object.freeze({
-        id: 'H-S-35O-V16', market: '3.5_UST', decisionModel: 'v16',
-        minuteLow: 35, minuteHigh: 45, probabilityMinimum: 60,
-        probabilityMaximum: 70, edgeField: 'v16Edge', edgeLow: -3.5,
-        edgeHigh: -1.5, minimumOdd: 1.60, maximumOdd: MAXIMUM_ODD,
-        priority: 50,
-    }),
-]);
-
 const finite = value => value === null || value === undefined || value === '' || typeof value === 'boolean'
     ? null
     : Number.isFinite(Number(value)) ? Number(value) : null;
@@ -111,10 +87,6 @@ function edgeValues(dinoProbability, selectorProbability, v18Edge, odds) {
 
 function findRule(slot, market) {
     return rulesForSlot(slot).find(rule => rule.market === market) || null;
-}
-
-function findObservationRule(market) {
-    return OBSERVATION_RULES.find(rule => rule.market === market) || null;
 }
 
 function evaluateRule({
@@ -222,13 +194,6 @@ function check({
     return result;
 }
 
-function checkObservation(args) {
-    return {
-        ...evaluateRule({ ...args, rule: findObservationRule(args.market) }),
-        slot: 'observation',
-    };
-}
-
 // V18 puanı güç bağlamı toplandıktan sonra hesaplanabildiği için ucuz ön seçim
 // yalnız dakika/oran/market kapısını kontrol eder. Nihai karar daima check ile
 // tüm olasılık ve EDGE koşulları üzerinden yeniden verilir.
@@ -257,12 +222,9 @@ module.exports = {
     MAXIMUM_ODD,
     PRIMARY_RULES,
     FOLLOW_RULES,
-    OBSERVATION_RULES,
     currentSlot,
     edgeValues,
     findRule,
-    findObservationRule,
     check,
-    checkObservation,
     canPreselect,
 };

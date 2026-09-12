@@ -1,16 +1,16 @@
-# V20 bağımsız gölge — mevcut Ubuntu kurulumunu güncelleme
+# V21 — mevcut Ubuntu kurulumunu güncelleme
 
-Bu paket **V20'yi Telegram'a geçirmez**. Mevcut V19 karar hattı ve eski V17 / hibrit karşılaştırmaları korunur. V20, aynı veri akışından ayrı tahmin üretip yalnız test laboratuvarına kaydeder. Kod henüz sunucunuza yüklenmedi.
+Bu paket **Telegram seçimini değiştirir**: V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST. V21 ise yalnız Test Lab'da ÜST/ALT uzlaşması olarak çalışır. Yeni çekirdek, V20 ve Legacy V17 labları korunur; V19 için bağımsız lab geçmişi açılır.
 
-## Önce koruyun
+Kod henüz sunucunuza yüklenmedi. Paketi açmak için önce mevcut uygulama dizininizin ve çalışan sürümünüzün yedeğini alın. `.env`, `dino_data.json`, bütün sinyal/aday/gölge geçmişleri, API cache dosyaları ve `v20_snapshot_archive` özellikle korunmalıdır. ZIP bunları içermez. Uygulama klasörünü silmeyin; boş klasörle değiştirmeyin.
 
-Mevcut uygulama klasörünüzün bir yedeğini alın. Özellikle `.env`, `dino_data.json`, sinyal/aday/gölge geçmişleri, API önbellekleri ve varsa `v20_snapshot_archive` korunmalı. ZIP bunları içermez; yeni kodu açarken mevcut klasörü silmeyin veya boş klasörle değiştirmeyin.
+## Güncelleme
 
-Paket tam kod güncellemesidir; **yalnız index.html kopyalamak yeterli değildir**. ZIP'in kökünde server.js, public/, model JSON'ları ve testler bulunur. Bunları mevcut dinobot uygulama dizinine açın. Eski Node/Python/PM2 ve API anahtarı ayarlarınızı koruyun. Python tarafında kullanılan modüller standart kütüphanedendir; V20 eğitimi için yerelde kullanılan NumPy/scikit-learn sunucuda gerekmez.
+Aşağıdaki `/root/dinobot` ve PM2 adı `dinobot`, yalnız mevcut kurulumunuz gerçekten bu adları kullanıyorsa geçerlidir. Farklıysa kendi uygulama yolunuzu ve PM2 adınızı kullanın.
 
-## Kontrol ve başlatma
-
-Uygulama dizininizde (mevcut kurulumunuz `/root/dinobot` ise):
+1. Yedeği aldıktan sonra `pm2 stop dinobot` ile mevcut süreci durdurun.
+2. `dinobot-v21-test-lab-ust-telegram-ubuntu-2026-09-12.zip` içindeki dosyaları mevcut uygulama dizinine açın. Yalnız HTML değil, ZIP'teki bütün kod/model dosyaları gerekir. `public/index.html` de yenilenmelidir.
+3. Uygulama dizininde doğrulayın:
 
 ```bash
 cd /root/dinobot
@@ -26,35 +26,29 @@ pm2 save
 pm2 logs dinobot --lines 40 --nostream
 ```
 
-Bu güncelleme için .env değişikliği zorunlu değil. Ortam değişkenini kendiniz değiştirirseniz PM2 yeniden başlatırken `--update-env` gerekebilir. Node/Python komutları sunucudaki mevcut kurulumunuzdan çalışır; yerel doğrulamada Node v24.19.0 kullanıldı. Paket üzerinde 10 çevrimdışı test grubu ve sözdizimi kontrolleri yapıldı; gerçek Ubuntu açılışı, npm indirmesi ve gerçek API/Telegram çağrıları yerelde test edilmedi.
+Bir kontrol başarısızsa yeni sürümü başlatmayın; aldığınız kod yedeğine dönüp mevcut geçmişleri koruyun. Paket bağımlılık sürümlerini değiştirmez. Python standart kütüphane kullanır; eğitim kütüphaneleri sunucuda gerekmez. Yerel test ortamı Node v24.19.0'dır; sunucudaki Node sürümü bu kodun gerektirdiği modern Node özelliklerini desteklemelidir.
 
-Başlangıç sürümü: `ml-v20-independent-shadow-ubuntu-2026-09-09`.
+## Açılışta kontrol
 
-Paneli sert yenileyin. Test laboratuvarında V20 modelinin yüklü ve gölge modunun açık olduğunu görün. Model/politika dosyası okunamazsa V20 hata gösterir; başka bir modele sessizce geçmez. Henüz sinyal olmaması tek başına arıza değildir: adaylarda V20 yüzdesi ve ret gerekçeleri de izlenebilir.
+- Log ve `/api/status` build değeri: `ml-v21-lab-over-telegram-ubuntu-2026-09-12`.
+- Telegram yönlendiricisi mevcut V19 2.5/4.5 ÜST + Legacy V17 2.5 ÜST olarak görünmeli.
+- Paneli sert yenileyin. Test Lab'da V19 bağımsız lab, V20, Yeni Çekirdek, Legacy V17 ve V21 bulunmalı. Ham Gözlem bulunmamalı.
+- V21: Pre >%50, Dino/V16/V18'den 2/3 >%50, kayıt EDGE ≤+1, dakika 25–80, oran 1.50–4.00. Henüz uygun canlı sinyal olmaması tek başına arıza değildir.
+- Yeni V19 ve V21 geçmiş dosyalarının uygulama kullanıcısı tarafından yazılabildiğini kontrol edin. Dosyaları silmek tekrar kilidini kaybettirir.
+- Shared sinyal takibi yalnız Telegram'ın başarılı gönderimlerini içerir. V19 labı tüm mevcut marketleri test ettiği için iki tablo artık birebir aynı olmak zorunda değildir.
 
-## V20'nin sabit kuralları
+## Ortam değişkenleri
 
-- ALT kapalı. 0.5/1.5/2.5/3.5/4.5 ÜST ve MS1/X/MS2 aday olabilir.
-- Dakika 25–80; oran 1.50–4.00.
-- V20 olasılığı en az %70 ve V20 ham EDGE en az +10 yüzde puan.
-- EDGE = V20 olasılığı − 100/oran. 1.50 oranda bu iki koşul birlikte yaklaşık %76,67 gerektirir.
-- Maç başına en fazla 1 gölge sinyal. İkinci sinyal üretim paketinde kapalı.
-- Canlı istatistik ve oran tekrar kontrol edilir; son fixture skor/statü/kimlik kontrolü de geçmelidir. Başarısız veya bayat veriyle V20 sinyali yazılmaz.
+Varsayılanlar yeni kurulum için yeterlidir. `.env` otomatik değiştirilmez; anahtarlar korunur.
 
-Model canlı fiyatın ima ettiği olasılığı canlı istatistiklerle düzeltir; Dino/V16/V18 olasılıklarını kullanmaz. Pre-match, API takım/tahmin bağlamı ve xG seçenekleri incelendi, bu veride yeterli/tutarlı ek katkı doğrulanamadığından final modelde yok. Bu özellikler eski kollarda mevcut davranışlarıyla bulunabilir.
+- `DINO_V21_SHADOW_ENABLED` ve `DINO_V19_SHADOW_ENABLED`: varsayılan `true`. Yalnız ilgili lab kolunu kapatmak için `false`.
+- `DINO_V21_SHADOW_HISTORY_FILE` ve `DINO_V19_SHADOW_HISTORY_FILE`: istenirse özel, yazılabilir geçmiş yolu.
+- Mevcut `DINO_V20_SHADOW_ENABLED`, `DINO_CORE_SHADOW_ENABLED`, `DINO_LEGACY_V17_SHADOW_ENABLED` korunur; hepsinin labda çalışmasını istiyorsanız açık olmalıdır.
+- Önceden `DINO_HYBRID_TARIFF_ENABLED=false` veya `DINO_V2_SELECTOR_ENABLED=false` ayarladıysanız Telegram'ın yeni yönlendiricisini kullanmak için bunları `true` yapın. Eski alternatif modlar yeni Telegram son kapısından sessizce başka market gönderemez.
+- Ortam değişkenini değiştirirseniz PM2 için `pm2 restart dinobot --update-env` kullanmanız gerekebilir.
 
-## Kalıcılık ve API yükü
+V21 ve bağımsız V19 uygun adayları, Telegram adayı olmasa da taze kontrol isteği oluşturabilir. Günlük API ve disk tüketimini izleyin. Bu kod taze veri kontrollerini kaldırmaz veya kotayı sınırsız artırmaz.
 
-V20 gölge varsayılan açıktır. İstenirse `DINO_V20_SHADOW_ENABLED=false` ile yalnız bu kol kapatılabilir. Özel konum gerekirse `DINO_V20_SHADOW_HISTORY_FILE` ve `DINO_V20_SNAPSHOT_ARCHIVE_DIR` kullanılabilir; dizin uygulama kullanıcısı için yazılabilir olmalıdır.
+Eski Ham Gözlem dosyası varsa yedek/arşiv olarak bırakılır; yeni kod onu okumaz. Geçmişiniz fiziksel olarak silinmez.
 
-Yeni gölge geçmişi `dino_v20_shadow_history.json` dosyasındadır. Restart sonrasında maç başına sinyal hakkı buradan korunur. Dosyayı silmek aynı maça yeniden sinyal verilmesine yol açabilir.
-
-Tam-stat tarama anları ayrıca `v20_snapshot_archive` altında Türkiye gününe göre eklemeli JSONL arşivlenir. Panelin kayıt sınırı eski anları çıkarsa da bu anlar arşivde kalır. Disk kullanımını düzenli kontrol edin ve arşivi yedekleyin. Panelden çıkarılmış bir maç sonradan biterse arşivin final sonucu ayrıca tamamlanmaya ihtiyaç duyabilir; bütün arşiv etiketlerinin otomatik tamamlandığını varsaymayın.
-
-V20 uygun adayı için taze istatistik/oran ve son fixture kontrolü ek API isteği doğurabilir; günlük maliyet aday sayısına bağlıdır. Kaynakların yerel alınma zamanları kaydedilir. Sağlayıcının gerçek yayın gecikmesi bilinmediğinden bu kontroller kusursuz eşzamanlılık veya her fiyatın oynanabilirliğini garanti etmez.
-
-## Sonuçları nasıl değerlendirelim?
-
-Geliştirme döneminin başarısı bağımsız başarı kanıtı değildir. 8 Eylül ayrılmış örneği yalnız 2 sinyal verdi: 1 kazanan / 1 kaybeden, teorik ROI −%16,7. V20'nin üstünlüğü henüz doğrulanmadı. Sonuçlara göre eşikleri günlük oynatmadan yeni canlı günlerin V20 JSON'unu, tam-stat arşivini ve mevcut V19 sonuçlarını birlikte değerlendirin.
-
-Ayrıntılı eğitim/test raporu paketteki `V20_INCELEME_VE_KURULUM_2026-09-09.md` dosyasındadır. Belirli bir günlük başarı veya azami kayıp sayısı taahhüt edilmez.
+Kural ayrıntıları ve doğrulama kapsamı: `V21_DEGISIKLIKLER_2026-09-12.md`. Yeni sistemin kârlılığı henüz kanıtlanmış değildir; V21'i ileri testte değerlendirin.

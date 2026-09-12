@@ -55,7 +55,6 @@ globalThis.testApi = {
         if (f.send) telegramSinyaliGonder = f.send;
         selectorV2OnAdayMi = () => false;
         golgeGucBaglamlariniTopla = async () => new Map();
-        hibritGozlemAdayiniKaydet = () => null;
         labGolgeOnAdayiMi = () => false;
         tazeLabGolgeKayitlariniOlustur = () => ({});
         fixtureGonderimKaydi = () => null;

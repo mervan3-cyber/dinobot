@@ -68,11 +68,6 @@ for (const market of ['0.5_UST', '1.5_UST', '3.5_UST']) {
         false,
         `${market} Telegram portföyünde olmamalı`
     );
-    assert.equal(
-        tariff.OBSERVATION_RULES.some(rule => rule.market === market),
-        true,
-        `${market} gözlem portföyünde kalmalı`
-    );
 }
 
 assert.equal(tariff.check({
@@ -84,13 +79,5 @@ assert.equal(tariff.check({
     slot: 'primary', market: 'X', minute: 65, odds: 2.01,
     dinoProbability: implied(2.01) + 1, selectorProbability: 60,
 }).eligible, false, '2.00 üstü oran kapalı');
-
-const observation15 = tariff.checkObservation({
-    market: '1.5_UST', minute: 42, odds: 1.70,
-    dinoProbability: 65, selectorProbability: 60,
-    v18Probability: 20, v18Edge: -10,
-});
-assert.equal(observation15.eligible, true);
-assert.equal(observation15.decisionModel, 'v16');
 
 console.log('V19 hybrid tariff tests passed.');
