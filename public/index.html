@@ -298,7 +298,7 @@
         }
         .v18-arm-card.core { border-color: rgba(100,181,246,.58); }
         .v18-arm-card.legacy { border-color: rgba(177,137,255,.52); }
-        .v18-arm-card.observation { border-color: rgba(255,211,79,.55); }
+        .v18-arm-card.v21 { border-color: rgba(255,211,79,.55); }
 
         .v18-arm-title {
             display: flex;
@@ -346,7 +346,7 @@
         }
         .v18-table-panel.core { border-color: rgba(100,181,246,.38); }
         .v18-table-panel.legacy { border-color: rgba(177,137,255,.34); }
-        .v18-table-panel.observation { border-color: rgba(255,211,79,.38); }
+        .v18-table-panel.v21 { grid-column: 1 / -1; border-color: rgba(255,211,79,.38); }
 
         .test-lab-table-title {
             display: flex;
@@ -1336,7 +1336,7 @@
             <button type="button" data-target="section-v18-shadow" onclick="jumpToSection('section-v18-shadow', this)">Test Lab</button>
             <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
             <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
-            <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">V17 Tarifesi</button>
+            <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
             <button type="button" data-target="section-radar" onclick="jumpToSection('section-radar', this)">Sistem Radarı</button>
         </nav>
 
@@ -1361,7 +1361,7 @@
                 <div class="meta-item">
                     <span class="meta-label">Karar güvenliği</span>
                     <span class="meta-value">Tam-stat + taze doğrulama</span>
-                    <span class="meta-subvalue">ALT kapalı · oran 1.50+</span>
+                    <span class="meta-subvalue">Telegram yalnız ÜST · oran 1.50+</span>
                 </div>
             </div>
 
@@ -1649,7 +1649,7 @@
                 </div>
             </div>
 
-            <p class="muted" style="margin-bottom:10px;">Her maç için en fazla bir ilk sinyal ve yalnız daha ileri dakikada, farklı markette bir takip sinyali kaydedilir.</p>
+            <p class="muted" style="margin-bottom:10px;">Telegram: V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST. Ortak maç kilidiyle tek sinyal; eski ilk/takip kayıtları korunur.</p>
 
             <div class="table-wrap">
                 <table>
@@ -1660,14 +1660,15 @@
                             <th>Maç</th>
                             <th>Dk.</th>
                             <th>Market</th>
-                            <th>V16</th>
+                            <th>Model / kaynak</th>
+                            <th>Pre destek</th>
                             <th>Oran</th>
                             <th>Sonuç</th>
                             <th>Final</th>
                         </tr>
                     </thead>
                     <tbody id="signal-history-rows">
-                        <tr><td colspan="9" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
+                        <tr><td colspan="10" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1677,7 +1678,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
-                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">Aktif V19, deneysel V20 ve bağımsız gölge kolları aynı Türkiye tarihinde ölçülür.</p>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V19 · bağımsız lab, deneysel V20 ve bağımsız gölge kolları aynı Türkiye tarihinde ölçülür.</p>
                 </div>
                 <div class="tracker-actions">
                     <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
@@ -1688,7 +1689,7 @@
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
-                    <span class="muted">V20 dahil bütün test kolları aynı tarih filtresiyle karşılaştırılır; yalnız V19 Telegram kararı verir.</span>
+                    <span class="muted">Beş lab kolu Telegram’dan bağımsızdır. Telegram: V19 ÜST + Legacy V17 yalnız 2.5 ÜST.</span>
                 </div>
                 <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
                     <option value="">🗂️ Tüm Ortak Test Dönemi</option>
@@ -1697,7 +1698,7 @@
 
             <div class="v18-comparison-grid">
                 <div class="v18-arm-card active">
-                    <div class="v18-arm-title"><span>🟠 Aktif V19</span><span class="mini-badge bg-warning" id="testlab-v19-mode-badge">TELEGRAM</span></div>
+                    <div class="v18-arm-title"><span>🟠 V19 · bağımsız lab</span><span class="mini-badge bg-warning" id="testlab-v19-mode-badge">TAZE DOĞRULAMA</span></div>
                     <div class="v18-arm-metrics">
                         <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v19-total">0</strong></div>
                         <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v19-win-loss">0 / 0</strong></div>
@@ -1736,16 +1737,24 @@
                         <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v17-average-odds">-</strong></div>
                     </div>
                 </div>
-                <div class="v18-arm-card observation">
-                    <div class="v18-arm-title"><span>🟡 Hibrit Gözlem</span><span class="mini-badge bg-warning" id="testlab-observation-mode-badge">HAM GÖZLEM</span></div>
+                <div class="v18-arm-card v21">
+                    <div class="v18-arm-title"><span>🟡 V21 · ÜST / ALT</span><span class="mini-badge bg-warning" id="testlab-v21-mode-badge">TAZE DOĞRULAMA</span></div>
                     <div class="v18-arm-metrics">
-                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-observation-total">0</strong></div>
-                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-observation-win-loss">0 / 0</strong></div>
-                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-observation-hit-rate">-</strong></div>
-                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-observation-roi">-</strong></div>
-                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-observation-average-odds">-</strong></div>
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v21-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v21-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v21-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v21-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v21-average-odds">-</strong></div>
                     </div>
                 </div>
+            </div>
+
+            <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 ÜST ALT kuralları">
+                <span class="test-lab-rule">V21 · ÜST / ALT · Pre &gt; %50</span>
+                <span class="test-lab-rule">Dino / V16 / V18: en az 2 model &gt; %50 · eksik puan onay değildir</span>
+                <span class="test-lab-rule">Kayıt EDGE ≤ +1 · negatiflerde alt sınır yok</span>
+                <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · Maç başına 1 · Telegram yok</span>
+                <span class="test-lab-rule">Aynı anda birden çok aday: onay sayısı ↓, oran ↑, market adı</span>
             </div>
 
             <div class="test-lab-rules" id="test-lab-v20-rules" aria-label="V20 deneysel politika bilgisi">
@@ -1761,45 +1770,45 @@
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. Bütün ALT marketleri kapalıdır.</p>
-                <span class="mini-badge bg-info">4 BAĞIMSIZ TEST KOLU</span>
+                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. V21’de ÜST ve ALT açıktır; diğer lab politikaları değişmedi.</p>
+                <span class="mini-badge bg-info">5 BAĞIMSIZ TEST KOLU</span>
             </div>
 
             <div class="v18-table-grid">
                 <div class="v18-table-panel">
                     <div class="test-lab-table-title">
-                        <h4>🟠 Aktif V19 kayıtları</h4>
+                        <h4>🟠 V19 · bağımsız lab kayıtları</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v19','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v19','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v19-rows"><tr><td colspan="9" class="empty-row">Henüz V19 sinyali yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v19-rows"><tr><td colspan="10" class="empty-row">Henüz V19 sinyali yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel v20">
                     <div class="test-lab-table-title">
                         <h4>🧠 V20 · deneysel taze-doğrulamalı gölge</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v20','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v20','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Olasılık</th><th>Ham EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v20-rows"><tr><td colspan="9" class="empty-row">Henüz V20 gölge sinyali yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Olasılık</th><th>Ham EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v20-rows"><tr><td colspan="10" class="empty-row">Henüz V20 gölge sinyali yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel core">
                     <div class="test-lab-table-title">
                         <h4>🔵 Yeni çekirdek · taze doğrulama</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('core','json')">JSON</button><button type="button" onclick="downloadTestLabExport('core','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V18</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-core-rows"><tr><td colspan="9" class="empty-row">Henüz yeni çekirdek sinyali yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V18</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-core-rows"><tr><td colspan="10" class="empty-row">Henüz yeni çekirdek sinyali yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel legacy">
                     <div class="test-lab-table-title">
                         <h4>🟣 Legacy V17 · taze doğrulama</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v17','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v17','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V16</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v17-rows"><tr><td colspan="10" class="empty-row">Henüz Legacy V17 sinyali yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V16</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v17-rows"><tr><td colspan="11" class="empty-row">Henüz Legacy V17 sinyali yok.</td></tr></tbody></table></div>
                 </div>
-                <div class="v18-table-panel observation">
+                <div class="v18-table-panel v21">
                     <div class="test-lab-table-title">
-                        <h4>🟡 Hibrit · ham gözlem kayıtları</h4>
-                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('observation','json')">JSON</button><button type="button" onclick="downloadTestLabExport('observation','csv')">CSV</button></div>
+                        <h4>🟡 V21 · ÜST / ALT · 2/3 onay</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v21','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v21','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-observation-rows"><tr><td colspan="9" class="empty-row">Henüz hibrit gözlem sinyali yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v21-rows"><tr><td colspan="10" class="empty-row">Henüz V21 sinyali yok.</td></tr></tbody></table></div>
                 </div>
             </div>
         </div>
@@ -1867,7 +1876,7 @@
         <div class="card" id="section-tariff">
             <div class="section-title">
                 <div>
-                    <h3>🗺️ V17 Kilitli Karar Tarifesi</h3>
+                    <h3>🗺️ Telegram · V19 ÜST + Legacy V17 2.5 ÜST</h3>
                     <p class="muted" style="margin-top:4px;">Kör test boyunca kurallar salt okunurdur; panelden yanlışlıkla değiştirilemez.</p>
                 </div>
                 <span class="mini-badge bg-success">🔒 KİLİTLİ</span>
@@ -1963,11 +1972,11 @@
             comparison: "/api/test-lab-comparison",
             refresh: "/api/test-lab-results/refresh",
             exports: Object.freeze({
-                v19: "/api/signal-history",
+                v19: "/api/v19-independent-shadow-history",
                 v20: "/api/v20-shadow-history",
                 core: "/api/two-rule-core-shadow-history",
                 v17: "/api/v17-legacy-shadow-history",
-                observation: "/api/hybrid-observation-history"
+                v21: "/api/v21-consensus-shadow-history"
             })
         });
 
@@ -2124,7 +2133,7 @@
         }
 
         function edgeDisplay(rule) {
-            const source = rule?.edgeField === "v16Edge" ? "V16" : "Dino";
+            const source = rule?.edgeField === "v18Edge" ? "V18" : rule?.edgeField === "v16Edge" ? "V16" : "Dino";
             if (Number(rule?.edgeLow) <= -99) return `${source} ≤ +${rule.edgeHigh}`;
             const high = Number(rule?.edgeHigh) > 0 ? `+${rule.edgeHigh}` : rule?.edgeHigh;
             return `${source} ${rule?.edgeLow}…${high}`;
@@ -2140,7 +2149,7 @@
                 const values = [
                     marketDisplayName(rule.market),
                     `${rule.minuteLow}–${rule.minuteHigh}. dk`,
-                    `V16 %${rule.v16Minimum}+`,
+                    `${rule.signalSource || ''} · ${String(rule.decisionModel || 'v16').toUpperCase()} %${rule.probabilityMinimum ?? rule.v16Minimum ?? '-'}${rule.probabilityMaximum < 100 ? '–' + rule.probabilityMaximum : '+'}`,
                     edgeDisplay(rule)
                 ];
                 values.forEach((value, index) => {
@@ -2771,7 +2780,7 @@
             if (signals.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 9;
+                cell.colSpan = 10;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
                     ? `${formatHistoryDateLabel(selectedDate)} tarihinde paylaşılan sinyal yok.`
@@ -2801,7 +2810,8 @@
                     signal.match || "-",
                     signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
                     signal.market || "-",
-                    `${String(signal.decisionModel || "V16").toUpperCase()} ${formatPercent(signal.decisionProbability ?? signal.selectorV2Probability ?? signal.dinoProbability)}`,
+                    `${(signal.signalSources || []).join(' + ')}${signal.signalSources?.length ? ' · ' : ''}${String(signal.decisionModel || "V16").toUpperCase()} ${formatPercent(signal.decisionProbability ?? signal.selectorV2Probability ?? signal.dinoProbability)}`,
+                    formatPercent(testLabNumber(signal.prematchMarketSupport)),
                     Number.isFinite(Number(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
                 for (const value of plainValues) {
@@ -2809,6 +2819,7 @@
                     cell.textContent = String(value);
                     row.appendChild(cell);
                 }
+                row.title = (signal.signalSources || []).join(' + ');
 
                 const resultCell = document.createElement("td");
                 const resultBadge = document.createElement("span");
@@ -2924,7 +2935,7 @@
             if (!Array.isArray(signals) || signals.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = options.showSignalType ? 10 : 9;
+                cell.colSpan = options.showSignalType ? 11 : 10;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
                     ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${options.label} sinyali yok.`
@@ -2950,7 +2961,9 @@
                     ? signal.v20Probability ?? signal.decisionProbability
                     : testLabProbability(signal);
                 const modelName = String(signal.decisionModel || options.modelName || "MODEL").toUpperCase();
-                const probabilityText = options.probabilityOnly
+                const probabilityText = options.consensus
+                    ? `${signal.voteCount ?? "-"}/3 onay\nD ${formatPercent(testLabNumber(signal.dinoProbability))} · V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))} · V18 ${formatPercent(testLabNumber(signal.v18Probability))}`
+                    : options.probabilityOnly
                     ? formatPercent(testLabNumber(probability))
                     : `${modelName} ${formatPercent(probability)}`;
                 const values = [
@@ -2959,11 +2972,16 @@
                     marketDisplayName(signal.market),
                     probabilityText,
                     testLabEdge(signal, options.probabilityOnly),
+                    formatPercent(testLabNumber(signal.prematchMarketSupport)),
                     Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
                 for (const value of values) {
                     const cell = document.createElement("td");
                     cell.textContent = String(value);
+                    if (options.consensus && value === probabilityText) {
+                        cell.style.whiteSpace = "pre-line";
+                        cell.style.minWidth = "145px";
+                    }
                     row.appendChild(cell);
                 }
                 const resultCell = document.createElement("td");
@@ -2984,9 +3002,9 @@
             if (!badge) return;
             const disabled = arm?.enabled === false;
             const unavailable = !arm || arm.available === false;
-            const labels = { active: "TELEGRAM", fresh: "TAZE DOĞRULAMA", raw: "HAM GÖZLEM", shadow: "GÖLGE", experimental: "DENEYSEL GÖLGE" };
+            const labels = { active: "TELEGRAM", fresh: "TAZE DOĞRULAMA", shadow: "GÖLGE", experimental: "DENEYSEL GÖLGE" };
             badge.textContent = disabled ? "KAPALI" : unavailable ? "HAZIR DEĞİL" : labels[mode] || labels.shadow;
-            badge.className = `mini-badge ${disabled || unavailable ? "bg-danger" : mode === "active" || mode === "raw" ? "bg-warning" : "bg-info"}`;
+            badge.className = `mini-badge ${disabled || unavailable ? "bg-danger" : mode === "active" ? "bg-warning" : "bg-info"}`;
         }
 
         function renderV20Rules(arm) {
@@ -3076,13 +3094,13 @@
             setTestLabSummary("testlab-v20", data?.v20Shadow?.summary);
             setTestLabSummary("testlab-core", data?.coreShadow?.summary);
             setTestLabSummary("testlab-v17", data?.legacyV17?.summary);
-            setTestLabSummary("testlab-observation", data?.hybridObservation?.summary);
+            setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
 
-            setTestLabModeBadge("testlab-v19-mode-badge", data?.activeV19, "active");
+            setTestLabModeBadge("testlab-v19-mode-badge", data?.activeV19, "fresh");
             setTestLabModeBadge("testlab-v20-mode-badge", data?.v20Shadow, "experimental");
             setTestLabModeBadge("testlab-core-mode-badge", data?.coreShadow, "fresh");
             setTestLabModeBadge("testlab-v17-mode-badge", data?.legacyV17, "fresh");
-            setTestLabModeBadge("testlab-observation-mode-badge", data?.hybridObservation, "raw");
+            setTestLabModeBadge("testlab-v21-mode-badge", data?.v21Shadow, "fresh");
 
             const selectedDate = data?.date || data?.filter?.date || "";
             const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
@@ -3091,13 +3109,13 @@
                 data?.v20Shadow?.summary?.updatedAt,
                 data?.coreShadow?.summary?.updatedAt,
                 data?.legacyV17?.summary?.updatedAt,
-                data?.hybridObservation?.summary?.updatedAt,
+                data?.v21Shadow?.summary?.updatedAt,
             ]
                 .filter(Boolean)
                 .sort();
             const lastUpdated = updatedCandidates.at(-1);
             document.getElementById("test-lab-updated").textContent = lastUpdated
-                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · dört test kolu Telegram hattından bağımsız`
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · beş test kolu Telegram hattından bağımsız`
                 : `Görünüm: ${viewLabel} · Test Lab ilk uygun adayı bekliyor`;
             const availableDates = Array.isArray(data?.dateOptions)
                 ? data.dateOptions
@@ -3112,7 +3130,7 @@
             renderTestLabRows("testlab-v20-rows", data?.v20Shadow?.signals, { label: "V20 gölge", modelName: "V20", probabilityOnly: true }, selectedDate);
             renderTestLabRows("testlab-core-rows", data?.coreShadow?.signals, { label: "yeni çekirdek", modelName: "V18" }, selectedDate);
             renderTestLabRows("testlab-v17-rows", data?.legacyV17?.signals, { label: "Legacy V17", modelName: "V16", showSignalType: true }, selectedDate);
-            renderTestLabRows("testlab-observation-rows", data?.hybridObservation?.signals, { label: "hibrit gözlem", modelName: "V19" }, selectedDate);
+            renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
         }
 
         function filterTestLabTables(value) {
@@ -3120,7 +3138,7 @@
             filterTableRows(value, "testlab-v20-rows");
             filterTableRows(value, "testlab-core-rows");
             filterTableRows(value, "testlab-v17-rows");
-            filterTableRows(value, "testlab-observation-rows");
+            filterTableRows(value, "testlab-v21-rows");
         }
 
         async function fetchTestLabHistory() {
