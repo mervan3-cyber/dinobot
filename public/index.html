@@ -299,6 +299,7 @@
         .v18-arm-card.core { border-color: rgba(100,181,246,.58); }
         .v18-arm-card.legacy { border-color: rgba(177,137,255,.52); }
         .v18-arm-card.v21 { border-color: rgba(255,211,79,.55); }
+        .v18-arm-card.v22 { border-color: rgba(45,212,191,.65); }
 
         .v18-arm-title {
             display: flex;
@@ -347,6 +348,7 @@
         .v18-table-panel.core { border-color: rgba(100,181,246,.38); }
         .v18-table-panel.legacy { border-color: rgba(177,137,255,.34); }
         .v18-table-panel.v21 { grid-column: 1 / -1; border-color: rgba(255,211,79,.38); }
+        .v18-table-panel.v22 { grid-column: 1 / -1; border-color: rgba(45,212,191,.5); }
 
         .test-lab-table-title {
             display: flex;
@@ -1749,6 +1751,30 @@
                 </div>
             </div>
 
+            <div class="v18-arm-card v22" style="margin:14px 0;">
+                <div class="v18-arm-title"><span>🟢 V22 · ÜST · A/B/C</span><span class="mini-badge bg-info" id="testlab-v22-mode-badge">TAZE DOĞRULAMA</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v22-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v22-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v22-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v22-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v22-average-odds">-</strong></div>
+                </div>
+                <p class="muted" id="testlab-v22-start-note">İlk uygun canlı V22 sinyali bekleniyor; geçmiş sonuçlar aktarılmaz.</p>
+                <div class="test-lab-rules" aria-label="V22 filtre sonuçları">
+                    <span class="test-lab-rule" id="testlab-v22-filter-A">A · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v22-filter-B">B · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v22-filter-C">C · 0 sinyal</span>
+                </div>
+                <p class="muted">A/B/C etiketleri çakışabilir; alt toplamları toplamayın. V22 toplamı maç başına tektir.</p>
+            </div>
+            <div class="test-lab-rules" id="test-lab-v22-rules" aria-label="V22 üç filtre OR kuralları">
+                <span class="test-lab-rule">A · Ev sahibi önde → ÜST · EDGE −5…−2,5 · Pre &gt; %20</span>
+                <span class="test-lab-rule">B · 2.5 ÜST · Skor 1–0/0–1 · EDGE −5…−2,5 · Pre &gt; %40</span>
+                <span class="test-lab-rule">C · Yalnız 1 gol gerekiyor · EDGE −10…+5 · Pre &gt; %75</span>
+                <span class="test-lab-rule">A VEYA B VEYA C · Dino/V16/V18: üçü de &gt; %50</span>
+                <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · EDGE uçları dahil · İlk uygun an · Maç başına 1 · Telegram yok</span>
+            </div>
             <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 yalnız ÜST 3/3 kuralları">
                 <span class="test-lab-rule">V21 · Yalnız ÜST · Pre &gt; %50</span>
                 <span class="test-lab-rule">Dino / V16 / V18: üçü de &gt; %50 · eksik model varsa sinyal yok</span>
@@ -1770,7 +1796,7 @@
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. Telegram'a ya da mevcut karara etkisi yoktur. V21 yalnız ÜST ve 3/3 onay ister; diğer lab politikaları değişmedi.</p>
+                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. V21 aynen korunur. V22 ayrı geçmişle A/B/C filtrelerini ileri test eder; hiçbir lab kolu Telegram kararını genişletmez.</p>
                 <span class="mini-badge bg-info">5 BAĞIMSIZ TEST KOLU</span>
             </div>
 
@@ -1802,6 +1828,13 @@
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v17','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v17','csv')">CSV</button></div>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V16</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v17-rows"><tr><td colspan="11" class="empty-row">Henüz Legacy V17 sinyali yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v22">
+                    <div class="test-lab-table-title">
+                        <h4>🟢 V22 · ÜST · A/B/C · taze doğrulama</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v22','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v22','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Filtre</th><th>Gereken gol</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v22-rows"><tr><td colspan="13" class="empty-row">Henüz V22 sinyali yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel v21">
                     <div class="test-lab-table-title">
@@ -1977,7 +2010,8 @@
                 v20: "/api/v20-shadow-history",
                 core: "/api/two-rule-core-shadow-history",
                 v17: "/api/v17-legacy-shadow-history",
-                v21: "/api/v21-consensus-shadow-history"
+                v21: "/api/v21-consensus-shadow-history",
+                v22: "/api/v22-union-shadow-history"
             })
         });
 
@@ -2936,7 +2970,7 @@
             if (!Array.isArray(signals) || signals.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = options.showSignalType ? 11 : 10;
+                cell.colSpan = options.v22 ? 13 : options.showSignalType ? 11 : 10;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
                     ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${options.label} sinyali yok.`
@@ -2976,6 +3010,9 @@
                     formatPercent(testLabNumber(signal.prematchMarketSupport)),
                     Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
+                if (options.v22) values.splice(3, 0, signal.score || "-",
+                    Array.isArray(signal.matchedFilters) ? signal.matchedFilters.join(" + ") : "-",
+                    signal.goalsNeeded ?? "-");
                 for (const value of values) {
                     const cell = document.createElement("td");
                     cell.textContent = String(value);
@@ -3096,6 +3133,17 @@
             setTestLabSummary("testlab-core", data?.coreShadow?.summary);
             setTestLabSummary("testlab-v17", data?.legacyV17?.summary);
             setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
+            setTestLabSummary("testlab-v22", data?.v22Shadow?.summary);
+            setTestLabModeBadge("testlab-v22-mode-badge", data?.v22Shadow, "fresh");
+            const v22Start = document.getElementById("testlab-v22-start-note");
+            if (v22Start) v22Start.textContent = data?.v22Shadow?.startedAt
+                ? `V22 ilk sinyal: ${formatDateTime(data.v22Shadow.startedAt)} · V21 geçmişi ayrı ve korunuyor.`
+                : "İlk uygun canlı V22 sinyali bekleniyor; geçmiş sonuçlar aktarılmaz.";
+            for (const id of ["A", "B", "C"]) {
+                const element = document.getElementById(`testlab-v22-filter-${id}`);
+                const summary = data?.v22Shadow?.filterSummaries?.[id];
+                if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
+            }
 
             setTestLabModeBadge("testlab-v19-mode-badge", data?.activeV19, "fresh");
             setTestLabModeBadge("testlab-v20-mode-badge", data?.v20Shadow, "experimental");
@@ -3117,12 +3165,13 @@
                 data?.coreShadow?.summary?.updatedAt,
                 data?.legacyV17?.summary?.updatedAt,
                 data?.v21Shadow?.summary?.updatedAt,
+                data?.v22Shadow?.summary?.updatedAt,
             ]
                 .filter(Boolean)
                 .sort();
             const lastUpdated = updatedCandidates.at(-1);
             document.getElementById("test-lab-updated").textContent = lastUpdated
-                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · beş test kolu Telegram hattından bağımsız`
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · altı test kolu Telegram hattından bağımsız`
                 : `Görünüm: ${viewLabel} · Test Lab ilk uygun adayı bekliyor`;
             const availableDates = Array.isArray(data?.dateOptions)
                 ? data.dateOptions
@@ -3138,6 +3187,7 @@
             renderTestLabRows("testlab-core-rows", data?.coreShadow?.signals, { label: "yeni çekirdek", modelName: "V18" }, selectedDate);
             renderTestLabRows("testlab-v17-rows", data?.legacyV17?.signals, { label: "Legacy V17", modelName: "V16", showSignalType: true }, selectedDate);
             renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
+            renderTestLabRows("testlab-v22-rows", data?.v22Shadow?.signals, { label: "V22", modelName: "V22", consensus: true, v22: true }, selectedDate);
         }
 
         function filterTestLabTables(value) {
@@ -3146,6 +3196,7 @@
             filterTableRows(value, "testlab-core-rows");
             filterTableRows(value, "testlab-v17-rows");
             filterTableRows(value, "testlab-v21-rows");
+            filterTableRows(value, "testlab-v22-rows");
         }
 
         async function fetchTestLabHistory() {
