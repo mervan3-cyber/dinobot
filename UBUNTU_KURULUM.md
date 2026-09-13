@@ -1,17 +1,15 @@
-# V21.1 — ÜST / 3/3 / EDGE −5…0 denemesini Ubuntu'ya yükleme
+# V22 — A/B/C Test Lab; V21 korunur
 
-Bu paket önceki V21'e göre **yalnız V21 deneyini daraltır**: ÜST, Dino/V16/V18'in üçü de >%50, Pre >%50, −5 ≤ kayıt EDGE ≤ 0. Telegram'daki V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST seçimi değişmez. V21 hâlâ yalnız Test Lab'dadır. Yeni Çekirdek, V20 ve V19/V17 lab politikaları değişmedi.
+Bu paket **V22'yi ayrı bir ileri test olarak ekler**. V21'in kuralları, geçmişi ve eski V21 arşivi korunur. Telegram'ın mevcut V19 2.5/4.5 ÜST + Legacy V17 2.5 ÜST yönlendirmesi değişmez. V22 Telegram'a gönderim yapmaz. Yeni Çekirdek, V20, V19 ve Legacy V17 laboratuvarları yerinde kalır.
 
-Eski V21 geçmiş dosyası aynı yerde korunur. Yeni kart ve normal JSON/CSV yalnız yeni tarifeyi gösterir. **Eski V21 JSON** düğmesi önceki tarifelerin tüm tarihlerdeki kayıtlarını indirir. Eski ve yeni kayıtlar aynı güne denk gelse bile sonuçlar karışmaz. Eski bekleyen sonuçlar güncellenmeye devam eder; eski kayıtların maç kilitleri yeniden başlatmada da korunur. Yeni V21 kartının ilk uygun sinyale kadar sıfır göstermesi veri silindiği anlamına gelmez.
-
-Kod henüz sunucunuza yüklenmedi. Paketi açmak için önce mevcut uygulama dizininizin ve çalışan sürümünüzün yedeğini alın. `.env`, `dino_data.json`, bütün sinyal/aday/gölge geçmişleri, API cache dosyaları ve `v20_snapshot_archive` özellikle korunmalıdır. ZIP bunları içermez. Uygulama klasörünü silmeyin; boş klasörle değiştirmeyin.
+Kod henüz sunucuya yüklenmedi. ZIP `.env`, API anahtarları, `dino_data.json`, sinyal/aday/lab geçmişleri, API cache dosyaları, `v20_snapshot_archive` veya `node_modules` içermez. **Mevcut uygulama klasörünü silmeyin.**
 
 ## Güncelleme
 
-Aşağıdaki `/root/dinobot` ve PM2 adı `dinobot`, yalnız mevcut kurulumunuz gerçekten bu adları kullanıyorsa geçerlidir. Farklıysa kendi uygulama yolunuzu ve PM2 adınızı kullanın.
+Aşağıdaki `/root/dinobot` ve PM2 adı `dinobot`, yalnız mevcut kurulumunuz bu adları kullanıyorsa geçerlidir.
 
-1. Yedeği aldıktan sonra `pm2 stop dinobot` ile mevcut süreci durdurun.
-2. `dinobot-v21-1-ust-3onay-edge-eksi5-0-ubuntu-2026-09-13.zip` içindeki dosyaları mevcut uygulama dizinine açın. Yalnız HTML değil, ZIP'teki bütün kod/model dosyaları gerekir. Yeni `v21_history.js` dosyası da mutlaka yüklenmeli; `public/index.html` de yenilenmelidir.
+1. `pm2 stop dinobot` ile süreci durdurun. Mevcut uygulama dizininin kod, `.env` ve bütün geçmiş dosyalarıyla birlikte yedeğini alın; yedeğin açılabildiğini kontrol edin. Yedeği uygulama klasörünün içine koymayın.
+2. `dinobot-v22-abc-test-lab-v21-korunur-ubuntu-2026-09-13.zip` dosyasını mevcut uygulama dizinine açın; yalnız paketteki kod dosyalarının üzerine yazın. ZIP'teki bütün dosyalar gerekir. Özellikle yeni `v22_tariff.js`, `v22_lab.js`, güncel `server.js`, `signal_tracker.js` ve `public/index.html` yüklenmelidir. Mevcut `.env` ve geçmişler yerinde kalmalı.
 3. Uygulama dizininde doğrulayın:
 
 ```bash
@@ -25,32 +23,52 @@ Her iki komut da başarılıysa:
 ```bash
 pm2 restart dinobot
 pm2 save
-pm2 logs dinobot --lines 40 --nostream
+pm2 logs dinobot --lines 50 --nostream
 ```
 
-Bir kontrol başarısızsa yeni sürümü başlatmayın; aldığınız kod yedeğine dönüp mevcut geçmişleri koruyun. Paket bağımlılık sürümlerini değiştirmez. Python standart kütüphane kullanır; eğitim kütüphaneleri sunucuda gerekmez. Yerel test ortamı Node v24.19.0'dır; sunucudaki Node sürümü bu kodun gerektirdiği modern Node özelliklerini desteklemelidir.
+Testler başarısızsa yeni sürümü başlatmayın. Aldığınız kod yedeğine dönün; geçmiş dosyalarını silmeyin veya eski kopyalarla geriye almayın. Bağımlılık sürümleri değişmedi. Python standart kütüphane kullanır; eğitim kütüphaneleri sunucuda gerekmez. Testler çevrimdışı çalışır ve gerçek Telegram/API istekleri göndermez.
 
-## Açılışta kontrol
+## Açılış kontrolü
 
-- Log ve `/api/status` build değeri: `ml-v21-1-over-3of3-edge-m5-0-ubuntu-2026-09-13`.
-- Telegram yönlendiricisi mevcut V19 2.5/4.5 ÜST + Legacy V17 2.5 ÜST olarak görünmeli.
-- Paneli sert yenileyin. Test Lab'da V19 bağımsız lab, V20, Yeni Çekirdek, Legacy V17 ve V21 bulunmalı. Ham Gözlem bulunmamalı.
-- V21: yalnız ÜST, Pre >%50, Dino/V16/V18'in üçü de >%50, −5 ≤ kayıt EDGE ≤ 0, dakika 25–80, oran 1.50–4.00. Pre için %80 tavanı veya modellere %55 sınırı eklenmedi. Henüz uygun canlı sinyal olmaması tek başına arıza değildir.
-- V19 ve V21 geçmiş dosyalarının uygulama kullanıcısı tarafından yazılabildiğini kontrol edin. `dino_v21_consensus_shadow_history.json` dosyasını silmeyin veya boşaltmayın: eski sonuçlar ve maç kilitleri burada korunur. Özel geçmiş yolu kullanan ortam değişkenleri aynı şekilde çalışır.
-- Shared sinyal takibi yalnız Telegram'ın başarılı gönderimlerini içerir. V19 labı tüm mevcut marketleri test ettiği için iki tablo artık birebir aynı olmak zorunda değildir.
+- Build: `ml-v22-union-abc-lab-v21-preserved-ubuntu-2026-09-13`; paket sürümü `2.2.0`.
+- Logda `V22 LAB: AÇIK`, `A/B/C OR` ve `Telegram YOK` görülmeli.
+- Paneli sert yenileyin. Test Lab'da **V21'in yanında ayrı V22 kartı ve tablosu** bulunmalı. V21 geçmişi ve Eski V21 JSON düğmesi korunmalı.
+- V22 ilk uygun canlı sinyale kadar sıfır görünür. Eski tam-stat veya V21 kayıtları V22'ye aktarılmaz; başlangıç tarihi ilk gerçek V22 kaydından gelir.
+- V22 tablosunda giriş skoru, A/B/C etiketi, gereken gol, Dino/V16/V18, Pre Destek, EDGE, oran ve sonuç bulunur. JSON/CSV düğmeleri seçilen güne aittir.
+- A/B/C özetlerinde aynı sinyal birden fazla etikete girebilir. **Filtre sayaçlarını toplamayın:** V22 genel toplamında maç başına yalnız bir kayıt vardır.
+- Telegram'ın mevcut yönlendiricisi ve diğer laboratuvarlar değişmemeli. Ham Gözlem geri eklenmedi.
 
-## Ortam değişkenleri
+## V22 kuralları
 
-Varsayılanlar yeni kurulum için yeterlidir. `.env` otomatik değiştirilmez; anahtarlar korunur.
+Ortak şartlar: yalnız yarım gollü ÜST; **Dino, V16 ve V18 ayrı ayrı >%50**; dakika **25–80**, oran **1.50–4.00** dahil; market giriş skoruyla zaten kazanılmış olmamalı. EDGE, kayıttaki gibi `Dino − 100/oran` hesabının bir ondalığa yuvarlanmış değeridir.
 
-- `DINO_V21_SHADOW_ENABLED` ve `DINO_V19_SHADOW_ENABLED`: varsayılan `true`. Yalnız ilgili lab kolunu kapatmak için `false`.
-- `DINO_V21_SHADOW_HISTORY_FILE` ve `DINO_V19_SHADOW_HISTORY_FILE`: istenirse özel, yazılabilir geçmiş yolu.
-- Mevcut `DINO_V20_SHADOW_ENABLED`, `DINO_CORE_SHADOW_ENABLED`, `DINO_LEGACY_V17_SHADOW_ENABLED` korunur; hepsinin labda çalışmasını istiyorsanız açık olmalıdır.
-- Önceden `DINO_HYBRID_TARIFF_ENABLED=false` veya `DINO_V2_SELECTOR_ENABLED=false` ayarladıysanız Telegram'ın yeni yönlendiricisini kullanmak için bunları `true` yapın. Eski alternatif modlar yeni Telegram son kapısından sessizce başka market gönderemez.
-- Ortam değişkenini değiştirirseniz PM2 için `pm2 restart dinobot --update-env` kullanmanız gerekebilir.
+| Filtre | Durum | EDGE, sınırlar dahil | Pre Destek |
+|---|---|---|---|
+| A | Ev sahibi önde → ÜST | −5 … −2.5 | >%20 |
+| B | 2.5 ÜST; giriş skoru 1–0 veya 0–1 | −5 … −2.5 | >%40 |
+| C | ÜST için yalnız bir gol daha gerekiyor | −10 … +5 | >%75 |
 
-V21 ve bağımsız V19 uygun adayları, Telegram adayı olmasa da taze kontrol isteği oluşturabilir. Günlük API ve disk tüketimini izleyin. Bu kod taze veri kontrollerini kaldırmaz veya kotayı sınırsız artırmaz.
+A, B **veya** C yeterlidir; üçünün aynı anda karşılanması gerekmez. Aynı maç için filtreler arasında ortak tek sinyal kilidi vardır; yeniden başlatmada da korunur. İlk uygun taze taramada, birden fazla market varsa oy sayısı azalan, oran artan, market adı artan sıralama kullanılır. V21 ve V22 maç kilitleri birbirinden bağımsızdır.
 
-Eski Ham Gözlem dosyası varsa yedek/arşiv olarak bırakılır; yeni kod onu okumaz. Geçmişiniz fiziksel olarak silinmez.
+Sinyal kaydı öncesi taze skor/istatistik/oran kontrolü ve model yeniden hesaplaması gerekir. İlk taramada uygun görünen fakat taze kontrolde şartları kaybeden aday yazılmaz. Eksik model veya Pre desteği onay sayılmaz.
 
-Kural ayrıntıları ve doğrulama kapsamı: `V21_1_DEGISIKLIKLER_2026-09-13.md`. Yeni sistemin kârlılığı henüz kanıtlanmış değildir; V21'i ileri testte değerlendirin. Yeni tarife etiketi `v21-over-consensus-3of3-edge-m5-0-2026-09-13` olmalıdır. Yarın rapor için normal V21 JSON'u ve o günün tam-stat JSON'unu indirin; önceden üretilmiş sonuçlar yeni kurala taşınmaz.
+## Geçmiş, ayarlar ve raporlar
+
+- V22'nin ayrı dosyası: `dino_v22_union_shadow_history.json`. İlk çalıştırmada oluşturulur. Uygulama kullanıcısının bu konuma yazabilmesi gerekir. Sonraki güncellemelerde bu dosyayı da yedekleyin ve koruyun.
+- `dino_v21_consensus_shadow_history.json` aynen korunur. V22'yi başlatmak için V21 geçmişini sıfırlamayın.
+- `DINO_V22_SHADOW_ENABLED`: varsayılan `true`; yalnız V22'yi kapatmak için `false`.
+- `DINO_V22_SHADOW_HISTORY_FILE`: isteğe bağlı özel, yazılabilir yol. Başka bir deneyin veya aktif takip dosyasının yolunu kullanmayın; çakışırsa sunucu açılışta hata verir.
+- Mevcut V21/V19/V20/Yeni Çekirdek/Legacy V17 ortam ayarları korunur. `.env` paket tarafından değiştirilmez. Ortam ayarı değiştirilirse `pm2 restart dinobot --update-env` gerekebilir.
+
+V22 API'leri:
+
+- `/api/v22-union-shadow-history`
+- `/api/v22-union-shadow-history/export?date=2026-09-13`
+- `/api/v22-union-shadow-history/export.csv?date=2026-09-13`
+- `/api/test-lab-comparison` ve `/api/status` içinde `v22Shadow`.
+
+V22 adayları, Telegram adayı olmasa da mevcut kotalar çerçevesinde taze API/Python doğrulaması isteyebilir. Günlük API ve disk tüketimini izleyin; veri doğrulama kontrolleri veya kota korumaları kaldırılmadı.
+
+Sonraki değerlendirmede V22 JSON'unu ve aynı günün tam-stat JSON'unu alın; V21 karşılaştırması için V21 JSON'unu da ayrıca saklayın. Geçmiş örneklerdeki isabet gelecekteki sonuçların garantisi değildir; V22 yalnız ileri testtir.
+
+Teknik değişiklikler: `V22_DEGISIKLIKLER_2026-09-13.md`. ZIP içindeki `V22_PACKAGE_MANIFEST.json` dosya SHA-256 değerlerini içerir. Eski V21 değişiklik notları yalnız geçmiş sürüm referansıdır; bu kurulum belgesi günceldir.

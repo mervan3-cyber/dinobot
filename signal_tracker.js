@@ -218,6 +218,9 @@ class SignalTracker {
             voteCount: numberOrNull(payload.voteCount),
             tariffSlot: payload.tariffSlot || null,
             tariffRuleId: payload.tariffRuleId || null,
+            ...(Array.isArray(payload.matchedFilters) ? {
+                matchedFilters: [...payload.matchedFilters], goalsNeeded: numberOrNull(payload.goalsNeeded)
+            } : {}),
             v16Edge: numberOrNull(payload.v16Edge),
             prematchSource: payload.prematchSource || null,
             prematchProbabilities: payload.prematchProbabilities || null,

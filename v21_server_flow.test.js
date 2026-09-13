@@ -30,6 +30,11 @@ const context = vm.createContext({
     setInterval() {}, setTimeout() {}, setImmediate() {}, clearInterval() {}, clearTimeout() {}
 });
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'server.js'), 'utf8') + `
+// This fixture explicitly tests all cohort records, including fixed dates below.
+// Do not let the wall-clock startup time silently exclude those fixture records.
+for (const tracker of [coreShadowTracker, legacyV17ShadowTracker, v20ShadowTracker]) {
+    tracker.data.startedAt = '1970-01-01T00:00:00.000Z';
+}
 globalThis.api = { botuCalistir, valueAnalizleriYap, telegramSinyaliGonder, signalTracker, v19ShadowTracker, v21ShadowTracker,
     setup(mac, initial, fresh, valid = true) {
         let pythonCalls = 0;

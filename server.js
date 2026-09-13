@@ -31,6 +31,8 @@ const marketTariff = require('./active_tariff');
 const v19Tariff = require('./hybrid_tariff');
 const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
+const v22Tariff = require('./v22_tariff');
+const { createV22Lab } = require('./v22_lab');
 const { createIndependentLab, importV19History } = require('./independent_lab');
 const legacyV17Tariff = require('./market_tariff');
 const dinoSelectorV18 = require('./dino_selector_v18');
@@ -46,7 +48,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v21-1-over-3of3-edge-m5-0-ubuntu-2026-09-13';
+const BUILD_VERSION = 'ml-v22-union-abc-lab-v21-preserved-ubuntu-2026-09-13';
 
 app.use(cors());
 app.use(express.json());
@@ -222,6 +224,14 @@ const V21_SHADOW_HISTORY_FILE = process.env.DINO_V21_SHADOW_HISTORY_FILE
     : path.join(__dirname, 'dino_v21_consensus_shadow_history.json');
 const DINO_V19_SHADOW_ENABLED = String(process.env.DINO_V19_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V21_SHADOW_ENABLED = String(process.env.DINO_V21_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V22_SHADOW_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v22_union_shadow_history.json');
+const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
+    CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE].some(file => path.resolve(file) === V22_SHADOW_HISTORY_FILE)) {
+    throw new Error('V22 geçmiş yolu diğer deneylerden ayrı olmalıdır.');
+}
 
 const PREMATCH_CACHE_FILE =
     path.join(
@@ -431,6 +441,12 @@ const v20ShadowTracker = new SignalTracker({
 
 const v19ShadowTracker = new SignalTracker({ filePath: V19_SHADOW_HISTORY_FILE, logger: message => addSystemLog(message) });
 const v21ShadowTracker = new SignalTracker({ filePath: V21_SHADOW_HISTORY_FILE, logger: message => addSystemLog(message) });
+const v22ShadowTracker = new SignalTracker({ filePath: V22_SHADOW_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V22 lab sinyali')) });
+const v22Lab = createV22Lab({ tracker: v22ShadowTracker, enabled: DINO_V22_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu });
 const independentLab = createIndependentLab({
     v19Tracker: v19ShadowTracker, v21Tracker: v21ShadowTracker,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
@@ -3692,7 +3708,7 @@ function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
         });
         const coreAdayi = coreGolgeOnSecimi(mac);
         const legacyV17Adayi = legacyV17GolgeOnSecimi(mac, dino);
-        return aktifAday || independentLab.preselect(mac, dino) || coreAdayi || legacyV17Adayi;
+        return aktifAday || independentLab.preselect(mac, dino) || v22Lab.preselect(mac, dino) || coreAdayi || legacyV17Adayi;
     }
 
     const fullyVerifiedPlaceholder = {
@@ -4952,6 +4968,7 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
     return Boolean(
         independentLab.select('v21', { mac, dino, liveOnlyDino }) ||
         independentLab.select('v19', { mac, dino, liveOnlyDino }) ||
+        v22Lab.select({ mac, dino, liveOnlyDino }) ||
         coreGolgeSeciminiBul({ mac, dino, liveOnlyDino }) ||
         legacyV17GolgeSeciminiBul({ mac, dino, liveOnlyDino })
     );
@@ -4959,7 +4976,7 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
 
 
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
-    const results = { core: null, legacyV17: null, v19: null, v21: null };
+    const results = { core: null, legacyV17: null, v19: null, v21: null, v22: null };
     for (const kind of ['v19', 'v21']) {
         try {
             results[kind] = independentLab.record(kind, { mac, dino, liveOnlyDino, capturedAt });
@@ -4967,6 +4984,12 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         } catch (error) {
             addSystemLog(`> ⚠️ ${kind.toUpperCase()} lab kaydı atlandı: ${error.message}`);
         }
+    }
+    try {
+        results.v22 = v22Lab.record({ mac, dino, liveOnlyDino, capturedAt });
+        if (results.v22) addSystemLog(`> 🧪 V22 LAB [${results.v22.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results.v22.market} | taze kontrol geçti | Telegram yok.`);
+    } catch (error) {
+        addSystemLog(`> ⚠️ V22 lab kaydı atlandı: ${error.message}`);
     }
     try {
         results.core = coreGolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
@@ -5962,7 +5985,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
     const coreShadowFixtureIDs = coreShadowTracker.unresolvedFixtureIds();
     const legacyV17ShadowFixtureIDs = legacyV17ShadowTracker.unresolvedFixtureIds();
-    const independentFixtureIDs = [...v19ShadowTracker.unresolvedFixtureIds(), ...v21ShadowTracker.unresolvedFixtureIds()];
+    const independentFixtureIDs = [...v19ShadowTracker.unresolvedFixtureIds(), ...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds()];
     const v20ShadowFixtureIDs = v20ShadowTracker.unresolvedFixtureIds();
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
@@ -6018,7 +6041,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 resolvedCandidates += candidateTracker.settleFixture(fixture);
                 resolvedCoreShadow += coreShadowTracker.settleFixture(fixture);
                 resolvedLegacyV17Shadow += legacyV17ShadowTracker.settleFixture(fixture);
-                resolvedIndependentLab += v19ShadowTracker.settleFixture(fixture) + v21ShadowTracker.settleFixture(fixture);
+                resolvedIndependentLab += v19ShadowTracker.settleFixture(fixture) + v21ShadowTracker.settleFixture(fixture) + v22ShadowTracker.settleFixture(fixture);
                 resolvedV20Shadow += v20ShadowTracker.settleFixture(fixture);
             }
         }
@@ -6029,7 +6052,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             resolvedIndependentLab > 0 || resolvedV20Shadow > 0 || manuel
         ) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} V19 | ${resolvedCandidates} aday | ${resolvedCoreShadow} çekirdek | ${resolvedLegacyV17Shadow} legacy V17 | ${resolvedIndependentLab} V19/V21 lab | ${resolvedV20Shadow} V20 gölge sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} V19 | ${resolvedCandidates} aday | ${resolvedCoreShadow} çekirdek | ${resolvedLegacyV17Shadow} legacy V17 | ${resolvedIndependentLab} V19/V21/V22 lab | ${resolvedV20Shadow} V20 gölge sonuçlandı.`
             );
         }
 
@@ -6045,7 +6068,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             message: resolvedSignals > 0 || resolvedCandidates > 0 ||
                 resolvedCoreShadow > 0 || resolvedLegacyV17Shadow > 0 ||
                 resolvedIndependentLab > 0 || resolvedV20Shadow > 0
-                ? `${resolvedSignals} V19, ${resolvedCandidates} aday, ${resolvedCoreShadow} çekirdek, ${resolvedLegacyV17Shadow} legacy V17, ${resolvedIndependentLab} V19/V21 lab ve ${resolvedV20Shadow} V20 gölge sonucu güncellendi.`
+                ? `${resolvedSignals} V19, ${resolvedCandidates} aday, ${resolvedCoreShadow} çekirdek, ${resolvedLegacyV17Shadow} legacy V17, ${resolvedIndependentLab} V19/V21/V22 lab ve ${resolvedV20Shadow} V20 gölge sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -6440,7 +6463,7 @@ app.get(
 );
 
 
-function v18GolgeCsvOlustur(signals) {
+function v18GolgeCsvOlustur(signals, includeV22 = false) {
     const headers = [
         'shadow_signal_id', 'fixture_id', 'signal_type', 'tariff_slot',
         'captured_at', 'match', 'league', 'minute', 'score', 'market',
@@ -6450,7 +6473,8 @@ function v18GolgeCsvOlustur(signals) {
         'decision_probability', 'decision_edge', 'tariff_version', 'rule_id',
         'prematch_market_support', 'prematch_market_source', 'vote_count', 'dino_vote', 'v16_vote', 'v18_vote', 'signal_sources',
         'stats_validation_status', 'stats_verified_at',
-        'result', 'profit', 'final_score', 'fixture_status', 'resolved_at'
+        'result', 'profit', 'final_score', 'fixture_status', 'resolved_at',
+        ...(includeV22 ? ['matched_filters', 'goals_needed'] : [])
     ];
     const rows = signals.map(signal => {
         const settlement = signal?.settlement || {};
@@ -6467,7 +6491,8 @@ function v18GolgeCsvOlustur(signals) {
             (signal.signalSources || []).join(' + '), signal?.statsValidation?.status,
             signal?.statsValidation?.verifiedAt, settlement.result, settlement.profit,
             settlement.finalScore, settlement.fixtureStatus,
-            settlement.resolvedAt
+            settlement.resolvedAt,
+            ...(includeV22 ? [(signal.matchedFilters || []).join('+'), signal.goalsNeeded] : [])
         ].map(csvHucre).join(',');
     });
     return [headers.map(csvHucre).join(','), ...rows].join('\n');
@@ -6511,6 +6536,7 @@ function testLabKarsilastirmaSecimi(req, res) {
             ...testLabDonemineGoreSec(coreShadowTracker, null),
             ...testLabDonemineGoreSec(legacyV17ShadowTracker, null),
             ...testLabDonemineGoreSec(v21ShadowTracker, null),
+            ...testLabDonemineGoreSec(v22ShadowTracker, null),
             ...testLabDonemineGoreSec(v20ShadowTracker, null),
             ...aktifV19SinyalleriniSec(null)
         ],
@@ -6562,6 +6588,10 @@ app.get(
                 maximumSignalsPerFixture: 1,
                 summary: v21History.summary(v21ShadowTracker, testLabDonemineGoreSec(v21ShadowTracker, selection.date)),
                 signals: v21ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v21ShadowTracker, selection.date))
+            },
+            v22Shadow: {
+                ...v22Lab.metadata(testLabDonemineGoreSec(v22ShadowTracker, selection.date)),
+                signals: v22ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v22ShadowTracker, selection.date))
             },
             // Geçici istemci uyumluluğu: yeni panel activeV19 anahtarını kullanır.
             currentSystemSummary: activeV19.summary,
@@ -6626,7 +6656,7 @@ function labHistoryResponse(req, res, tracker, metadata) {
     const selection = gecmisSeciminiHazirla(
         req,
         res,
-        tracker === v21ShadowTracker ? labHistorySignals(req, tracker) : tracker.list(100000),
+        tracker === v21ShadowTracker || tracker === v22ShadowTracker ? labHistorySignals(req, tracker) : tracker.list(100000),
         'sentAt'
     );
     if (!selection) return;
@@ -6638,7 +6668,8 @@ function labHistoryResponse(req, res, tracker, metadata) {
         filter: selection.filter,
         summary: tracker === v21ShadowTracker
             ? v21History.summary(tracker, selection.items, req.query.cohort) : tracker.summary(selection.items),
-        signals: tracker.list(req.query.limit, selection.items)
+        signals: tracker.list(req.query.limit, selection.items),
+        ...(tracker === v22ShadowTracker ? v22Lab.metadata(selection.items) : {})
     });
 }
 
@@ -6803,6 +6834,7 @@ function labJsonExport(req, res, tracker, options) {
         ...(tracker === v21ShadowTracker ? v21History.metadata(tracker.data.signals, req.query.cohort) : {})
     }, selection.items);
     if (tracker === v21ShadowTracker) payload.summary = v21History.summary(tracker, selection.items, req.query.cohort);
+    if (tracker === v22ShadowTracker) Object.assign(payload, v22Lab.metadata(selection.items));
     const cohortSuffix = tracker === v21ShadowTracker && req.query.cohort === 'previous' ? '-previous' : '';
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader(
@@ -6824,12 +6856,13 @@ function labCsvExport(req, res, tracker, filePrefix) {
         'Content-Disposition',
         `attachment; filename="${filePrefix}${cohortSuffix}-${dosyaEtiketi}.csv"`
     );
-    res.send(`\uFEFF${v18GolgeCsvOlustur(selection.items)}`);
+    res.send(`\uFEFF${v18GolgeCsvOlustur(selection.items, tracker === v22ShadowTracker)}`);
 }
 
 for (const [slug, tracker, tariff, enabled] of [
     ['v19-independent-shadow', v19ShadowTracker, v19Tariff, DINO_V19_SHADOW_ENABLED],
-    ['v21-consensus-shadow', v21ShadowTracker, v21Tariff, DINO_V21_SHADOW_ENABLED]
+    ['v21-consensus-shadow', v21ShadowTracker, v21Tariff, DINO_V21_SHADOW_ENABLED],
+    ['v22-union-shadow', v22ShadowTracker, v22Tariff, DINO_V22_SHADOW_ENABLED]
 ]) {
     const metadata = { enabled, tariffVersion: tariff.VERSION,
         validationMode: 'fresh-required', rules: tariff.POLICY || [...tariff.PRIMARY_RULES, ...tariff.FOLLOW_RULES] };
@@ -7564,6 +7597,7 @@ app.get(
                     policy: v21Tariff.POLICY, ...v21History.metadata(v21ShadowTracker.data.signals),
                     summary: v21History.summary(v21ShadowTracker)
                 },
+                v22Shadow: v22Lab.metadata(),
                 coreShadow: {
                     enabled: DINO_CORE_SHADOW_ENABLED,
                     validationMode: 'fresh-required',
@@ -7626,6 +7660,8 @@ v20ShadowTracker.load();
 
 v19ShadowTracker.load();
 v21ShadowTracker.load();
+v22ShadowTracker.load();
+addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Dino/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram YOK.`);
 importV19History(signalTracker, v19ShadowTracker);
 
 prematchOddsCache.load();
