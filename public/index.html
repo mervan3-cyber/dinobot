@@ -1691,7 +1691,7 @@
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
-                    <span class="muted">Beş lab kolu Telegram’dan bağımsızdır. Telegram: V19 ÜST + Legacy V17 yalnız 2.5 ÜST.</span>
+                    <span class="muted">Lab kolları Telegram’dan bağımsızdır. Telegram: V19 ÜST + Legacy V17 yalnız 2.5 ÜST.</span>
                 </div>
                 <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
                     <option value="">🗂️ Tüm Ortak Test Dönemi</option>
@@ -1797,7 +1797,21 @@
 
             <div class="section-title" style="margin:14px 0 9px;">
                 <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. V21 aynen korunur. V22 ayrı geçmişle A/B/C filtrelerini ileri test eder; hiçbir lab kolu Telegram kararını genişletmez.</p>
-                <span class="mini-badge bg-info">5 BAĞIMSIZ TEST KOLU</span>
+                <span class="mini-badge bg-info">BAĞIMSIZ LAB + EŞLEŞTİRİLMİŞ V23</span>
+            </div>
+
+            <div class="v18-arm-card" id="testlab-v23-card" style="margin:14px 0;border-color:#4db6ac;">
+                <div class="v18-arm-title"><span>🌱 V23 · Gol Geçmişi Kontrolü</span><span class="mini-badge bg-info" id="testlab-v23-mode">YALNIZ GÖZLEM</span></div>
+                <p class="muted">Yalnız yeni V21 adaylarıyla eşleştirilir; V21 ve Telegram değişmez. Son 10 + aynı ligde son 365 günün ev/deplasman gol profili, kalan süre ve gereken gol. Sezon başında gerekirse önceki sezon da alınır. Kırmızı kart/eksik geçmiş: veri yetersiz. Sabit referans hesap kalibre edilmiş bir başarı yüzdesi değildir.</p>
+                <div class="table-wrap"><table><thead><tr><th>Grup</th><th>Aday</th><th>K / Y</th><th>Bekleyen</th><th>İsabet</th><th>Teorik ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
+                <p class="muted" id="testlab-v23-impact">İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.</p>
+                <p class="muted" id="testlab-v23-cache">Profil önbelleği hazırlanmayı bekliyor.</p>
+                <div class="test-lab-table-title">
+                    <h4>Onay / Ret / Veri yetersiz — hepsinin sonucu takip edilir</h4>
+                    <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v23','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v23','csv')">CSV</button></div>
+                </div>
+                <div class="table-wrap"><table><thead><tr><th>Tarih (TSİ)</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Dino / V16 / V18</th><th>Pre / EDGE</th><th>Gereken gol</th><th>Gol referansı*</th><th>Karar / Gerekçe</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
+                <p class="muted">* Sabit Poisson referansı; öğrenilmiş/kalibre edilmiş olasılık değil. Son 5 / 10, ev-deplasman gol ve gol atamama ayrıntıları JSON'daki tekil profillerde bulunur. Veri yetersiz kayıtlar ret veya kayıp sayılmaz.</p>
             </div>
 
             <div class="v18-table-grid">
@@ -2011,7 +2025,8 @@
                 core: "/api/two-rule-core-shadow-history",
                 v17: "/api/v17-legacy-shadow-history",
                 v21: "/api/v21-consensus-shadow-history",
-                v22: "/api/v22-union-shadow-history"
+                v22: "/api/v22-union-shadow-history",
+                v23: "/api/v23-goal-history"
             })
         });
 
@@ -3127,7 +3142,43 @@
             }
         }
 
+        function renderV23GoalLab(data) {
+            document.getElementById("testlab-v23-mode").textContent = data ? (data.enabled ? "YALNIZ GÖZLEM" : "KAPALI") : "HAZIR DEĞİL";
+            const summary = document.getElementById("testlab-v23-summary-rows"); summary.replaceChildren();
+            const addRow = (body, values) => {
+                const tr = document.createElement("tr");
+                for (const value of values) { const td = document.createElement("td"); td.textContent = value; tr.appendChild(td); }
+                body.appendChild(tr); return tr;
+            };
+            for (const [label,bucket] of [["Tüm eşleşen V21 (baz)",data?.summary?.overall],
+                ["Verisi yeterli baz",data?.comparableBaseline],["Onay",data?.groups?.approve],
+                ["Ret",data?.groups?.reject],["Veri yetersiz",data?.groups?.insufficient]]) {
+                addRow(summary,[label,bucket?.total || 0,`${bucket?.wins || 0} / ${bucket?.losses || 0}`,
+                    bucket?.pending || 0,formatPercent(bucket?.hitRate),formatPercent(bucket?.roi)]);
+            }
+            document.getElementById("testlab-v23-impact").textContent = data
+                ? `Ret ile elenen kayıp: ${data.avoidedLosses || 0} · Kaçırılan kazanan: ${data.missedWinners || 0} · Korunan aday: ${formatPercent(data.retainedPercent)} · Veri kapsamı: ${formatPercent(data.assessedCoverage)}${data.disabledReason ? " · DURUM: " + data.disabledReason : ""}`
+                : "İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.";
+            document.getElementById("testlab-v23-cache").textContent = data?.cache
+                ? `Önbellek: ${data.cache.cachedTeams} takım/gün · Sırada: ${data.cache.queued} · Ek API: ${data.cache.callsToday}/${data.cache.maxCallsPerDay} (UTC gün) · ${data.cache.enabled ? "Profil toplama açık" : "Profil toplama kapalı"} · İlk açılışta hazır olmayan veriler sonradan karara eklenmez.`
+                : "Profil önbelleği hazırlanmayı bekliyor.";
+            const body = document.getElementById("testlab-v23-rows"); body.replaceChildren();
+            for (const s of data?.signals || []) {
+                const a = s.assessment || {}, verdict = {approve:"Onay",reject:"Ret",insufficient:"Veri yetersiz"}[a.status] || "-";
+                const row = addRow(body,[formatDateTime(s.sentAt),s.match || "-",`${s.minute ?? "-"}' / ${s.score || "-"}`,
+                    `${String(s.market || "-").replace("_UST"," ÜST")} / ${Number(s.odds).toFixed(3)}`,
+                    [s.dinoProbability,s.selectorV2Probability,s.v18Probability].map(v=>formatPercent(v)).join(" / "),
+                    `${formatPercent(s.prematchMarketSupport)} / ${formatPercent(s.edge)}`,a.goalsNeeded ?? "-",
+                    a.remainingProbability == null ? "-" : formatPercent(100*a.remainingProbability),
+                    `${verdict} · ${(a.reasonLabels || []).join("; ")}`,
+                    `${{W:"Kazandı",L:"Kaybetti",VOID:"İptal",PUSH:"İade"}[s.settlement?.result] || "Bekliyor"} / ${s.settlement?.finalScore || "-"}`]);
+                row.children[8].title = (a.noteLabels || []).join("; ");
+            }
+            if (!body.children.length) { const row=addRow(body,["Bu dönemde V23 gözlemi yok."]); row.children[0].colSpan=10; }
+        }
+
         function renderTestLabHistory(data) {
+            renderV23GoalLab(data?.v23Goal);
             setTestLabSummary("testlab-v19", data?.activeV19?.summary);
             setTestLabSummary("testlab-v20", data?.v20Shadow?.summary);
             setTestLabSummary("testlab-core", data?.coreShadow?.summary);
@@ -3166,12 +3217,13 @@
                 data?.legacyV17?.summary?.updatedAt,
                 data?.v21Shadow?.summary?.updatedAt,
                 data?.v22Shadow?.summary?.updatedAt,
+                data?.v23Goal?.summary?.updatedAt,
             ]
                 .filter(Boolean)
                 .sort();
             const lastUpdated = updatedCandidates.at(-1);
             document.getElementById("test-lab-updated").textContent = lastUpdated
-                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · altı test kolu Telegram hattından bağımsız`
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · lab kolları Telegram hattından bağımsız`
                 : `Görünüm: ${viewLabel} · Test Lab ilk uygun adayı bekliyor`;
             const availableDates = Array.isArray(data?.dateOptions)
                 ? data.dateOptions
@@ -3197,6 +3249,7 @@
             filterTableRows(value, "testlab-v17-rows");
             filterTableRows(value, "testlab-v21-rows");
             filterTableRows(value, "testlab-v22-rows");
+            filterTableRows(value, "testlab-v23-rows");
         }
 
         async function fetchTestLabHistory() {
