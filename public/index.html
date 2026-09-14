@@ -1801,17 +1801,26 @@
             </div>
 
             <div class="v18-arm-card" id="testlab-v23-card" style="margin:14px 0;border-color:#4db6ac;">
-                <div class="v18-arm-title"><span>🌱 V23 · Gol Geçmişi Kontrolü</span><span class="mini-badge bg-info" id="testlab-v23-mode">YALNIZ GÖZLEM</span></div>
-                <p class="muted">Yalnız yeni V21 adaylarıyla eşleştirilir; V21 ve Telegram değişmez. Son 10 + aynı ligde son 365 günün ev/deplasman gol profili, kalan süre ve gereken gol. Sezon başında gerekirse önceki sezon da alınır. Kırmızı kart/eksik geçmiş: veri yetersiz. Sabit referans hesap kalibre edilmiş bir başarı yüzdesi değildir.</p>
+                <div class="v18-arm-title"><span>🌱 V23 · V21 / V22 Kontrol Laboratuvarı</span><span class="mini-badge bg-info" id="testlab-v23-mode">SİNYAL ELENMEZ</span></div>
+                <p class="muted">V21 ve V22 sinyalleri kendi kurallarıyla devam eder. Her kontrol bağımsızdır: “ret”, uygulanmış olsaydı elerdi demektir. Bütün kayıtlar sonuçlandırılır. Olay sonrası üretim yalnız gözlemdir; henüz veto eşiği yoktur. Telegram değişmez.</p>
                 <div class="table-wrap"><table><thead><tr><th>Grup</th><th>Aday</th><th>K / Y</th><th>Bekleyen</th><th>İsabet</th><th>Teorik ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
                 <p class="muted" id="testlab-v23-impact">İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.</p>
                 <p class="muted" id="testlab-v23-cache">Profil önbelleği hazırlanmayı bekliyor.</p>
+                <p class="muted" id="testlab-v23-cohort"></p>
                 <div class="test-lab-table-title">
-                    <h4>Onay / Ret / Veri yetersiz — hepsinin sonucu takip edilir</h4>
+                    <label for="testlab-v23-source">Kaynak / deney grubu</label>
+                    <select id="testlab-v23-source" onchange="setV23Source(this.value)" aria-label="V23 kaynak filtresi">
+                        <option value="all">V21 + V22 · ayrı karşılaştırma</option><option value="v21">V21</option><option value="v22">V22</option>
+                        <option value="v22:A">V22 · A</option><option value="v22:B">V22 · B</option><option value="v22:C">V22 · C</option><option value="legacy">Eski V23 · yeni kontrol yok</option>
+                    </select>
+                </div>
+                <div id="testlab-v23-controls"></div>
+                <div class="test-lab-table-title">
+                    <h4>Sinyaller · gerekçeler ve ölçümler satırda açılır</h4>
                     <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v23','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v23','csv')">CSV</button></div>
                 </div>
-                <div class="table-wrap"><table><thead><tr><th>Tarih (TSİ)</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Dino / V16 / V18</th><th>Pre / EDGE</th><th>Gereken gol</th><th>Gol referansı*</th><th>Karar / Gerekçe</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
-                <p class="muted">* Sabit Poisson referansı; öğrenilmiş/kalibre edilmiş olasılık değil. Son 5 / 10, ev-deplasman gol ve gol atamama ayrıntıları JSON'daki tekil profillerde bulunur. Veri yetersiz kayıtlar ret veya kayıp sayılmaz.</p>
+                <div class="table-wrap"><table><thead><tr><th>Tarih / Kaynak</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Dino / V16 / V18</th><th>Pre / EDGE</th><th>Gereken gol</th><th>Gol referansı*</th><th>Kontroller / Gerekçeler</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
+                <p class="muted">* Sabit Poisson referansı; kalibre edilmiş başarı olasılığı değil. Onay/ret tahmini uygulamadır, gerçek sinyal engellenmez. Yalnız ret filtresi simülasyonunda yetersiz/gözlem kayıtları korunur. Δ kâr: aynı giriş oranında birim bahislerle bazdan fark. A/B/C ve gerekçe grupları çakışır; toplanmaz. Özetler tüm seçili güne, satırlar son kayıtlara aittir; JSON/CSV tamdır.</p>
             </div>
 
             <div class="v18-table-grid">
@@ -2039,6 +2048,8 @@
         let coverageFilter = "all";
         let signalHistoryDate = "";
         let testLabDate = "";
+        let v23Source = "all";
+        let latestV23Data = null;
         let candidateHistoryDate = "";
         let pollingStarted = false;
         let nextRunTarget = 0;
@@ -3142,7 +3153,94 @@
             }
         }
 
+        function setV23Source(value) {
+            v23Source = value || "all";
+            renderV23GoalLab(latestV23Data);
+            filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
+        }
+
+        function v23Measurement(c) {
+            const v = c.values || {}, parts = [];
+            if (v.remainingProbability != null) parts.push(`Referans ${formatPercent(100*v.remainingProbability)} / eşik %50`);
+            for (const [side,label] of [["home","Ev"],["away","Dep"]]) if (v[side]?.n != null)
+                parts.push(`${label}: ${v[side].n} maç · atılan ${Number(v[side].goalsFor).toFixed(2)} / yenilen ${Number(v[side].goalsAgainst).toFixed(2)}`);
+            if (v.goalCount != null) parts.push(`Olay golü ${v.goalCount} / skor toplamı ${v.scoreTotal}`);
+            if (v.event) parts.push(`Olay ${v.event.minute}${v.event.extra ? "+"+v.event.extra : ""}' · ilk görüldü ${formatDateTime(v.event.firstObservedAt)}`);
+            if (v.windowMinutes != null) parts.push(`Ölçüm penceresi ${v.windowMinutes} dk.`);
+            for (const [side,label] of [["home","Ev"],["away","Dep"]]) if(v.deltas?.[side])
+                parts.push(`${label}: +${v.deltas[side].shot} şut / +${v.deltas[side].sot} isabet / +${v.deltas[side].corner} korner`);
+            if (v.homeFailedToScoreRate != null) parts.push(`Gol atamama: ev ${formatPercent(100*v.homeFailedToScoreRate)} / dep ${formatPercent(100*v.awayFailedToScoreRate)}`);
+            if (v.homeRed != null) parts.push(`Kırmızı: ev ${v.homeRed} / dep ${v.awayRed} · skor ${v.score || "-"}`);
+            return parts.join(" · ");
+        }
+
+        function renderV23Experiment(data) {
+            const e=data.experiment, verdicts={approve:"Onay verirdi",reject:"Reddederdi",insufficient:"Veri yetersiz",observed:"Yalnız gözlem"};
+            const make=(tag,value)=>{const el=document.createElement(tag);if(value!=null)el.textContent=value;return el;};
+            const addRow=(body,values)=>{const tr=make("tr");for(const value of values)tr.appendChild(make("td",value));body.appendChild(tr);return tr;};
+            const ky=b=>`${b?.wins||0} / ${b?.losses||0}`;
+            document.getElementById("testlab-v23-mode").textContent=data.enabled?"SİNYAL ELENMEZ":"KAPALI";
+            const summary=document.getElementById("testlab-v23-summary-rows");summary.replaceChildren();
+            for(const [label,b] of [["Yeni deney · V21",e.sources.v21.baseline],["Yeni deney · V22",e.sources.v22.baseline],
+                ["Birleşik · aynı giriş tekil",e.unique.baseline],["Eski V23 · ayrı dönem",e.legacy]])
+                addRow(summary,[label,b.total,ky(b),b.pending,formatPercent(b.hitRate),formatPercent(b.roi)]);
+            document.getElementById("testlab-v23-impact").textContent=`${e.sourceRecords} kaynak kaydı · ${e.uniqueEntries} tekil giriş · ${e.uniqueFixtures} maç · ${e.duplicateEntries} aynı giriş ortak · ${e.sharedFixtures} maç iki kaynakta. Farklı dakika/marketler ayrı tutulur.${data.disabledReason?" DURUM: "+data.disabledReason:""}`;
+            document.getElementById("testlab-v23-cohort").textContent=`Yeni kontrol dönemi: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Eski kayıtlar yeniden değerlendirilmez. Gözlem etiketleri onay/red değildir; başarı veya nedensellik kanıtı değildir.`;
+            document.getElementById("testlab-v23-cache").textContent=`Profil: ${data.cache?.cachedTeams||0} takım/gün · ek API ${data.cache?.callsToday||0}/${data.cache?.maxCallsPerDay||80}. Events: ${data.eventCapture?.cachedFixtures||0} maç · ek API 0. Yeniden başlatma sonrası olay pencereleri yeniden birikir; eski kararlar değişmez.`;
+            const container=document.getElementById("testlab-v23-controls");container.replaceChildren();
+            const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
+                v23Source==="legacy"?[]:v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
+            for(const [label,r] of reports) {
+                if(!r)continue;
+                const card=make("section");card.className="v18-arm-card";card.style.margin="12px 0";card.style.borderColor=label==="V21"?"#d9b455":"#4db6ac";
+                card.appendChild(make("h4",`${label} · ${r.baseline.total} sinyal · ${ky(r.baseline)} K/Y · ${formatPercent(r.baseline.hitRate)} başarı · ${formatPercent(r.baseline.roi)} ROI`));
+                const wrap=make("div");wrap.className="table-wrap";const table=make("table"),head=make("thead"),hr=make("tr");
+                for(const title of ["Bağımsız kontrol","Onay K/Y","Ret K/Y","Yetersiz / Gözlem","Onay isabet / ROI","Ret filtresi K/Y · ROI","Δ kâr (birim)"])hr.appendChild(make("th",title));
+                head.appendChild(hr);table.appendChild(head);const body=make("tbody");
+                for(const c of r.controls) {
+                    const diagnostic=c.mode==="observation";
+                    const row=addRow(body,[c.label,diagnostic?"—":ky(c.approve),diagnostic?"—":ky(c.reject),`${c.insufficient.total} / ${c.observed.total}`,
+                        diagnostic?"Veto eşiği yok":`${formatPercent(c.approve.hitRate)} / ${formatPercent(c.approve.roi)}`,
+                        diagnostic?"Uygulanmaz":`${ky(c.rejectOnly)} · ${formatPercent(c.rejectOnly.roi)}`,diagnostic?"—":Number(c.profitDifference).toFixed(2)]);
+                    row.children[2].title=`Önleyebileceği kayıp: ${c.avoidedLosses} · Gereksiz eleyeceği kazanan: ${c.missedWinners}`;
+                    const details=make("details"),caption=make("summary",c.mode==="data-quality"?"Veri kalitesi · gerekçeler":"Kural / gerekçeler / gözlem grupları");details.appendChild(caption);
+                    details.appendChild(make("p",c.rule));
+                    details.appendChild(make("p",`Önleyebileceği kayıp: ${c.avoidedLosses} · Gereksiz eleyeceği kazanan: ${c.missedWinners} · Onay/red kapsamı: ${formatPercent(c.coveredPercent)} · Yetersiz K/Y: ${ky(c.insufficient)}`));
+                    const tagLabels={NO_SHOTS_OBSERVED:"Pencerede yeni şut yok",SHOTS_WITHOUT_SOT:"Şut var, yeni isabet yok",SOT_OBSERVED:"Yeni isabetli şut var"};
+                    for(const [tag,b]of Object.entries(c.tags||{}))details.appendChild(make("p",`${tagLabels[tag]||tag}: ${b.total} kayıt · ${ky(b)} K/Y · ${b.pending} bekleyen · ${formatPercent(b.hitRate)} · ROI ${formatPercent(b.roi)}`));
+                    for(const b of Object.values(c.reasons||{}))details.appendChild(make("p",`${b.label}: ${b.total} kayıt · ${ky(b)} K/Y · ${b.pending} bekleyen`));
+                    row.children[0].appendChild(details);
+                }
+                table.appendChild(body);wrap.appendChild(table);card.appendChild(wrap);container.appendChild(card);
+            }
+            const signals=(data.signals||[]).filter(s=>v23Source==="all"?true:v23Source==="legacy"?!s.audit:
+                !!s.audit&&(s.sourceModel||"v21")===v23Source.split(":")[0]&&(!v23Source.includes(":")||s.matchedFilters?.includes(v23Source.split(":")[1])));
+            const body=document.getElementById("testlab-v23-rows");body.replaceChildren();
+            for(const s of signals) {
+                const a=s.assessment||{},source=(s.sourceModel||"v21").toUpperCase(),filters=s.matchedFilters?.length?" · "+s.matchedFilters.join("+"):"";
+                const row=addRow(body,[`${formatDateTime(s.sentAt)} · ${source}${filters}${s.audit?"":" · eski"}`,s.match||"-",`${s.minute??"-"}' / ${s.score||"-"}`,
+                    `${String(s.market||"-").replace("_UST"," ÜST")} / ${Number(s.odds).toFixed(3)}`,
+                    [s.dinoProbability,s.selectorV2Probability,s.v18Probability].map(v=>formatPercent(v)).join(" / "),
+                    `${formatPercent(s.prematchMarketSupport)} / ${formatPercent(s.edge)}`,a.goalsNeeded??"-",a.remainingProbability==null?"-":formatPercent(100*a.remainingProbability),"",
+                    `${{W:"Kazandı",L:"Kaybetti",VOID:"İptal",PUSH:"İade"}[s.settlement?.result]||"Bekliyor"} / ${s.settlement?.finalScore||"-"}`]);
+                if(s.audit) {
+                    const details=make("details"),counts={};for(const c of s.audit.controls)counts[c.status]=(counts[c.status]||0)+1;
+                    details.appendChild(make("summary",`${counts.approve||0} onay · ${counts.reject||0} ret · ${counts.observed||0} gözlem · ${counts.insufficient||0} yetersiz`));
+                    for(const c of s.audit.controls) {
+                        const p=make("p",`${c.label}: ${verdicts[c.status]||c.status}. ${(c.reasonLabels||[]).join("; ")}`);p.style.maxWidth="480px";p.style.whiteSpace="normal";
+                        const measurement=v23Measurement(c);if(measurement)p.appendChild(make("small"," "+measurement));details.appendChild(p);
+                    }
+                    row.children[8].appendChild(details);
+                } else row.children[8].textContent=`Eski V23 · ${verdicts[a.status]||"-"} · ${(a.reasonLabels||[]).join("; ")}`;
+            }
+            if(!body.children.length){const row=addRow(body,["Bu kaynak/dönemde listelenen V23 kaydı yok. Tam kayıtlar JSON/CSV'dedir."]);row.children[0].colSpan=10;}
+        }
+
         function renderV23GoalLab(data) {
+            latestV23Data=data;
+            if(data?.experiment)return renderV23Experiment(data);
+            document.getElementById("testlab-v23-controls").replaceChildren();
+            document.getElementById("testlab-v23-cohort").textContent="";
             document.getElementById("testlab-v23-mode").textContent = data ? (data.enabled ? "YALNIZ GÖZLEM" : "KAPALI") : "HAZIR DEĞİL";
             const summary = document.getElementById("testlab-v23-summary-rows"); summary.replaceChildren();
             const addRow = (body, values) => {
@@ -3311,6 +3409,7 @@
                 params.delete("scope");
                 params.set("cohort", "previous");
             } else if (testLabDate) params.set("date", testLabDate);
+            if (String(arm).toLowerCase() === "v23") params.set("source",v23Source);
             link.href = `${BACKEND_URL}${base}${suffix}?${params.toString()}`;
             link.target = "_blank";
             link.rel = "noopener";
