@@ -33,6 +33,9 @@ const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
 const v22Tariff = require('./v22_tariff');
 const { createV22Lab } = require('./v22_lab');
+const { GoalProfileCache } = require('./v23_goal_profile');
+const { GoalLab } = require('./v23_goal_lab');
+const { streamJson: streamV23Json } = require('./v23_export');
 const { createIndependentLab, importV19History } = require('./independent_lab');
 const legacyV17Tariff = require('./market_tariff');
 const dinoSelectorV18 = require('./dino_selector_v18');
@@ -48,7 +51,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v22-union-abc-lab-v21-preserved-ubuntu-2026-09-13';
+const BUILD_VERSION = 'ml-v23-goal-history-shadow-ubuntu-2026-09-14';
 
 app.use(cors());
 app.use(express.json());
@@ -228,6 +231,14 @@ const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V22_SHADOW_HISTORY_FILE)
     : path.join(__dirname, 'dino_v22_union_shadow_history.json');
 const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const DINO_V23_SHADOW_ENABLED = String(process.env.DINO_V23_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_goal_history.json');
+const V23_GOAL_CACHE_FILE = path.join(__dirname, 'dino_v23_goal_cache.json');
+if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
+    V21_SHADOW_HISTORY_FILE, V22_SHADOW_HISTORY_FILE, CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE]
+    .some(file => [V23_GOAL_HISTORY_FILE, V23_GOAL_CACHE_FILE].includes(path.resolve(file)))) {
+    throw new Error('V23 dosya yolları diğer geçmişlerden ayrı olmalıdır.');
+}
 if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
     CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE].some(file => path.resolve(file) === V22_SHADOW_HISTORY_FILE)) {
     throw new Error('V22 geçmiş yolu diğer deneylerden ayrı olmalıdır.');
@@ -455,6 +466,14 @@ const independentLab = createIndependentLab({
     liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
     v19Enabled: DINO_V19_SHADOW_ENABLED, v21Enabled: DINO_V21_SHADOW_ENABLED
 });
+
+const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fetchApi: apiGet,
+    // Low-priority warming only between scans; never await history on a signal.
+    canFetch: () => DINO_V23_SHADOW_ENABLED && DINO_V21_SHADOW_ENABLED && !isScanning && !isSignalResultRefreshing &&
+        Number.isFinite(quotaRemaining) && quotaRemaining > SHADOW_MIN_QUOTA_REMAINING,
+    logger: message => addSystemLog(message) });
+const v23GoalLab = new GoalLab({ filePath: V23_GOAL_HISTORY_FILE, cache: v23ProfileCache,
+    enabled: DINO_V23_SHADOW_ENABLED && DINO_V21_SHADOW_ENABLED, logger: message => addSystemLog(message) });
 
 const v20Engine = new V20Engine();
 
@@ -2359,6 +2378,7 @@ function enrichFixturesWithStats(fixtures) {
         // yalnızca ML filtresi bu maçı Python'dan ayırır.
         return {
             fixture_id: Number(fixture.fixture?.id),
+            fixture_kickoff: fixture.fixture?.date || null,
             mac_isim: `${fixture.teams?.home?.name || 'Ev Sahibi'} - ${fixture.teams?.away?.name || 'Deplasman'}`,
             lig: fixture.league?.name || 'Bilinmeyen Lig',
             league_id: Number(fixture.league?.id),
@@ -2695,6 +2715,18 @@ async function canliMaclariHazirla() {
         const allLiveFixtures =
             liveResponse.data?.response ||
             [];
+
+        // Warm early (5–24') too, before the existing 25–80' model gate.
+        // Queueing is memory-only and does not change that gate or fetch live stats.
+        if (DINO_V23_SHADOW_ENABLED && DINO_V21_SHADOW_ENABLED) {
+            for (const fixture of allLiveFixtures) {
+                const minute = Number(fixture.fixture?.status?.elapsed);
+                if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25) continue;
+                v23ProfileCache.request({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
+                    league_id: fixture.league?.id, season: fixture.league?.season,
+                    home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id });
+            }
+        }
 
         for (const fixture of allLiveFixtures) {
             fixture._dino_fixture_request_started_at = liveFixtureRequestStartedAt;
@@ -4986,6 +5018,12 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         }
     }
     try {
+        const observed = v23GoalLab.observe(results.v21, mac);
+        if (observed) addSystemLog(`> 🧪 V23 GOL GEÇMİŞİ: ${mac.mac_isim} | ${observed.market} | ${observed.assessment.status} | yalnız gözlem, Telegram yok.`);
+    } catch (error) {
+        addSystemLog('> ⚠️ V23 değerlendirmesi atlandı; mevcut lab ve Telegram kararları değişmedi.');
+    }
+    try {
         results.v22 = v22Lab.record({ mac, dino, liveOnlyDino, capturedAt });
         if (results.v22) addSystemLog(`> 🧪 V22 LAB [${results.v22.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results.v22.market} | taze kontrol geçti | Telegram yok.`);
     } catch (error) {
@@ -5358,6 +5396,11 @@ async function botuCalistir() {
 
         const hazirlananMaclar = await canliMaclariHazirla();
         const canliMaclar = hazirlananMaclar.filter(hazirMacHalaUygunMu);
+        // Queue early live fixtures, including those not yet eligible at minute 25.
+        // Network work runs only after the scan. Cold-cache decisions stay insufficient.
+        if (DINO_V23_SHADOW_ENABLED && DINO_V21_SHADOW_ENABLED) {
+            for (const mac of canliMaclar) v23ProfileCache.request(mac);
+        }
 
         if (canliMaclar.length !== hazirlananMaclar.length) {
             addSystemLog(
@@ -5811,6 +5854,7 @@ async function botuCalistir() {
             addSystemLog(`> ⚠️ Aday denetim geçmişi yazılamadı: ${error.message}`);
         }
         isScanning = false;
+        void v23ProfileCache.warm();
     }
 }
 
@@ -5985,7 +6029,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
     const coreShadowFixtureIDs = coreShadowTracker.unresolvedFixtureIds();
     const legacyV17ShadowFixtureIDs = legacyV17ShadowTracker.unresolvedFixtureIds();
-    const independentFixtureIDs = [...v19ShadowTracker.unresolvedFixtureIds(), ...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds()];
+    const independentFixtureIDs = [...v19ShadowTracker.unresolvedFixtureIds(), ...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(), ...v23GoalLab.unresolvedFixtureIds()];
     const v20ShadowFixtureIDs = v20ShadowTracker.unresolvedFixtureIds();
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
@@ -6042,6 +6086,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 resolvedCoreShadow += coreShadowTracker.settleFixture(fixture);
                 resolvedLegacyV17Shadow += legacyV17ShadowTracker.settleFixture(fixture);
                 resolvedIndependentLab += v19ShadowTracker.settleFixture(fixture) + v21ShadowTracker.settleFixture(fixture) + v22ShadowTracker.settleFixture(fixture);
+                try { resolvedIndependentLab += v23GoalLab.settleFixture(fixture); }
+                catch { addSystemLog('> ⚠️ V23 sonuç kaydı yazılamadı; diğer sonuç takipleri devam ediyor.'); }
                 resolvedV20Shadow += v20ShadowTracker.settleFixture(fixture);
             }
         }
@@ -6537,6 +6583,7 @@ function testLabKarsilastirmaSecimi(req, res) {
             ...testLabDonemineGoreSec(legacyV17ShadowTracker, null),
             ...testLabDonemineGoreSec(v21ShadowTracker, null),
             ...testLabDonemineGoreSec(v22ShadowTracker, null),
+            ...testLabDonemineGoreSec(v23GoalLab, null),
             ...testLabDonemineGoreSec(v20ShadowTracker, null),
             ...aktifV19SinyalleriniSec(null)
         ],
@@ -6592,6 +6639,10 @@ app.get(
             v22Shadow: {
                 ...v22Lab.metadata(testLabDonemineGoreSec(v22ShadowTracker, selection.date)),
                 signals: v22ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v22ShadowTracker, selection.date))
+            },
+            v23Goal: {
+                ...v23GoalLab.metadata(testLabDonemineGoreSec(v23GoalLab, selection.date)),
+                signals: v23GoalLab.list(req.query.limit, testLabDonemineGoreSec(v23GoalLab, selection.date))
             },
             // Geçici istemci uyumluluğu: yeni panel activeV19 anahtarını kullanır.
             currentSystemSummary: activeV19.summary,
@@ -6857,6 +6908,21 @@ function labCsvExport(req, res, tracker, filePrefix) {
         `attachment; filename="${filePrefix}${cohortSuffix}-${dosyaEtiketi}.csv"`
     );
     res.send(`\uFEFF${v18GolgeCsvOlustur(selection.items, tracker === v22ShadowTracker)}`);
+}
+
+for (const suffix of ['', '/export', '/export.csv']) {
+    app.get(`/api/v23-goal-history${suffix}`, async (req, res) => {
+        const selection = gecmisSeciminiHazirla(req, res, testLabDonemineGoreSec(v23GoalLab,null), 'sentAt');
+        if (!selection) return;
+        if (!suffix) return res.json({ ...v23GoalLab.metadata(selection.items), filter: selection.filter,
+            signals: v23GoalLab.list(req.query.limit,selection.items) });
+        const csv = suffix.endsWith('.csv');
+        res.setHeader('Content-Type', csv ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="dino-v23-gol-gecmisi-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
+        if (csv) return res.send(v23GoalLab.csv(selection.items));
+        try { await streamV23Json(res, { ...v23GoalLab.export(selection.items), filter: selection.filter, exportedAt: new Date().toISOString() }); }
+        catch { if (!res.destroyed) res.destroy(); }
+    });
 }
 
 for (const [slug, tracker, tariff, enabled] of [
@@ -7598,6 +7664,7 @@ app.get(
                     summary: v21History.summary(v21ShadowTracker)
                 },
                 v22Shadow: v22Lab.metadata(),
+                v23Goal: v23GoalLab.metadata(),
                 coreShadow: {
                     enabled: DINO_CORE_SHADOW_ENABLED,
                     validationMode: 'fresh-required',
@@ -7661,6 +7728,9 @@ v20ShadowTracker.load();
 v19ShadowTracker.load();
 v21ShadowTracker.load();
 v22ShadowTracker.load();
+v23ProfileCache.load();
+v23GoalLab.load();
+addSystemLog(`> 🧪 V23 GOL GEÇMİŞİ: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | yalnız yeni V21 adayları | onay / ret / veri yetersiz | Telegram YOK.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Dino/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram YOK.`);
 importV19History(signalTracker, v19ShadowTracker);
 

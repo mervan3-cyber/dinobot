@@ -1,16 +1,16 @@
-# V22 — A/B/C Test Lab; V21 korunur
+# V23 Gol Geçmişi Kontrolü — Ubuntu kurulumu
 
-Bu paket **V22'yi ayrı bir ileri test olarak ekler**. V21'in kuralları, geçmişi ve eski V21 arşivi korunur. Telegram'ın mevcut V19 2.5/4.5 ÜST + Legacy V17 2.5 ÜST yönlendirmesi değişmez. V22 Telegram'a gönderim yapmaz. Yeni Çekirdek, V20, V19 ve Legacy V17 laboratuvarları yerinde kalır.
+Güncel build: `ml-v23-goal-history-shadow-ubuntu-2026-09-14` · sürüm `2.3.0`.
+Paket: `dinobot-v23-gol-gecmisi-test-lab-ubuntu-2026-09-14.zip`.
 
-Kod henüz sunucuya yüklenmedi. ZIP `.env`, API anahtarları, `dino_data.json`, sinyal/aday/lab geçmişleri, API cache dosyaları, `v20_snapshot_archive` veya `node_modules` içermez. **Mevcut uygulama klasörünü silmeyin.**
+Bu sürüm **yalnız ayrı bir V23 Test Lab gözlemi ekler**. Telegram yönlendirmesi, Dino/V16/V18/V20 model dosyaları, V19/Legacy V17 aktif kuralları, V21 ve V22 değişmedi. Sunucuya otomatik yüklenmedi.
 
-## Güncelleme
+## Kurulum
 
-Aşağıdaki `/root/dinobot` ve PM2 adı `dinobot`, yalnız mevcut kurulumunuz bu adları kullanıyorsa geçerlidir.
-
-1. `pm2 stop dinobot` ile süreci durdurun. Mevcut uygulama dizininin kod, `.env` ve bütün geçmiş dosyalarıyla birlikte yedeğini alın; yedeğin açılabildiğini kontrol edin. Yedeği uygulama klasörünün içine koymayın.
-2. `dinobot-v22-abc-test-lab-v21-korunur-ubuntu-2026-09-13.zip` dosyasını mevcut uygulama dizinine açın; yalnız paketteki kod dosyalarının üzerine yazın. ZIP'teki bütün dosyalar gerekir. Özellikle yeni `v22_tariff.js`, `v22_lab.js`, güncel `server.js`, `signal_tracker.js` ve `public/index.html` yüklenmelidir. Mevcut `.env` ve geçmişler yerinde kalmalı.
-3. Uygulama dizininde doğrulayın:
+1. PM2 süreç adınızın `dinobot` olduğunu kontrol edin. `pm2 stop dinobot` ile durdurun.
+2. Mevcut uygulamanın kodunu, `.env`, bütün geçmişlerini ve önbelleklerini uygulama dizini dışına yedekleyin. Yedeğin açılabildiğini kontrol edin.
+3. ZIP'i mevcut `/root/dinobot` dizinine açın. **Bütün paket dosyalarını** yükleyin; yalnız `server.js` yüklemek yeterli değildir. ZIP'te `.env`, sinyal geçmişleri, önbellekler, eğitim arşivleri ve `node_modules` yoktur. Bunları silmeyin.
+4. Doğrulayın:
 
 ```bash
 cd /root/dinobot
@@ -18,57 +18,53 @@ npm ci --omit=dev
 npm test
 ```
 
-Her iki komut da başarılıysa:
+5. Her iki komut da başarılıysa:
 
 ```bash
 pm2 restart dinobot
 pm2 save
-pm2 logs dinobot --lines 50 --nostream
+pm2 logs dinobot --lines 60 --nostream
 ```
 
-Testler başarısızsa yeni sürümü başlatmayın. Aldığınız kod yedeğine dönün; geçmiş dosyalarını silmeyin veya eski kopyalarla geriye almayın. Bağımlılık sürümleri değişmedi. Python standart kütüphane kullanır; eğitim kütüphaneleri sunucuda gerekmez. Testler çevrimdışı çalışır ve gerçek Telegram/API istekleri göndermez.
+Testler başarısızsa yeni sürümü başlatmayın. Kod yedeğine dönün; geçmişleri silmeyin veya eski kopyalarla geriye almayın. Bağımlılıklar değişmedi; V23 yalnız Node standart kütüphanelerini kullanır. 23 test dosyası çevrimdışı çalışır; gerçek API/Python/Telegram çağrısı yapmaz.
 
 ## Açılış kontrolü
 
-- Build: `ml-v22-union-abc-lab-v21-preserved-ubuntu-2026-09-13`; paket sürümü `2.2.0`.
-- Logda `V22 LAB: AÇIK`, `A/B/C OR` ve `Telegram YOK` görülmeli.
-- Paneli sert yenileyin. Test Lab'da **V21'in yanında ayrı V22 kartı ve tablosu** bulunmalı. V21 geçmişi ve Eski V21 JSON düğmesi korunmalı.
-- V22 ilk uygun canlı sinyale kadar sıfır görünür. Eski tam-stat veya V21 kayıtları V22'ye aktarılmaz; başlangıç tarihi ilk gerçek V22 kaydından gelir.
-- V22 tablosunda giriş skoru, A/B/C etiketi, gereken gol, Dino/V16/V18, Pre Destek, EDGE, oran ve sonuç bulunur. JSON/CSV düğmeleri seçilen güne aittir.
-- A/B/C özetlerinde aynı sinyal birden fazla etikete girebilir. **Filtre sayaçlarını toplamayın:** V22 genel toplamında maç başına yalnız bir kayıt vardır.
-- Telegram'ın mevcut yönlendiricisi ve diğer laboratuvarlar değişmemeli. Ham Gözlem geri eklenmedi.
+- Logda yeni build ve `V23 GOL GEÇMİŞİ: AÇIK` görünmeli.
+- Paneli sert yenileyin. Test Lab'da V21/V22 yerinde, ayrıca **V23 · Gol Geçmişi Kontrolü** kartı bulunmalı.
+- V23 boş başlar: eski V21/tam-stat dosyaları aktarılmaz. Yalnız bundan sonra oluşan yeni, taze doğrulanmış V21 adayları eşleştirilir.
+- V23 grupları: **Onay / Ret / Veri yetersiz**. Üç grubun da maç sonucu takip edilir. Ret, maçın kaybettiği anlamına gelmez.
+- Tüm eşleşen V21 bazını, verisi yeterli bazı, onaylananları ve reddedilenleri ayrı karşılaştırın. Veri yetersizleri gizleyerek başarı oranını yorumlamayın.
+- Kartta elenen kayıp, kaçırılan kazanan, veri kapsamı, tutulan aday oranı ve ek API sayacı bulunur. Tarih seçimi TSİ'dir.
+- İlk açılışta profil hazır değilse o aday veri yetersiz kalır; daha sonra gelen profil eski kararı değiştirmez.
 
-## V22 kuralları
+## Veri ve kaynak sınırları
 
-Ortak şartlar: yalnız yarım gollü ÜST; **Dino, V16 ve V18 ayrı ayrı >%50**; dakika **25–80**, oran **1.50–4.00** dahil; market giriş skoruyla zaten kazanılmış olmamalı. EDGE, kayıttaki gibi `Dino − 100/oran` hesabının bir ondalığa yuvarlanmış değeridir.
+Profiller, aynı ligde maçın başlama anından önceki tamamlanmış maçlardan hesaplanır: son 5/10, ev-deplasman atılan/yenen gol, gol atamama ve gol yememe oranları. En fazla son 365 gün kullanılır. Mevcut sezonda örneklem azsa kota uygunsa yalnız önceki sezona bir ek istek yapılır. Mevcut sezon özetleri JSON'da ayrıca bulunur; başka ligler/takımlar karıştırılmaz.
 
-| Filtre | Durum | EDGE, sınırlar dahil | Pre Destek |
-|---|---|---|---|
-| A | Ev sahibi önde → ÜST | −5 … −2.5 | >%20 |
-| B | 2.5 ÜST; giriş skoru 1–0 veya 0–1 | −5 … −2.5 | >%40 |
-| C | ÜST için yalnız bir gol daha gerekiyor | −10 … +5 | >%75 |
+Tam onay/ret değerlendirmesi için iki takımda da son 10 maç ve ilgili ev/deplasman tarafında en az 5 maç gerekir. Son maç 60 günden eskiyse, kart sayısı bilinmiyorsa veya kırmızı kart varsa ilk referans hesap karar vermez: **veri yetersiz**. Bu yüzden her V21 adayının mutlaka değerlendirilmesi beklenmemeli.
 
-A, B **veya** C yeterlidir; üçünün aynı anda karşılanması gerekmez. Aynı maç için filtreler arasında ortak tek sinyal kilidi vardır; yeniden başlatmada da korunur. İlk uygun taze taramada, birden fazla market varsa oy sayısı azalan, oran artan, market adı artan sıralama kullanılır. V21 ve V22 maç kilitleri birbirinden bağımsızdır.
+Ek istekler taramalar arasında seri çalışır. Her seferinde en çok 12, UTC günde en çok 80 istek; takım/sezon başına en çok 2 istek. Günlük sayaç yeniden başlatmada korunur. Mevcut kota rezervinin altına inilmez. Bir profil isteğinin zaman aşımı 6 saniye, deneme sayısı 1'dir. HTTP 429 sonrası 30 dakika beklenir. Başarılı önbellek 12 saat, hata 30 dakika saklanır; en fazla 600 takım/gün anahtarı tutulur. Ortak API kuyruğunda başlamış tek bir ek istek kısa gecikme yaratabilir; sinyal kararı profil indirmesini beklemez.
 
-Sinyal kaydı öncesi taze skor/istatistik/oran kontrolü ve model yeniden hesaplaması gerekir. İlk taramada uygun görünen fakat taze kontrolde şartları kaybeden aday yazılmaz. Eksik model veya Pre desteği onay sayılmaz.
+## Sabit deney kuralı
 
-## Geçmiş, ayarlar ve raporlar
+V21 bazı aynen: yarım gollü ÜST, Dino/V16/V18 ayrı ayrı >%50, Pre >%50, EDGE −5…0, dakika 25–80, oran 1.50–4.00, maç başına ilk sinyal. −2.7…+1.8 önerisi bu sürümde uygulanmadı.
 
-- V22'nin ayrı dosyası: `dino_v22_union_shadow_history.json`. İlk çalıştırmada oluşturulur. Uygulama kullanıcısının bu konuma yazabilmesi gerekir. Sonraki güncellemelerde bu dosyayı da yedekleyin ve koruyun.
-- `dino_v21_consensus_shadow_history.json` aynen korunur. V22'yi başlatmak için V21 geçmişini sıfırlamayın.
-- `DINO_V22_SHADOW_ENABLED`: varsayılan `true`; yalnız V22'yi kapatmak için `false`.
-- `DINO_V22_SHADOW_HISTORY_FILE`: isteğe bağlı özel, yazılabilir yol. Başka bir deneyin veya aktif takip dosyasının yolunu kullanmayın; çakışırsa sunucu açılışta hata verir.
-- Mevcut V21/V19/V20/Yeni Çekirdek/Legacy V17 ortam ayarları korunur. `.env` paket tarafından değiştirilmez. Ortam ayarı değiştirilirse `pm2 restart dinobot --update-env` gerekebilir.
+V23, atak ile rakibin gol yeme ortalamasını karşılaştırır. Her takımın son 10 ve ilgili ev/deplasman ortalaması yarı yarıya harmanlanır. Toplam gol hızı kalan normal süreye ölçeklenir ve gereken ek gol için basit Poisson referansı hesaplanır. Referans ≥%50 ise onay, altındaysa ret. **Bu eşik veriden optimize edilmedi; bu yüzde kalibre edilmiş model güveni değildir.** Son 5 maçın gol atamama bilgisi ayrıca gösterilir, son 10 ile çakıştığından bağımsız oy sayılmaz.
 
-V22 API'leri:
+Skor hangi tarafın önde olduğunu ve gereken golü belirler. Makaledeki kırmızı kart / geriye düşme yüzdeleri veya ilave uzatma dakikası doğrudan uygulanmaz. Geçmiş maçların “gerideyken/kırmızı karttan sonra” gol oranı için gerekli olay-zamanı modeli henüz yoktur. Ayrıntılar: `V23_DEGISIKLIKLER_2026-09-14.md`.
 
-- `/api/v22-union-shadow-history`
-- `/api/v22-union-shadow-history/export?date=2026-09-13`
-- `/api/v22-union-shadow-history/export.csv?date=2026-09-13`
-- `/api/test-lab-comparison` ve `/api/status` içinde `v22Shadow`.
+## Dosyalar ve dışa aktarım
 
-V22 adayları, Telegram adayı olmasa da mevcut kotalar çerçevesinde taze API/Python doğrulaması isteyebilir. Günlük API ve disk tüketimini izleyin; veri doğrulama kontrolleri veya kota korumaları kaldırılmadı.
+- `dino_v23_goal_history.json`: ayrı gözlem geçmişi ve tekil profil anlık görüntüleri; yedekleyin.
+- `dino_v23_goal_cache.json`: sınırlı API önbelleği ve günlük istek sayacı; yedekleyin.
+- Hiçbir eski dosya temizlenmez. V23 geçmişi 12.000 kayıtta sessizce silinmez; kayıt durur ve panel/log uyarır. Arşivleme planı gerekir.
+- Bozuk V23 geçmişi/önbelleği otomatik sıfırlanmaz. V23 ilgili işlevi kapanır, dosya korunur.
+- V23'ü kapatmak: `DINO_V23_SHADOW_ENABLED=false`; PM2 ortam değişikliğinde `pm2 restart dinobot --update-env`. V21 kapalıysa eşleştirilmiş V23 de kapalıdır.
+- API: `/api/v23-goal-history`, `/api/v23-goal-history/export?date=2026-09-14`, `/api/v23-goal-history/export.csv?date=2026-09-14`.
+- JSON dışa aktarımı parça parça yazılır, profiller bir kez bulunur. Paneldeki limit dışa aktarımı kısaltmaz.
+- JSON'daki `profileIds` değerleri `profiles` içindeki örnekleme bağlanır. Son 5/10, sezon, ev-deplasman ve geçmiş skorlar burada incelenebilir.
+- `/api/test-lab-comparison` ve `/api/status` içinde `v23Goal` vardır.
+- ZIP içindeki `V23_PACKAGE_MANIFEST.json` dosya SHA-256 değerlerini içerir.
 
-Sonraki değerlendirmede V22 JSON'unu ve aynı günün tam-stat JSON'unu alın; V21 karşılaştırması için V21 JSON'unu da ayrıca saklayın. Geçmiş örneklerdeki isabet gelecekteki sonuçların garantisi değildir; V22 yalnız ileri testtir.
-
-Teknik değişiklikler: `V22_DEGISIKLIKLER_2026-09-13.md`. ZIP içindeki `V22_PACKAGE_MANIFEST.json` dosya SHA-256 değerlerini içerir. Eski V21 değişiklik notları yalnız geçmiş sürüm referansıdır; bu kurulum belgesi günceldir.
+Yarın aynı tarihin **V23 JSON'u ve V21 JSON'unu** alın. İlk birkaç sonuçla eşiği değiştirmeyin; onay/ret sayısı, kaçırılan kazananlar, veri kapsamı ve teorik ROI'yi birlikte değerlendirin. Başarı veya kâr garantisi yoktur.
