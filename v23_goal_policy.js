@@ -1,6 +1,7 @@
 'use strict';
 const { finite, integer } = require('./v23_goal_profile');
 const baseline = require('./v21_tariff');
+const v22 = require('./v22_tariff');
 const VERSION = 'v23-goal-check-shadow-v1-2026-09-14';
 const POLICY = Object.freeze({ version: VERSION, baselineVersion: baseline.VERSION,
     minimumRecentGames: 10, minimumVenueGames: 5, maximumLatestMatchAgeDays: 60,
@@ -13,6 +14,12 @@ function poissonTail(lambda, needed) {
     for (let k=1; k<needed; k++) { mass *= lambda/k; cdf += mass; }
     return Math.max(0,Math.min(1,1-cdf));
 }
+function baselineCheck(signal) {
+    const tariff = signal.tariffVersion === v22.VERSION ? v22 : baseline;
+    return tariff.check({ market: signal.market, score: signal.score, minute: signal.minute, odds: signal.odds,
+        dinoProbability: signal.dinoProbability, selectorProbability: signal.selectorV2Probability,
+        v18Probability: signal.v18Probability, prematchSupport: signal.prematchMarketSupport });
+}
 function evaluate({ signal, mac, homeEntry, awayEntry }) {
     const reasons = [], notes = [], score = String(signal.score || '').match(/^(\d+)-(\d+)$/);
     const line = String(signal.market || '').match(/^(\d+\.5)_UST$/);
@@ -23,8 +30,7 @@ function evaluate({ signal, mac, homeEntry, awayEntry }) {
         profileIds: { home: homeEntry?.profile?.id || null, away: awayEntry?.profile?.id || null },
         profileStatus: { home: homeEntry?.status || 'missing', away: awayEntry?.status || 'missing' },
         expectedGoals90: null, expectedRemainingGoals: null, remainingProbability: null, calibrated: false };
-    const base = baseline.check({ market: signal.market, minute, odds: signal.odds, dinoProbability: signal.dinoProbability,
-        selectorProbability: signal.selectorV2Probability, v18Probability: signal.v18Probability, prematchSupport: signal.prematchMarketSupport });
+    const base = baselineCheck(signal);
     if (!base.eligible) reasons.push('BASELINE_INVALID');
     if (!score || !line || minute === null || minute < 0 || minute > 90) reasons.push('LIVE_STATE_MISSING');
     else {
@@ -46,7 +52,7 @@ function evaluate({ signal, mac, homeEntry, awayEntry }) {
                 reasons.push(`${side}_GOAL_AVERAGE_MISSING`);
         }
     }
-    notes.push('PRE_ALREADY_IN_BASELINE_NOT_AN_INDEPENDENT_VOTE');
+    notes.push(signal.tariffVersion === v22.VERSION ? 'V22_PRE_ALREADY_IN_SOURCE_NOT_AN_INDEPENDENT_VOTE' : 'PRE_ALREADY_IN_BASELINE_NOT_AN_INDEPENDENT_VOTE');
     notes.push('SCORE_EFFECT_AND_STOPPAGE_TIME_NOT_FITTED');
     if (reasons.length) return result;
     // Symmetric attack-versus-defence estimate. Last 5 is reported, not counted
@@ -68,4 +74,4 @@ function evaluate({ signal, mac, homeEntry, awayEntry }) {
     if (away.last5.failedToScoreRate >= 0.6) notes.push('AWAY_FAILED_TO_SCORE_3_OF_LAST_5');
     return result;
 }
-module.exports = { VERSION, POLICY, poissonTail, evaluate };
+module.exports = { VERSION, POLICY, poissonTail, evaluate, baselineCheck };

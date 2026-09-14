@@ -1,70 +1,81 @@
-# V23 Gol Geçmişi Kontrolü — Ubuntu kurulumu
+# V23.1 — V21 / V22 Kontrol Laboratuvarı
 
-Güncel build: `ml-v23-goal-history-shadow-ubuntu-2026-09-14` · sürüm `2.3.0`.
-Paket: `dinobot-v23-gol-gecmisi-test-lab-ubuntu-2026-09-14.zip`.
+Build: ml-v23-1-dual-source-controls-ubuntu-2026-09-14 · sürüm 2.3.1.
+Paket: dinobot-v23-1-v21-v22-kontrol-labi-ubuntu-2026-09-14.zip.
 
-Bu sürüm **yalnız ayrı bir V23 Test Lab gözlemi ekler**. Telegram yönlendirmesi, Dino/V16/V18/V20 model dosyaları, V19/Legacy V17 aktif kuralları, V21 ve V22 değişmedi. Sunucuya otomatik yüklenmedi.
+Panelde adı **V23** olarak kalır. V21 ve V22 yeni sinyalleri ayrı izlenir; hiçbir V23 kontrolü sinyali elemez. Telegram, V19/Legacy V17 aktif kuralları, V21/V22 seçim kuralları ve eğitilmiş modeller değişmedi. Bu paket sunucuya otomatik yüklenmedi.
 
-## Kurulum
+## Güvenli kurulum
 
-1. PM2 süreç adınızın `dinobot` olduğunu kontrol edin. `pm2 stop dinobot` ile durdurun.
-2. Mevcut uygulamanın kodunu, `.env`, bütün geçmişlerini ve önbelleklerini uygulama dizini dışına yedekleyin. Yedeğin açılabildiğini kontrol edin.
-3. ZIP'i mevcut `/root/dinobot` dizinine açın. **Bütün paket dosyalarını** yükleyin; yalnız `server.js` yüklemek yeterli değildir. ZIP'te `.env`, sinyal geçmişleri, önbellekler, eğitim arşivleri ve `node_modules` yoktur. Bunları silmeyin.
-4. Doğrulayın:
+1. PM2 süreç adının dinobot olduğunu kontrol edin; aşağıdaki komutla durdurun:
 
-```bash
-cd /root/dinobot
-npm ci --omit=dev
-npm test
-```
+       pm2 stop dinobot
 
-5. Her iki komut da başarılıysa:
+2. Uygulama kodunu, .env, bütün geçmişleri ve önbellekleri /root/dinobot dışında yedekleyin. Yedeğin açılabildiğini doğrulayın.
+3. ZIP'in **bütün dosyalarını** /root/dinobot dizinine yükleyin. Yalnız server.js yeterli değildir. .env, geçmişler, önbellekler, eğitim arşivleri ve node_modules ZIP'te yoktur; bunları silmeyin.
+4. Sunucuda:
 
-```bash
-pm2 restart dinobot
-pm2 save
-pm2 logs dinobot --lines 60 --nostream
-```
+       cd /root/dinobot
+       npm ci --omit=dev
+       npm test
 
-Testler başarısızsa yeni sürümü başlatmayın. Kod yedeğine dönün; geçmişleri silmeyin veya eski kopyalarla geriye almayın. Bağımlılıklar değişmedi; V23 yalnız Node standart kütüphanelerini kullanır. 23 test dosyası çevrimdışı çalışır; gerçek API/Python/Telegram çağrısı yapmaz.
+5. Başarılıysa:
 
-## Açılış kontrolü
+       pm2 restart dinobot
+       pm2 save
+       pm2 logs dinobot --lines 60 --nostream
 
-- Logda yeni build ve `V23 GOL GEÇMİŞİ: AÇIK` görünmeli.
-- Paneli sert yenileyin. Test Lab'da V21/V22 yerinde, ayrıca **V23 · Gol Geçmişi Kontrolü** kartı bulunmalı.
-- V23 boş başlar: eski V21/tam-stat dosyaları aktarılmaz. Yalnız bundan sonra oluşan yeni, taze doğrulanmış V21 adayları eşleştirilir.
-- V23 grupları: **Onay / Ret / Veri yetersiz**. Üç grubun da maç sonucu takip edilir. Ret, maçın kaybettiği anlamına gelmez.
-- Tüm eşleşen V21 bazını, verisi yeterli bazı, onaylananları ve reddedilenleri ayrı karşılaştırın. Veri yetersizleri gizleyerek başarı oranını yorumlamayın.
-- Kartta elenen kayıp, kaçırılan kazanan, veri kapsamı, tutulan aday oranı ve ek API sayacı bulunur. Tarih seçimi TSİ'dir.
-- İlk açılışta profil hazır değilse o aday veri yetersiz kalır; daha sonra gelen profil eski kararı değiştirmez.
+Test başarısızsa başlatmayın. Kod yedeğine dönün; canlı geçmişleri eski kopyalarla geriye almayın. Bağımlılıklar değişmedi. 25 test dosyası çevrimdışı çalışır; gerçek API, Python veya Telegram çağrısı yapmaz.
 
-## Veri ve kaynak sınırları
+## Panelde beklenenler
 
-Profiller, aynı ligde maçın başlama anından önceki tamamlanmış maçlardan hesaplanır: son 5/10, ev-deplasman atılan/yenen gol, gol atamama ve gol yememe oranları. En fazla son 365 gün kullanılır. Mevcut sezonda örneklem azsa kota uygunsa yalnız önceki sezona bir ek istek yapılır. Mevcut sezon özetleri JSON'da ayrıca bulunur; başka ligler/takımlar karıştırılmaz.
+- Yeni build ve V23 KONTROL LABI: AÇIK logu. Paneli sert yenileyin.
+- Test Lab'daki eski V21/V22 bölümleri yerinde kalır. V23 kartında **V21, V22, tekil birleşim, eski V23** özetleri ayrıdır.
+- Kaynak seçici: tümü, V21, V22, V22-A/B/C ve eski V23. JSON/CSV aynı kaynak ve TSİ tarih filtresini kullanır.
+- Kontrol satırında onay K/Y, ret K/Y, yetersiz/gözlem sayısı, onay isabeti/ROI, yalnız-ret filtresi sonucu ve bazdan birim kâr farkı bulunur.
+- **Ret K/Y = gereksiz elenecek kazanan / önlenebilecek kaybeden.** Bunlar gerçek veto değildir. Kural, gerekçeler ve örneklem açılır ayrıntılardadır.
+- Sinyal satırındaki kontrol özetini açınca tüm bağımsız kararlar ve ölçülen değerler görünür. Veri yetersizliği ret veya kayıp sayılmaz.
 
-Tam onay/ret değerlendirmesi için iki takımda da son 10 maç ve ilgili ev/deplasman tarafında en az 5 maç gerekir. Son maç 60 günden eskiyse, kart sayısı bilinmiyorsa veya kırmızı kart varsa ilk referans hesap karar vermez: **veri yetersiz**. Bu yüzden her V21 adayının mutlaka değerlendirilmesi beklenmemeli.
+## Dokuz bağımsız kontrol
 
-Ek istekler taramalar arasında seri çalışır. Her seferinde en çok 12, UTC günde en çok 80 istek; takım/sezon başına en çok 2 istek. Günlük sayaç yeniden başlatmada korunur. Mevcut kota rezervinin altına inilmez. Bir profil isteğinin zaman aşımı 6 saniye, deneme sayısı 1'dir. HTTP 429 sonrası 30 dakika beklenir. Başarılı önbellek 12 saat, hata 30 dakika saklanır; en fazla 600 takım/gün anahtarı tutulur. Ortak API kuyruğunda başlamış tek bir ek istek kısa gecikme yaratabilir; sinyal kararı profil indirmesini beklemez.
+1. Mevcut son 10 + ev/deplasman gol geçmişi: eski V23 sabit Poisson hesabı.
+2. Yalnız iki takımın son 10 gol üretimi/yeme ortalamaları.
+3. Yalnız ev sahibinin evde, deplasmanın deplasmanda gol üretimi/yeme ortalamaları; her tarafta en az 5 maç.
+4. Olay listesindeki geçerli toplam gol ile giriş skorunun tutarlılığı: **veri kalitesi kontrolü**, gol tahmini değil.
+5. Gol sonrası üretim.
+6. Kırmızı kart sonrası üretim.
+7. Oyuncu değişikliği sonrası üretim.
+8. Son 5 maçta gol atamama oranları.
+9. Girişteki kart ve skor durumu.
 
-## Sabit deney kuralı
+İlk üç kontrol için referans ≥%50 onay, altı ret etiketidir. Eşik veriden optimize edilmedi ve olasılıklar kalibre değildir. Kırmızı kart veya eksik kart verisinde bu üç hesap yetersiz kalır. Son 10 için en az 10, ilgili saha için en az 5 maç; son maç en fazla 60 günlük olmalıdır. Örneğin saha örneklemi azsa son-10 kontrolü yine bağımsız çalışabilir.
 
-V21 bazı aynen: yarım gollü ÜST, Dino/V16/V18 ayrı ayrı >%50, Pre >%50, EDGE −5…0, dakika 25–80, oran 1.50–4.00, maç başına ilk sinyal. −2.7…+1.8 önerisi bu sürümde uygulanmadı.
+5–9. kontroller **yalnız gözlem etiketidir**; uydurma onay/red eşiği uygulanmaz. Şut/isabet durumları ve sonuçları grup grup raporlanır. Bunlardan birini veto yapmak ayrı ileri-test kararı gerektirir. Son 5, son 10 ve saha verileri bağımsız model oyları sayılmaz.
 
-V23, atak ile rakibin gol yeme ortalamasını karşılaştırır. Her takımın son 10 ve ilgili ev/deplasman ortalaması yarı yarıya harmanlanır. Toplam gol hızı kalan normal süreye ölçeklenir ve gereken ek gol için basit Poisson referansı hesaplanır. Referans ≥%50 ise onay, altındaysa ret. **Bu eşik veriden optimize edilmedi; bu yüzde kalibre edilmiş model güveni değildir.** Son 5 maçın gol atamama bilgisi ayrıca gösterilir, son 10 ile çakıştığından bağımsız oy sayılmaz.
+## Zaman ve veri güvenliği
 
-Skor hangi tarafın önde olduğunu ve gereken golü belirler. Makaledeki kırmızı kart / geriye düşme yüzdeleri veya ilave uzatma dakikası doğrudan uygulanmaz. Geçmiş maçların “gerideyken/kırmızı karttan sonra” gol oranı için gerekli olay-zamanı modeli henüz yoktur. Ayrıntılar: `V23_DEGISIKLIKLER_2026-09-14.md`.
+- Her kaynak için maç başına kendi ilk sinyali; aynı maç iki kaynaktan gelirse birbirini engellemez.
+- Aynı fixture, market, dakika, skor, giriş zamanı ve oran birleşik raporda bir kez sayılır. Farklı girişler ayrıdır. A/B/C ve gerekçe grupları çakışabilir; toplamlarını toplamayın.
+- Eski V23 kayıtları korunur, eski dönem olarak gösterilir. Geçmiş V21/V22 veya tam-stat verileri yeni deneye aktarılmaz. İlk yeni sinyalle deney başlar.
+- Olay ve profil bilgisi giriş anında dondurulur. Sonradan gelen profil/olay/düzeltme geçmiş değerlendirmeyi değiştirmez; yalnız maç sonucu güncellenir.
+- Olaylar mevcut toplu/taze fixture cevaplarından kullanılır: **ek olay API isteği yok**. Liste eksikse veya alımı 120 saniyeden eski/girişten sonraysa veri yetersizdir. Kapsam ve sağlayıcı gecikmeleri nedeniyle her maçta olay değerlendirmesi beklenmemelidir.
+- Olay sonrası üretim, aynı devrede olay görüldükten sonra alınmış iki istatistik anı arasında 3–20 dakikalık penceredir. Tam olay dakikasındaki istatistikler uydurulmaz. Araya başka gol/kart/değişiklik girerse veya istatistik gerilerse pencere kullanılmaz. Yeni veri sonradan eski sinyale eklenmez.
+- 45+ uzatmaları ilk devrede kalır. Kaçan/iptal goller toplam gol sayılmaz. Kart olayından sahadaki oyuncu eksilmesi varsayılmaz; ikinci sarı/kırmızı aynı bilinen oyuncu kimliğiyle tekilleştirilir.
+- Olay penceresi bellekte en fazla 300 maç × 32 an; aynı olaylar referansla paylaşılır. Yeniden başlatmada pencere sıfırdan birikir, kaydedilmiş sinyal kanıtları korunur.
 
-## Dosyalar ve dışa aktarım
+## Kaynak kullanımı ve dosyalar
 
-- `dino_v23_goal_history.json`: ayrı gözlem geçmişi ve tekil profil anlık görüntüleri; yedekleyin.
-- `dino_v23_goal_cache.json`: sınırlı API önbelleği ve günlük istek sayacı; yedekleyin.
-- Hiçbir eski dosya temizlenmez. V23 geçmişi 12.000 kayıtta sessizce silinmez; kayıt durur ve panel/log uyarır. Arşivleme planı gerekir.
-- Bozuk V23 geçmişi/önbelleği otomatik sıfırlanmaz. V23 ilgili işlevi kapanır, dosya korunur.
-- V23'ü kapatmak: `DINO_V23_SHADOW_ENABLED=false`; PM2 ortam değişikliğinde `pm2 restart dinobot --update-env`. V21 kapalıysa eşleştirilmiş V23 de kapalıdır.
-- API: `/api/v23-goal-history`, `/api/v23-goal-history/export?date=2026-09-14`, `/api/v23-goal-history/export.csv?date=2026-09-14`.
-- JSON dışa aktarımı parça parça yazılır, profiller bir kez bulunur. Paneldeki limit dışa aktarımı kısaltmaz.
-- JSON'daki `profileIds` değerleri `profiles` içindeki örnekleme bağlanır. Son 5/10, sezon, ev-deplasman ve geçmiş skorlar burada incelenebilir.
-- `/api/test-lab-comparison` ve `/api/status` içinde `v23Goal` vardır.
-- ZIP içindeki `V23_PACKAGE_MANIFEST.json` dosya SHA-256 değerlerini içerir.
+Gol profili önbelleği değişmedi: aynı lig, son 365 gün, maç başlamadan önceki FT sonuçları; gerekirse bir önceki sezon. Ek profil çağrıları taramalar arasında, en fazla 12/tur ve 80/UTC gün; kota rezervi korunur. Events bunun üzerine çağrı eklemez. Soğuk önbellekte aday yine kaydolur, ilgili kontrol yetersiz olur.
 
-Yarın aynı tarihin **V23 JSON'u ve V21 JSON'unu** alın. İlk birkaç sonuçla eşiği değiştirmeyin; onay/ret sayısı, kaçırılan kazananlar, veri kapsamı ve teorik ROI'yi birlikte değerlendirin. Başarı veya kâr garantisi yoktur.
+- dino_v23_goal_history.json: eski/yeni gözlemler, dondurulmuş kontroller/olay kanıtları ve tekil profiller.
+- dino_v23_goal_cache.json: profil önbelleği ve kalıcı kota sayacı.
+- 12.000 kaynak kaydında V23 yeni kayıt almayı durdurur, geçmişi silmez; uyarı verir. Aynı maçın iki kaynak kaydı kapasiteye iki kayıt olarak dahildir.
+- Bozuk geçmiş/önbellek sıfırlanmaz. Dosya korunur, ilgili V23 işlevi durur. Mevcut modeller devam eder.
+- Kapatmak: DINO_V23_SHADOW_ENABLED=false; ortam değişirse pm2 restart dinobot --update-env. V21 veya V22'den en az biri açıkken V23 çalışabilir.
+- JSON: /api/v23-goal-history/export?date=2026-09-14&source=all
+- V22-B: /api/v23-goal-history/export?date=2026-09-14&source=v22%3AB
+- CSV için /export.csv. JSON akışla yazılır; panel satır limiti indirmeyi kısaltmaz.
+- experiment özetleri ve her signal.audit.controls ölçümleri JSON'dadır. profiles yalnız gerekli tekil profilleri içerir.
+- V23_PACKAGE_MANIFEST.json paket içindeki dosyaların SHA-256 değerlerini içerir.
+
+Yarın aynı günün V23 JSON'unu **tümü** seçiliyken indirmek iki kolu birlikte incelemek için yeterlidir. İlk birkaç sonuçla eşik değiştirmeyin. Başarı/kâr garantisi yoktur. Geri dönüşte yeni kayıtları anlayamayabilecek eski kodu canlı V23 dosyası üzerinde başlatmadan önce ayrıca arşivleyin; hiçbir geçmişi silmeyin.
