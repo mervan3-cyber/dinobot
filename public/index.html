@@ -1340,8 +1340,33 @@
             <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
             <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
             <button type="button" data-target="section-radar" onclick="jumpToSection('section-radar', this)">Sistem Radarı</button>
+            <button type="button" data-target="section-sharing" onclick="jumpToSection('section-sharing', this)">Paylaşım Ayarları</button>
+            <button type="button" onclick="logout()">Çıkış</button>
         </nav>
 
+        <section class="workspace-overview" id="section-sharing" style="margin-bottom:20px">
+            <div class="control-card">
+                <h3>📣 Paylaşım Ayarları</h3>
+                <p>Ana Telegram kanalı mevcut kurallarıyla devam eder. Ek kopyalar sinyal sayısını artırmaz. Anahtarlar ve hedef ID yalnız sunucudaki .env dosyasından okunur.</p>
+                <div class="control-grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))">
+                    <div class="control-card">
+                        <h3>Ek Telegram grubu</h3>
+                        <p>Aynı sinyal + kendi mesajına “Yakaladık!” yanıtı.</p>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-extraTelegram" type="checkbox" disabled onchange="saveSharing('extraTelegram', this.checked)"> Ek gruba paylaş</label>
+                        <p id="sharing-extraTelegram-status" role="status">Ayarlar yükleniyor…</p>
+                    </div>
+                    <div class="control-card">
+                        <h3>X paylaşımı</h3>
+                        <p>Yalnız sinyal. Otomatik sonuç, yanıt ve gün sonu paylaşımı yok.</p>
+                        <p>Telegram metni aynen gönderilir. Standart 280 karakter sınırını aşan metinleri X reddedebilir; kısaltma veya zincir otomatik yapılmaz.</p>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-x" type="checkbox" disabled onchange="saveSharing('x', this.checked)"> X’te paylaş</label>
+                        <p id="sharing-x-status" role="status">Ayarlar yükleniyor…</p>
+                    </div>
+                </div>
+                <p id="sharing-message" role="status" aria-live="polite">Yeni hedefler başlangıçta kapalıdır. Açınca yalnız yeni sinyaller gider; eski sinyaller tekrar paylaşılmaz.</p>
+                <button type="button" onclick="fetchSharing()">Durumu yenile</button>
+            </div>
+        </section>
         <section class="workspace-overview" id="section-overview">
             <div class="top-meta">
                 <div class="meta-item">
@@ -1984,11 +2009,10 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script>
-        const CORRECT_PASS = "enessro";
-        const REMOTE_BACKEND_URL = "http://91.198.66.192:3000";
-        const BACKEND_URL = window.location.protocol === "file:"
-            ? REMOTE_BACKEND_URL
-            : window.location.origin;
+        const BACKEND_URL = window.location.origin;
+        let authenticated = false;
+        let sharingState = null;
+        let sharingSaving = false;
         const API_DAILY_QUOTA = 7500;
         const TEST_LAB_API = Object.freeze({
             comparison: "/api/test-lab-comparison",
@@ -2272,17 +2296,63 @@
             renderLogEntries();
         }
 
+        function renderSharing(data) {
+            sharingState = data;
+            const names = {sent:'Gönderildi',declined:'Reddedildi',uncertain:'Sonuç belirsiz; tekrar gönderilmedi',skipped:'Atlandı',sending:'Gönderiliyor'};
+            for (const kind of ['extraTelegram','x']) {
+                const state = data[kind];
+                const toggle = document.getElementById(`sharing-${kind}`);
+                toggle.checked = !!state.enabled;
+                toggle.disabled = sharingSaving || data.disabled || (!state.enabled && (data.delivery?.disabled || !state.configured));
+                const last = data.delivery?.[kind]?.last;
+                document.getElementById(`sharing-${kind}-status`).textContent =
+                    `${state.active && !data.delivery?.disabled ? 'AÇIK' : 'KAPALI'} · ${state.configured ? '.env hazır (API yetkisi gönderimde doğrulanır)' : state.reason}` +
+                    (last ? ` · Son paylaşım: ${names[last.status] || last.status}${last.errorCode ? ' ('+last.errorCode+')' : ''}${last.reason ? ' — '+last.reason : ''}` : ' · Henüz paylaşım yok');
+            }
+            if (data.disabled || data.delivery?.disabled) document.getElementById('sharing-message').textContent = 'Ek paylaşım dosyasında hata var. Ana Telegram etkilenmedi; sunucu günlüklerini kontrol edin.';
+        }
+        async function fetchSharing() {
+            if (sharingSaving) return;
+            try { renderSharing(await apiFetch('/api/sharing-settings')); }
+            catch(error) { document.getElementById('sharing-message').textContent = error.message; }
+        }
+        async function saveSharing(kind, enabled) {
+            if (!sharingState || sharingSaving) return;
+            sharingSaving = true; renderSharing(sharingState);
+            document.getElementById('sharing-message').textContent = 'Kaydediliyor…';
+            try {
+                sharingState = await apiFetch('/api/sharing-settings',{method:'POST',body:JSON.stringify({revision:sharingState.revision,[kind]:enabled})});
+                document.getElementById('sharing-message').textContent = 'Kaydedildi. Ana kanal değişmedi. Değişiklik yeni sinyaller için hemen geçerli.';
+            } catch(error) { document.getElementById('sharing-message').textContent = `Kaydedilemedi: ${error.message}`; }
+            finally { sharingSaving = false; renderSharing(sharingState); }
+        }
+        function showLogin() {
+            authenticated = false;
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+        async function logout() {
+            try { await apiFetch('/api/auth/logout',{method:'POST',body:'{}'}); showLogin(); }
+            catch(error) { showToast(error.message,true); }
+        }
         async function apiFetch(path, options = {}) {
+            if (!authenticated && path !== '/api/auth/login') throw new Error('Panel oturumu gerekli.');
+            const mutating = !['GET','HEAD'].includes(String(options.method || 'GET').toUpperCase());
             const response = await fetch(`${BACKEND_URL}${path}`, {
                 ...options,
+                ...(mutating && options.body == null ? {body:'{}'} : {}),
+                credentials: 'same-origin',
                 headers: {
-                    ...(options.body ? { "Content-Type": "application/json" } : {}),
+                    'X-Mac-Yakala-Request': '1',
+                    ...(mutating || options.body ? { "Content-Type": "application/json" } : {}),
                     ...(options.headers || {})
                 }
             });
 
             if (!response.ok) {
-                throw new Error(`Sunucu ${response.status} hatası döndürdü.`);
+                if (response.status === 401 && path !== '/api/auth/login') showLogin();
+                const data = await response.json().catch(()=>({}));
+                throw new Error(data.error || `Sunucu ${response.status} hatası döndürdü.`);
             }
 
             return response.json();
@@ -2290,11 +2360,16 @@
 
         async function login() {
             const password = document.getElementById("admin-pass").value;
-            if (password !== CORRECT_PASS) {
+            try {
+                if (window.location.protocol === 'file:') throw new Error('Paneli sunucu adresinden açın; yerel HTML girişi kapalı.');
+                await apiFetch('/api/auth/login',{method:'POST',body:JSON.stringify({password})});
+            } catch(error) {
+                document.getElementById("login-error").textContent = error.message;
                 document.getElementById("login-error").classList.remove("hidden");
                 return;
             }
-
+            authenticated = true;
+            document.getElementById("admin-pass").value = '';
             document.getElementById("login-error").classList.add("hidden");
             document.getElementById("login-screen").classList.add("hidden");
             document.getElementById("dashboard").classList.remove("hidden");
@@ -2308,6 +2383,7 @@
                 setInterval(fetchSignalHistory, 10000);
                 setInterval(fetchTestLabHistory, 10000);
                 setInterval(fetchCandidateHistory, 15000);
+                setInterval(fetchSharing, 15000);
             }
         }
 
@@ -2315,6 +2391,7 @@
             await Promise.allSettled([
                 checkStatus(),
                 fetchSettings(),
+                fetchSharing(),
                 fetchCoverage(),
                 fetchSignalHistory(),
                 fetchTestLabHistory(),
