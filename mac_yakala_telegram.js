@@ -8,11 +8,25 @@ const WIN_TEXT='✅✅✅ YAKALADIK!';
 const FOOTER='Öncelikli modelimiz V22';
 const html=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const clone=v=>JSON.parse(JSON.stringify(v));
-function shortAnalysis(value,market) {
-    const clean=String(value||'').replace(/<[^>]*>/g,'').replace(/[*_`#]/g,'').replace(/\s+/g,' ').trim();
-    const sentences=clean.match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g)||[];
-    const selected=sentences.map(x=>x.trim()).filter(x=>x.length<=180&&!/EDGE|value|Dino|karar motoru|kesin kazan|garanti|%/i.test(x)).slice(0,2).join(' ');
-    return selected||`Canlı veriler ve giriş skoru üzerinden ${String(market).replace('_UST',' ÜST')} seçimi değerlendirildi.`;
+function shortAnalysis(value, market) {
+    const clean = String(value || '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/[*_`#]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!clean || /EDGE|value|Dino|karar motoru|kesin kazan|garanti/i.test(clean)) {
+        return `Canlı veriler ve giriş skoru üzerinden ${String(market).replace('_UST', ' ÜST')} seçimi değerlendirildi.`;
+    }
+
+    if (clean.length <= 240) return clean;
+
+    const shortened = clean.slice(0, 239);
+    const lastSpace = shortened.lastIndexOf(' ');
+
+    return (lastSpace > 0
+        ? shortened.slice(0, lastSpace)
+        : shortened).trimEnd() + '…';
 }
 function formatSignal(record) {
     const models=[...new Set(record.signalSources)].sort((a,b)=>a==='V22'?-1:b==='V22'?1:a.localeCompare(b));
