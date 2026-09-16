@@ -164,7 +164,7 @@ async function run() {
         assert.equal(sharedCells[6].textContent, expected);
     }
     context.renderTestLabHistory({ activeV19: { enabled: true }, v21Shadow: { enabled: true } });
-    assert.equal(byId('testlab-v19-mode-badge').textContent, 'TAZE DOĞRULAMA');
+    assert.equal(byId('testlab-v19-mode-badge'), undefined, 'Retired lab is absent, not just hidden');
     assert.equal(byId('testlab-v21-mode-badge').textContent, 'TAZE DOĞRULAMA');
     context.renderTestLabHistory({ v21Shadow: { enabled: true, archivedRecords: 129,
         startedAt: '2026-09-13T00:01:00Z', summary: {overall:{total:1,wins:0,losses:0}},
@@ -174,7 +174,7 @@ async function run() {
     assert.match(byId('testlab-v21-cohort-note').textContent,/İlk sinyal/);
     assert.equal(byId('testlab-v21-total').textContent,'1');
     assert.match(byId('testlab-v21-rows').children[0].children[4].textContent,/3\/3 onay/);
-    for (const [arm, endpoint] of [['v19', 'v19-independent-shadow'], ['v21', 'v21-consensus-shadow']]) {
+    for (const [arm, endpoint] of [['v22', 'v22-union-shadow'], ['v21', 'v21-consensus-shadow']]) {
         context.downloadTestLabExport(arm, 'json');
         assert.match(anchors.at(-1).href, new RegExp(`/api/${endpoint}-history/export`));
     }

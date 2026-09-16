@@ -13,6 +13,11 @@ process.env.DINO_V19_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v19.js
 process.env.DINO_V21_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v21.json');
 process.env.DINO_V20_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v20.json');
 process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
+process.env.DINO_V19_SHADOW_ENABLED = 'true';
+process.env.DINO_CORE_SHADOW_ENABLED = 'true';
+// Retired histories must not even be loaded/reset, regardless of obsolete env flags.
+fs.writeFileSync(process.env.DINO_CORE_SHADOW_HISTORY_FILE, 'retired-core-preserve');
+fs.writeFileSync(process.env.DINO_V19_SHADOW_HISTORY_FILE, 'retired-v19-preserve');
 
 const originalLoad = Module._load;
 const originalSetInterval = global.setInterval;
@@ -132,6 +137,12 @@ try {
     assert.ok(status?.testLabTracking?.v19Shadow);
     assert.ok(status?.testLabTracking?.v21Shadow);
     assert.equal(status?.v18ShadowTracking, undefined);
+    assert.equal(status.testLabTracking.coreShadow.enabled, false);
+    assert.equal(status.testLabTracking.v19Shadow.enabled, false);
+    assert.equal(fs.readFileSync(process.env.DINO_CORE_SHADOW_HISTORY_FILE,'utf8'),'retired-core-preserve');
+    assert.equal(fs.readFileSync(process.env.DINO_V19_SHADOW_HISTORY_FILE,'utf8'),'retired-v19-preserve');
+    assert.deepEqual(status.marketTariff.telegramSources,['V22','V21']);
+    assert.equal(status.marketTariff.maximumSignalsPerSourcePerFixture,1);
 
     console.log('Test Lab server contract tests passed.');
 } finally {

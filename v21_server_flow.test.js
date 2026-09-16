@@ -71,7 +71,7 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     await api.botuCalistir();
     assert.equal(api.v21ShadowTracker.findSignal(108, 'strong').voteCount, 3);
     assert.equal(api.v21ShadowTracker.findSignal(108, 'strong').tariffRuleId, 'V21-3OF3-PRE50-EM5-E0');
-    assert.equal(deliveries.length, 0, 'V21-only OVER must remain lab-only');
+    assert.equal(deliveries.length, 1, 'V21-only OVER sends independently and stays in lab');
 
     match = mac(102, '2.5_UST', 60);
     api.setup(match, dino('2.5_UST'), dino('2.5_UST', 40));
@@ -95,22 +95,22 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     match = mac(105, 'MS1', 30);
     api.setup(match, dino('MS1', 55), dino('MS1', 55));
     await api.botuCalistir();
-    assert.equal(api.v19ShadowTracker.findSignal(105, 'strong').market, 'MS1');
-    assert.equal(deliveries.length, 0, 'V19 all-market lab is not an active 1X2 route');
+    assert.equal(api.v19ShadowTracker.findSignal(105, 'strong'), null, 'Retired V19 has no lab work');
+    assert.equal(deliveries.length, 1, 'V19 1X2 remains retired');
 
     match = mac(106, '2.5_UST', 30);
     api.setup(match, dino('2.5_UST', 55), dino('2.5_UST', 55));
     await api.botuCalistir();
-    assert.equal(deliveries.length, 1, 'Overlapping V19/V17 must send exactly once');
+    assert.equal(deliveries.length, 2, 'New V21 signal sends without V19/V17');
     const sent = api.signalTracker.findSignal(106, 'strong');
-    assert.deepEqual(Array.from(sent.signalSources), ['V19', 'Legacy V17']);
+    assert.deepEqual(Array.from(sent.signalSources), ['V21']);
     assert.equal(sent.prematchMarketSupport, 65);
     await api.botuCalistir();
-    assert.equal(deliveries.length, 1, 'Second scan must respect the shared fixture lock');
-    const candidate = api.valueAnalizleriYap(mac(107, '2.5_UST', 30), dino('2.5_UST', 55)).selections[0];
+    assert.equal(deliveries.length, 2, 'Second scan respects V21 source lock');
+    const candidate = { market: '2.5_UST', tarife_yuvasi: 'primary' };
     assert.ok(candidate);
     assert.equal(await api.telegramSinyaliGonder(mac(107, 'MS1', 30), { ...candidate, market: 'MS1' }, 'offline'), false, 'Final send guard must reject wrong family even if called directly');
-    assert.equal(deliveries.length, 1);
+    assert.equal(deliveries.length, 2);
 
     // Shared exports always contain real (mock-delivered here) Telegram sends,
     // even if an old client still supplies the former lab scope parameter.
@@ -118,10 +118,10 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     routes.get('/api/signal-history/export')({ query: { scope: 'test-lab' } }, {
         setHeader() {}, send(value) { sharedExport = JSON.parse(value); }
     });
-    assert.equal(sharedExport.signals.length, 1);
+    assert.equal(sharedExport.signals.length, 2);
     assert.equal(sharedExport.signals[0].fixtureId, 106);
 
-    for (const slug of ['v19-independent-shadow', 'v21-consensus-shadow']) {
+    for (const slug of ['v21-consensus-shadow']) {
         let body;
         const response = { setHeader() {}, send(value) { body = value; }, status() { return this; }, json(value) { body = value; } };
         routes.get(`/api/${slug}-history/export`)({ query: {} }, response);
@@ -173,6 +173,6 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     assert.equal(status.summary.overall.total,current.signals.length);
     assert.equal(api.v21ShadowTracker.hasSignal(901,'strong'),true,'Reporting filters do not erase fixture locks');
     assert.equal(api.v21ShadowTracker.data.signals.find(s=>s.fixtureId===901).tariffVersion,oldVersion);
-    console.log('V21 server scan/fresh recheck, V19 lab isolation, Telegram union+dedup, final family guard and exports passed (offline).');
+    console.log('V21 server scan/fresh recheck, V19 retirement, independent Telegram+dedup, final family guard and exports passed (offline).');
 })().catch(error => { console.error(error); process.exitCode = 1; })
     .finally(() => fs.rmSync(root, { recursive: true, force: true }));

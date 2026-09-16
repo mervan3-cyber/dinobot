@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
+const { createRouter, TelegramDelivery, VERSION: TELEGRAM_VERSION } = require('./mac_yakala_telegram');
 const { CandidateTracker } = require('./candidate_tracker');
 const {
     parsePrematchOddsPayload,
@@ -27,7 +28,11 @@ const {
     buildMarketShadowAssessment
 } = require('./shadow_power');
 const dinoSelectorV2 = require('./dino_selector_v2');
-const marketTariff = require('./active_tariff');
+// Legacy exports remain readable, but their former Telegram rules no longer run.
+const marketTariff = { ...require('./active_tariff'), VERSION: 'mac-yakala-independent-2026-09-16',
+    PRIMARY_RULES: [], FOLLOW_RULES: [],
+    canPreselect: () => false,
+    check: () => ({eligible:false,reasons:['Telegram V21/V22 bağımsız yönlendiricisinde değerlendirilir'],slot:'primary',rule:null,priority:-Infinity,signalSources:[]}) };
 const v19Tariff = require('./hybrid_tariff');
 const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
@@ -51,7 +56,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'ml-v23-1-dual-source-controls-ubuntu-2026-09-14';
+const BUILD_VERSION = 'mac-yakala-independent-telegram-2026-09-16';
 
 app.use(cors());
 app.use(express.json());
@@ -225,7 +230,9 @@ const V19_SHADOW_HISTORY_FILE = process.env.DINO_V19_SHADOW_HISTORY_FILE
 const V21_SHADOW_HISTORY_FILE = process.env.DINO_V21_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V21_SHADOW_HISTORY_FILE)
     : path.join(__dirname, 'dino_v21_consensus_shadow_history.json');
-const DINO_V19_SHADOW_ENABLED = String(process.env.DINO_V19_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const DINO_V19_SHADOW_ENABLED = false; // Retired: not even an environment flag can start this lab again.
+const MY_V21_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V21_TELEGRAM_ENABLED || 'true').toLowerCase() !== 'false';
+const MY_V22_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V22_TELEGRAM_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V21_SHADOW_ENABLED = String(process.env.DINO_V21_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V22_SHADOW_HISTORY_FILE)
@@ -286,7 +293,7 @@ const TELEGRAM_MIN_MINUTE = DINO_V17_TARIFF_ENABLED ? 25 : 60;
 const TELEGRAM_MAX_MINUTE = 80;
 const MIN_SIGNAL_ODD = 1.40;
 
-// V16 ikinci katman: eski Dino yüzdesini tek başına karar kabul etmez.
+// V16 ikinci katman: eski Temel yüzdesini tek başına karar kabul etmez.
 // Canlı tempo, skor, piyasa ve pre-match verisini birlikte yeniden puanlar.
 // 1.40 kör testte doğruluk modu olarak üstün çıktı. İstenirse sunucuda
 // DINO_V2_MIN_ODD=1.60 ile yükseltilebilir; 1.60 geçmiş kör testte daha
@@ -301,8 +308,7 @@ const ACTIVE_MIN_SIGNAL_ODD = DINO_V17_TARIFF_ENABLED
         ? DINO_V2_MIN_ODD
         : MIN_SIGNAL_ODD;
 
-const DINO_CORE_SHADOW_ENABLED =
-    String(process.env.DINO_CORE_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const DINO_CORE_SHADOW_ENABLED = false; // Retired lab; no refresh, recording or result polling.
 const DINO_LEGACY_V17_SHADOW_ENABLED =
     String(process.env.DINO_LEGACY_V17_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V20_SHADOW_ENABLED =
@@ -419,6 +425,7 @@ let signalResultInterval = null;
 
 const signalTracker = new SignalTracker({
     filePath: SIGNAL_HISTORY_FILE,
+    strict: true,
     logger: message => addSystemLog(message)
 });
 
@@ -465,6 +472,18 @@ const independentLab = createIndependentLab({
     alreadyDecided: toplamGolMarketiSkoraGoreSonuclanmisMi,
     liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
     v19Enabled: DINO_V19_SHADOW_ENABLED, v21Enabled: DINO_V21_SHADOW_ENABLED
+});
+
+const telegramDelivery = new TelegramDelivery({
+    filePath: path.join(__dirname, 'mac_yakala_telegram_delivery.json'), tracker: signalTracker,
+    send: (channel, text, options) => { if (!bot) throw Error('Telegram ayarları eksik'); return bot.sendMessage(channel, text, options); },
+    logger: message => addSystemLog(message)
+});
+const telegramRouter = createRouter({delivery: telegramDelivery, channel: kanalID,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    alreadyDecided: toplamGolMarketiSkoraGoreSonuclanmisMi, liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    v21Enabled: MY_V21_TELEGRAM_ENABLED, v22Enabled: MY_V22_TELEGRAM_ENABLED
 });
 
 const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fetchApi: apiGet,
@@ -3723,6 +3742,7 @@ function legacyV17GolgeOnSecimi(mac, dino) {
 
 
 function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
+    if (telegramRouter.preselect(mac, dino)) return true; // Independent of legacy active-selector flags.
     if (!DINO_V2_SELECTOR_ENABLED) return true;
     const marketNames = [...new Set([
         ...Object.keys(mac?.canli_oranlar || {}),
@@ -3730,24 +3750,8 @@ function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
     ])];
 
     if (DINO_V17_TARIFF_ENABLED) {
-        const tarifeDurumu = tarifeGonderimDurumu(mac);
-        const aktifAday = Boolean(tarifeDurumu.slot) && marketNames.some(market => {
-            const oddsData = mac?.canli_oranlar?.[market];
-            const odds = oddsData && typeof oddsData === 'object'
-                ? Number(oddsData.oran)
-                : Number(oddsData);
-            return marketTariff.canPreselect({
-                slot: tarifeDurumu.slot,
-                market,
-                minute: mac?.dakika,
-                odds,
-                dinoProbability: dino?.[market],
-                previousPrimary: tarifeDurumu.primary
-            });
-        });
-        const coreAdayi = coreGolgeOnSecimi(mac);
-        const legacyV17Adayi = legacyV17GolgeOnSecimi(mac, dino);
-        return aktifAday || independentLab.preselect(mac, dino) || v22Lab.preselect(mac, dino) || coreAdayi || legacyV17Adayi;
+        return telegramRouter.preselect(mac, dino) || independentLab.preselect(mac, dino) ||
+            v22Lab.preselect(mac, dino) || legacyV17GolgeOnSecimi(mac, dino);
     }
 
     const fullyVerifiedPlaceholder = {
@@ -3909,7 +3913,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             edge
         );
         addSystemLog(
-            `> 🧪 ${mac.mac_isim} | ${market} | Dino:%${dinoYuzde} | V16:${Number.isFinite(Number(selectorScore?.selectorProbability)) ? `%${Number(selectorScore.selectorProbability).toFixed(1)}` : '-'} | V18:${Number.isFinite(Number(v18Score?.v18Probability)) ? `%${Number(v18Score.v18Probability).toFixed(1)}` : '-'} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
+            `> 🧪 ${mac.mac_isim} | ${market} | Temel:%${dinoYuzde} | V16:${Number.isFinite(Number(selectorScore?.selectorProbability)) ? `%${Number(selectorScore.selectorProbability).toFixed(1)}` : '-'} | V18:${Number.isFinite(Number(v18Score?.v18Probability)) ? `%${Number(v18Score.v18Probability).toFixed(1)}` : '-'} | Oran:${piyasaOrani} | Piyasa:%${piyasaYuzde.toFixed(1)} | EDGE:${edge.toFixed(1)} | ${turEtiketi}`
         );
 
         if (toplamGolMarketiSkoraGoreSonuclanmisMi(market, mac.skor)) {
@@ -3941,13 +3945,13 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             Number(mac?.dakika) < TELEGRAM_MIN_MINUTE
         ) {
             auditRecord.decision = 'signal_minute_waiting';
-            auditRecord.decisionDetail = `Dino sınıfı uygun fakat Telegram kapısı ${TELEGRAM_MIN_MINUTE}. dakikada açılır.`;
+            auditRecord.decisionDetail = `Temel sınıfı uygun fakat Telegram kapısı ${TELEGRAM_MIN_MINUTE}. dakikada açılır.`;
             continue;
         }
 
         if (!DINO_V2_SELECTOR_ENABLED && !sinyalTuru) {
             auditRecord.decision = 'class_outside';
-            auditRecord.decisionDetail = 'Dino ihtimali ve dakika, gölge/sürpriz/güçlü sınıfına uymadı.';
+            auditRecord.decisionDetail = 'Temel ihtimali ve dakika, gölge/sürpriz/güçlü sınıfına uymadı.';
             continue;
         }
 
@@ -3968,7 +3972,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
 
         if (!DINO_V2_SELECTOR_ENABLED && sinyalTuru === 'shadow') {
             auditRecord.decision = 'shadow_probability';
-            auditRecord.decisionDetail = 'Dino %60–69.9: Telegram dışı gölge sinyal olarak kaydedildi.';
+            auditRecord.decisionDetail = 'Temel %60–69.9: Telegram dışı gölge sinyal olarak kaydedildi.';
             continue;
         }
 
@@ -4068,7 +4072,7 @@ function valueAnalizleriYap(mac, dino, { scanId, capturedAt, liveOnlyDino } = {}
             ? `Hibrit ${selected.tarife_yuvasi === 'follow' ? 'takip' : 'ilk'} sinyal haritasında ${String(selected.karar_modeli).toUpperCase()} ile uygun market seçildi (${selected.tarife_kural_id}).`
             : DINO_V2_SELECTOR_ENABLED
             ? 'V16 ikinci katmanda gerçekleşme olasılığı en yüksek doğrulanmış market.'
-            : 'Sınıfındaki en yüksek Dino ihtimalli uygun market.';
+            : 'Sınıfındaki en yüksek Temel ihtimalli uygun market.';
     }
 
     if (auditRecords.length > 0) {
@@ -4131,7 +4135,7 @@ async function geminiYorumuYaz(
         !genAI
     ) {
 
-        return "İstatistiksel model canlı verilerde pozitif value tespit etti.";
+        return "Canlı istatistikler ve giriş skoru birlikte değerlendirilerek bu market seçildi.";
 
     }
 
@@ -4161,7 +4165,7 @@ async function geminiYorumuYaz(
         const prompt = `
 Sen uzman bir canlı futbol veri analistisin.
 
-Python tabanlı istatistiksel modelimiz bu maçta pozitif bahis value'su tespit etti.
+V21/V22 kuralları bu marketi seçti. Seçim pozitif EDGE veya kazanç garantisi anlamına gelmez.
 
 Maç:
 ${mac.mac_isim}
@@ -4187,20 +4191,9 @@ ${firsat.market}
 Canlı oran:
 ${firsat.oran}
 
-Dino olasılığı:
-%${firsat.dino_yuzde}
-
-Hibrit karar motoru ve gerçekleşme puanı:
-${String(firsat.karar_modeli || 'dino').toUpperCase()} | %${firsat.karar_yuzde ?? firsat.dino_yuzde}
-
-Piyasa olasılığı:
-%${firsat.piyasa_yuzde}
-
-Karar EDGE'i:
-${firsat.karar_edge ?? firsat.edge}%
-
 Görevin:
-Bu value'nun istatistiksel olarak neden oluştuğunu 3 kısa cümlede profesyonel biçimde açıkla.
+Seçilen marketin canlı verilerle ilişkisini en fazla 2 kısa Türkçe cümleyle açıkla; toplam 240 karakteri geçme.
+Model adı, kaynak, yüzdeler, EDGE, value ve karar motoru ifadeleri yazma. Güvenli, garanti, kesin veya yatırım dili kullanma.
 
 ${analysisRule} Pre-match yüzdeleri mevcutsa takım gücü bağlamı olarak kullan; bunları canlı istatistik diye sunma.
 
@@ -4232,7 +4225,7 @@ Sadece analiz metnini yaz.
         );
 
 
-        return "İstatistiksel model canlı verilerde pozitif value tespit etti.";
+        return "Canlı veriler ve giriş skoru üzerinden seçilen market değerlendirildi.";
 
     }
 
@@ -5006,9 +4999,8 @@ function legacyV17GolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt }) {
 function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
     return Boolean(
         independentLab.select('v21', { mac, dino, liveOnlyDino }) ||
-        independentLab.select('v19', { mac, dino, liveOnlyDino }) ||
+        telegramRouter.select({ mac, dino, liveOnlyDino }).length > 0 ||
         v22Lab.select({ mac, dino, liveOnlyDino }) ||
-        coreGolgeSeciminiBul({ mac, dino, liveOnlyDino }) ||
         legacyV17GolgeSeciminiBul({ mac, dino, liveOnlyDino })
     );
 }
@@ -5016,10 +5008,10 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
 
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
     const results = { core: null, legacyV17: null, v19: null, v21: null, v22: null };
-    for (const kind of ['v19', 'v21']) {
+    for (const kind of ['v21']) {
         try {
             results[kind] = independentLab.record(kind, { mac, dino, liveOnlyDino, capturedAt });
-            if (results[kind]) addSystemLog(`> 🧪 ${kind.toUpperCase()} LAB: ${mac.mac_isim} | ${results[kind].market} | taze kontrol geçti | Telegram yok.`);
+            if (results[kind]) addSystemLog(`> 🧪 ${kind.toUpperCase()} LAB: ${mac.mac_isim} | ${results[kind].market} | taze kontrol geçti | Telegram ayrı izlenir.`);
         } catch (error) {
             addSystemLog(`> ⚠️ ${kind.toUpperCase()} lab kaydı atlandı: ${error.message}`);
         }
@@ -5037,11 +5029,6 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         } catch {
             addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
         }
-    }
-    try {
-        results.core = coreGolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
-    } catch (error) {
-        addSystemLog(`> ⚠️ İki kurallı çekirdek değerlendirmesi atlandı (${mac?.mac_isim}): ${error.message}`);
     }
     try {
         results.legacyV17 = legacyV17GolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
@@ -5132,6 +5119,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             return false;
         }
 
+        if (Number(latest.fixture.id) !== fixtureId) return false;
         const currentMinute = Number(latest.fixture.status.elapsed);
         const currentOdds = parseLiveOdds(oddsResult.value).get(fixtureId);
         if (!currentOdds || Object.keys(currentOdds).length === 0) {
@@ -5173,6 +5161,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 );
                 return false;
             }
+            firsat.oran = currentOdd; // Recheck the frozen model against the actual final odds.
         }
 
         if (eventsResult.status === 'fulfilled') {
@@ -5231,167 +5220,11 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
     }
 }
 
-async function telegramSinyaliGonder(
-    mac,
-    firsat,
-    yorum
-) {
-
-    // Fail closed even when an old environment flag tries to use the legacy fallback.
-    const activePolicy = marketTariff.check({
-        slot: firsat?.tarife_yuvasi, market: firsat?.market, minute: mac?.dakika,
-        odds: firsat?.oran, dinoProbability: firsat?.dino_yuzde,
-        selectorProbability: firsat?.selector_yuzde,
-        v18Probability: firsat?.v18_yuzde, v18Edge: firsat?.v18_edge
-    });
-    if (mac?.stats_validation?.status !== 'passed' || !activePolicy.eligible || fixtureGonderimKaydi(mac, 'strong') || fixtureGonderimKaydi(mac, 'surprise')) {
-        addSystemLog(`> ⛔ Telegram ÜST yönlendiricisi / ortak maç kilidi reddetti: ${mac?.mac_isim} | ${firsat?.market}`);
-        return false;
-    }
-    firsat.sinyal_kaynaklari = activePolicy.signalSources;
-
-    if (!telegramMacHalaUygunMu(mac)) {
-        addSystemLog(
-            `> ⛔ ${mac.mac_isim}: Telegram güvenlik filtresi maçı reddetti (${mac.dakika}' / ${mac.status_short || mac.status_long || '?'}).`
-        );
-        return false;
-    }
-
-    if (
-        !bot ||
-        !kanalID
-    ) {
-
-        addSystemLog(
-            "> ⚠️ Telegram ayarları eksik."
-        );
-
-        return false;
-
-    }
-
-
-    const ekCanliStats = telegramEkStatsSatirlari(mac);
-
-    const gucluSinyal = firsat?.sinyal_turu === 'strong';
-    const sinyalBasligi = DINO_V17_TARIFF_ENABLED
-        ? firsat?.tarife_yuvasi === 'follow'
-            ? '🔁 DİNO HİBRİT TAKİP SİNYALİ'
-            : '🟢 DİNO ÜST SİNYALİ'
-        : DINO_V2_SELECTOR_ENABLED
-        ? '🧬 DİNO V16 DOĞRULANMIŞ SİNYAL'
-        : gucluSinyal
-        ? '🟢 DİNO GÜÇLÜ SİNYAL'
-        : '🟡 DİNO SÜRPRİZ SİNYAL';
-    const sinyalAciklamasi = DINO_V17_TARIFF_ENABLED
-        ? firsat?.tarife_yuvasi === 'follow'
-            ? 'Aynı maçta daha ileri dakikadaki ikinci market'
-            : 'Markete özel dakika-model-EDGE ilk sinyali'
-        : DINO_V2_SELECTOR_ENABLED
-        ? 'İkinci katman doğruluk sinyali'
-        : gucluSinyal
-        ? 'Doğruluk öncelikli güçlü sinyal'
-        : 'Risk almak isteyenler için sürpriz sinyal';
-    const modelEtiketi = DINO_V17_TARIFF_ENABLED
-        ? `${(firsat?.sinyal_kaynaklari || []).join(' + ')} · karar ${String(firsat?.karar_modeli || '-').toUpperCase()}`
-        : DINO_V2_SELECTOR_ENABLED
-        ? 'Dino + piyasa + pre-match + canlı tempo ikinci katmanı'
-        : firsat?.model_varyanti === 'live_plus_prematch'
-        ? 'Canlı istatistik + pre-match modeli'
-        : 'Canlı istatistik modeli';
-    const prematchSatiri = mac?.prematch_available
-        ? `\n🧭 <b>Pre-Match:</b> ${telegramHtml(mac.prematch_source)} | 1:%${telegramHtml((Number(mac.prematch_p_home) * 100).toFixed(1))} X:%${telegramHtml((Number(mac.prematch_p_draw) * 100).toFixed(1))} 2:%${telegramHtml((Number(mac.prematch_p_away) * 100).toFixed(1))}`
-        : '';
-    const prematchMarketSatiri = firsat?.prematch_destek_yuzde !== null && firsat?.prematch_destek_yuzde !== undefined && Number.isFinite(Number(firsat.prematch_destek_yuzde))
-        ? `\n🧩 <b>Pre-Match Market Desteği:</b> %${telegramHtml(firsat.prematch_destek_yuzde)}`
-        : '';
-    const liveOnlySatiri = Number.isFinite(Number(firsat?.live_only_yuzde))
-        ? `\n🔬 <b>Live-Only Karşılığı:</b> %${telegramHtml(firsat.live_only_yuzde)}`
-        : '';
-    const statsDogrulamaSatiri = mac?.stats_validation?.status === 'passed'
-        ? '\n🛡️ <b>Taze Veri:</b> Skor + canlı stats + oran doğrulandı'
-        : '';
-
-
-    const mesaj =
-
-`<b>${sinyalBasligi}</b>
---------------------------------------
-⚽️ <b>Maç:</b> ${telegramHtml(mac.mac_isim)}
-🏆 <b>Lig:</b> ${telegramHtml(mac.lig)}
-⏱ <b>Dakika:</b> ${telegramHtml(mac.dakika)} | <b>Skor:</b> ${telegramHtml(mac.skor)}
-
-🏷️ <b>Sinyal Sınıfı:</b> ${telegramHtml(sinyalAciklamasi)}
-
-🎯 <b>Value Market:</b> ${telegramHtml(firsat.market)}
-💵 <b>Canlı Oran:</b> ${telegramHtml(firsat.oran)}
-🏦 <b>Kaynak:</b> ${telegramHtml(firsat.bookmaker)}
-🧠 <b>Karar Motoru:</b> ${telegramHtml(String(firsat.karar_modeli || '-').toUpperCase())} | <b>Karar:</b> %${telegramHtml(firsat.karar_yuzde ?? '-')} | <b>EDGE:</b> ${telegramHtml(firsat.karar_edge ?? '-')}
-🧬 <b>V16 / V18:</b> %${telegramHtml(firsat.selector_yuzde ?? '-')} / %${telegramHtml(firsat.v18_yuzde ?? '-')}
-🗺️ <b>Hibrit Kural:</b> ${telegramHtml(firsat.tarife_kural_id || '-')}
-🦖 <b>Dino İhtimali:</b> %${telegramHtml(firsat.dino_yuzde)}
-📊 <b>Piyasa İhtimali:</b> %${telegramHtml(firsat.piyasa_yuzde)}
-🧠 <b>Model:</b> ${telegramHtml(modelEtiketi)}${prematchSatiri}${prematchMarketSatiri}${liveOnlySatiri}${statsDogrulamaSatiri}
-
-📌 <b>Canlı İstatistikler</b>
-🏠 ${telegramHtml(statGoster(mac.home_shot))} Şut | ${telegramHtml(statGoster(mac.home_sot))} İsabet | ${telegramHtml(statGoster(mac.home_corner))} Korner
-✈️ ${telegramHtml(statGoster(mac.away_shot))} Şut | ${telegramHtml(statGoster(mac.away_sot))} İsabet | ${telegramHtml(statGoster(mac.away_corner))} Korner${ekCanliStats ? `\n${ekCanliStats}` : ''}
-
-📝 <b>Dino Analiz:</b>
-<i>${telegramHtml(yorum)}</i>
-
---------------------------------------`;
-
-
-    try {
-
-        const telegramMesaji = await bot.sendMessage(
-            kanalID,
-            mesaj,
-            {
-                parse_mode:
-                    'HTML'
-            }
-        );
-
-
-        // Yalnızca Telegram gönderimi gerçekten başarılı olduktan sonra kilitle.
-        // Başarısız gönderimler sonraki taramada yeniden denenebilir.
-        fixtureGonderildiKaydet(
-            mac,
-            firsat
-        );
-
-        // İstatistik dosyasına yalnızca Telegram API'si başarı döndürdükten
-        // sonra yaz. Böylece taranan fakat paylaşılmayan maçlar asla girmez.
-        paylasilanSinyaliKaydet(
-            mac,
-            firsat,
-            yorum,
-            telegramMesaji
-        );
-
-
-        return true;
-
-    } catch (error) {
-
-        addSystemLog(
-            `> ⚠️ TELEGRAM HATASI: ${error.message}`
-        );
-
-
-        return false;
-
-    }
-
+async function telegramSinyaliGonder() {
+    // The old V19/Legacy V17 sender is retired. All new Telegram writes go through
+    // the source-specific, persisted V21/V22 delivery path below.
+    return false;
 }
-
-
-
-// =========================================================
-// ANA TARAMA
-// =========================================================
 
 async function botuCalistir() {
     if (isScanning) return;
@@ -5495,7 +5328,7 @@ async function botuCalistir() {
             const liveOnlyDino = dino?.LIVE_ONLY || (
                 dino?.MODEL_VARYANTI === 'live_only' ? dino : null
             );
-            // V20 eski Dino/Python kararından bağımsızdır. Her tam-stat canlı
+            // V20 eski Temel/Python kararından bağımsızdır. Her tam-stat canlı
             // anda çağrılır; böylece yalnız geçmiş gözlemleri kullanan delta
             // özellikleri gelecekteki taramalar için nedensel kalır.
             const v20InitialEvaluation = v20GolgeDegerlendir(
@@ -5548,10 +5381,10 @@ async function botuCalistir() {
             );
             candidateAuditRows.push(...degerlendirme.auditRecords);
 
-            const firsatlar = degerlendirme.selections;
-            // Core ve legacy V17 yalnız tam politika uygunluğu görüldüğünde
-            // ortak taze doğrulamayı tetikler. Böylece salt dakika/oran kapısı
-            // API çağrısı oluşturmaz ve iki lab kolu aynı yenilenmiş anı kullanır.
+            const firsatlar = []; // No V19/Legacy V17 Telegram selection.
+            const initialTelegram = telegramRouter.select({mac,dino,liveOnlyDino});
+            const initialTelegramSources = new Set(initialTelegram.flatMap(group=>group.choices.map(s=>s.source)));
+            // Remaining lab branches and independent Telegram models share the fresh data check.
             const labGolgeOnAdayi = labGolgeOnAdayiMi({
                 mac,
                 dino,
@@ -5616,10 +5449,7 @@ async function botuCalistir() {
                 ilkGonderilecekFirsatlar.push(firsat);
             }
 
-            // Bir lab adayı tek başına taze kontrolü çalıştırabilir; bu durum
-            // aktif V19'un Telegram davranışını genişletmemelidir. Telegram
-            // kolu yalnız V19'un ilk değerlendirmede kendi adayı varsa açılır.
-            const aktifV19TazeTetikledi = ilkGonderilecekFirsatlar.length > 0;
+            // Lab-only qualification must not add a new Telegram source after recheck.
             if (
                 ilkGonderilecekFirsatlar.length === 0 &&
                 !labGolgeOnAdayi &&
@@ -5654,7 +5484,7 @@ async function botuCalistir() {
 
             // V20 ilk gözlemde kendi dondurulmuş politikasını geçtiyse aynı
             // ortak taze veride yeniden puanlanır. Taze puan da geçmeden kayıt
-            // oluşmaz; Telegram ve aktif V19 kararı bu kayıttan etkilenmez.
+            // oluşmaz; V21/V22 Telegram kararı bu kayıttan etkilenmez.
             const freshV20Evaluation = v20GolgeDegerlendir(
                 mac,
                 freshValidation.verifiedAt
@@ -5729,86 +5559,26 @@ async function botuCalistir() {
                 capturedAt: freshValidation.verifiedAt || new Date().toISOString()
             });
 
-            if (!aktifV19TazeTetikledi) {
-                addSystemLog(
-                    `> 🧪 ${mac.mac_isim}: taze kontrolü yalnız Test Lab tetikledi; aktif V19/Telegram hattına aday eklenmedi.`
-                );
-                continue;
-            }
-
-            const gonderilecekFirsatlar = [];
-            for (const firsat of freshEvaluation.selections || []) {
-                const oncekiGonderim = fixtureGonderimKaydi(
-                    mac,
-                    firsat.sinyal_turu
-                );
-                if (oncekiGonderim) {
-                    firsat.auditRecord.decision = 'already_sent';
-                    firsat.auditRecord.decisionDetail = 'Taze doğrulama sonrası bu fixture ve sinyal sınıfının hakkı daha önce kullanılmış.';
-                    continue;
+            // Independent source locks, unrelated to lab locks or old fixture-wide locks.
+            const groups = telegramRouter.select({mac,dino:freshDino,liveOnlyDino:freshLiveOnlyDino});
+            for (const group of groups) {
+                group.choices = group.choices.filter(s=>initialTelegramSources.has(s.source));
+                if (!group.choices.length) continue;
+                const choice = group.choices[0];
+                const analysisInput = {...group, sinyal_kaynaklari:group.choices.map(s=>s.source),
+                    dino_yuzde:choice.policy.probabilities.dino, prematch_destek_yuzde:choice.args.prematchSupport};
+                const yorum = await geminiYorumuYaz(mac, analysisInput);
+                // Each market is checked separately: a closed V21 market must not veto V22.
+                if (!await sinyalOncesiCanlilikDogrula(mac,[group])) continue;
+                if (!telegramMacHalaUygunMu(mac)) continue;
+                const payload = telegramRouter.record(mac,group,yorum,new Date().toISOString());
+                if (!payload) continue;
+                const sent = await telegramDelivery.publish(kanalID,payload);
+                for (const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
+                    record.decision = sent ? 'sent' : 'telegram_failed';
+                    record.decisionDetail = sent ? 'V21/V22 bağımsız Telegram gönderimi başarılı.' : 'Telegram gönderilmedi; lab kaydı korundu.';
                 }
-                firsat.auditRecord.decision = 'telegram_candidate';
-                firsat.auditRecord.decisionDetail = 'Taze skor, stats, oran ve ikinci Python değerlendirmesini geçti.';
-                gonderilecekFirsatlar.push(firsat);
-            }
-
-            if (gonderilecekFirsatlar.length === 0) {
-                addSystemLog(
-                    `> 🛡️ ${mac.mac_isim}: taze doğrulama sonrası uygun market kalmadı; Telegram sinyali yok.`
-                );
-                continue;
-            }
-
-            for (const firsat of gonderilecekFirsatlar) {
-                const turEtiketi = DINO_V17_TARIFF_ENABLED
-                    ? firsat.tarife_yuvasi === 'follow' ? 'HİBRİT TAKİP' : 'HİBRİT İLK'
-                    : firsat.sinyal_turu === 'strong'
-                    ? 'GÜÇLÜ'
-                    : 'SÜRPRİZ';
-                addSystemLog(
-                    `> 🚨 TAZE ML VALUE: ${mac.mac_isim} | ${firsat.market} | ${String(firsat.karar_modeli || 'dino').toUpperCase()} %${DINO_V2_SELECTOR_ENABLED ? firsat.karar_yuzde : firsat.edge} | ${turEtiketi}`
-                );
-            }
-
-            // Aynı maçta güçlü ve sürpriz market aynı taramada çıkabilir.
-            // Gemini yalnızca taze doğrulamadan geçen son marketleri açıklar.
-            const yorumlar = await Promise.all(
-                gonderilecekFirsatlar.map(
-                    firsat => geminiYorumuYaz(mac, firsat)
-                )
-            );
-
-            // İki sinyal de aynı veri anına ait olduğundan canlılık/skor bir kez
-            // doğrulanır ve ardından bekleme süresi olmadan arka arkaya gönderilir.
-            if (!await sinyalOncesiCanlilikDogrula(mac, gonderilecekFirsatlar)) {
-                for (const firsat of gonderilecekFirsatlar) {
-                    firsat.auditRecord.decision = 'live_revalidation_failed';
-                    firsat.auditRecord.decisionDetail = 'Telegram öncesi dakika/skor/canlılık kontrolü başarısız.';
-                }
-                continue;
-            }
-
-            for (let firsatIndex = 0; firsatIndex < gonderilecekFirsatlar.length; firsatIndex++) {
-                const firsat = gonderilecekFirsatlar[firsatIndex];
-                const yorum = yorumlar[firsatIndex];
-                const gonderildi = await telegramSinyaliGonder(mac, firsat, yorum);
-
-                if (gonderildi) {
-                    firsat.auditRecord.decision = 'sent';
-                    firsat.auditRecord.decisionDetail = 'Telegram API gönderimi başarılı ve sinyal geçmişine kaydedildi.';
-                    onaylanan++;
-                    const turEtiketi = DINO_V17_TARIFF_ENABLED
-                        ? firsat.tarife_yuvasi === 'follow' ? 'HİBRİT TAKİP' : 'HİBRİT İLK'
-                        : firsat.sinyal_turu === 'strong'
-                        ? 'GÜÇLÜ'
-                        : 'SÜRPRİZ';
-                    addSystemLog(
-                        `> ✅ ${turEtiketi} ML SİNYALİ GÖNDERİLDİ: ${mac.mac_isim} | ${firsat.market}`
-                    );
-                } else {
-                    firsat.auditRecord.decision = 'telegram_failed';
-                    firsat.auditRecord.decisionDetail = 'Telegram gönderimi başarısız.';
-                }
+                if (sent) { onaylanan++; addSystemLog(`> ✅ MAÇ YAKALA: ${payload.signalSources.join(' + ')} | ${payload.match} | ${payload.market} | ${payload.minute}'`); }
             }
         }
 
@@ -6039,9 +5809,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
 
     const signalFixtureIDs = signalTracker.unresolvedFixtureIds();
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
-    const coreShadowFixtureIDs = coreShadowTracker.unresolvedFixtureIds();
+    const coreShadowFixtureIDs = [];
     const legacyV17ShadowFixtureIDs = legacyV17ShadowTracker.unresolvedFixtureIds();
-    const independentFixtureIDs = [...v19ShadowTracker.unresolvedFixtureIds(), ...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(), ...v23GoalLab.unresolvedFixtureIds()];
+    const independentFixtureIDs = [...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(), ...v23GoalLab.unresolvedFixtureIds()];
     const v20ShadowFixtureIDs = v20ShadowTracker.unresolvedFixtureIds();
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
@@ -6052,6 +5822,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
         ...v20ShadowFixtureIDs
     ])];
     if (fixtureIDs.length === 0) {
+        await telegramDelivery.flushWins();
         return {
             success: true,
             checkedFixtures: 0,
@@ -6095,9 +5866,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             for (const fixture of fixtures) {
                 resolvedSignals += signalTracker.settleFixture(fixture);
                 resolvedCandidates += candidateTracker.settleFixture(fixture);
-                resolvedCoreShadow += coreShadowTracker.settleFixture(fixture);
+                // Retired core/V19 history is left untouched.
                 resolvedLegacyV17Shadow += legacyV17ShadowTracker.settleFixture(fixture);
-                resolvedIndependentLab += v19ShadowTracker.settleFixture(fixture) + v21ShadowTracker.settleFixture(fixture) + v22ShadowTracker.settleFixture(fixture);
+                resolvedIndependentLab += v21ShadowTracker.settleFixture(fixture) + v22ShadowTracker.settleFixture(fixture);
                 try { resolvedIndependentLab += v23GoalLab.settleFixture(fixture); }
                 catch { addSystemLog('> ⚠️ V23 sonuç kaydı yazılamadı; diğer sonuç takipleri devam ediyor.'); }
                 resolvedV20Shadow += v20ShadowTracker.settleFixture(fixture);
@@ -6110,7 +5881,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             resolvedIndependentLab > 0 || resolvedV20Shadow > 0 || manuel
         ) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} V19 | ${resolvedCandidates} aday | ${resolvedCoreShadow} çekirdek | ${resolvedLegacyV17Shadow} legacy V17 | ${resolvedIndependentLab} V19/V21/V22 lab | ${resolvedV20Shadow} V20 gölge sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedCoreShadow} çekirdek | ${resolvedLegacyV17Shadow} legacy V17 | ${resolvedIndependentLab} V21/V22 lab | ${resolvedV20Shadow} V20 gölge sonuçlandı.`
             );
         }
 
@@ -6126,7 +5897,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             message: resolvedSignals > 0 || resolvedCandidates > 0 ||
                 resolvedCoreShadow > 0 || resolvedLegacyV17Shadow > 0 ||
                 resolvedIndependentLab > 0 || resolvedV20Shadow > 0
-                ? `${resolvedSignals} V19, ${resolvedCandidates} aday, ${resolvedCoreShadow} çekirdek, ${resolvedLegacyV17Shadow} legacy V17, ${resolvedIndependentLab} V19/V21/V22 lab ve ${resolvedV20Shadow} V20 gölge sonucu güncellendi.`
+                ? `${resolvedSignals} Telegram, ${resolvedCandidates} aday, ${resolvedCoreShadow} çekirdek, ${resolvedLegacyV17Shadow} legacy V17, ${resolvedIndependentLab} V21/V22 lab ve ${resolvedV20Shadow} V20 gölge sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -6145,6 +5916,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             message: error.message
         };
     } finally {
+        await telegramDelivery.flushWins();
         isSignalResultRefreshing = false;
     }
 }
@@ -6470,6 +6242,8 @@ app.get(
             marketTariff: {
                 enabled: DINO_V17_TARIFF_ENABLED,
                 version: marketTariff.VERSION,
+                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                deliveryDisabled: telegramDelivery.disabled,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
                 maximumOdd: marketTariff.MAXIMUM_ODD
@@ -6561,7 +6335,7 @@ function testLabOrtakKarsilastirmaBaslangici() {
     // Her deney kolunun aynı ileri-test dönemini görmesi için en geç başlayan
     // kol baz alınır. V20'nin kurulmasından önceki V19/V17 sonuçları onunla
     // aynı tabloda karşılaştırılmaz.
-    const starts = [coreShadowTracker, legacyV17ShadowTracker, v20ShadowTracker]
+    const starts = [legacyV17ShadowTracker, v20ShadowTracker]
         .map(tracker => tracker.data?.startedAt || tracker.data?.signals?.[0]?.sentAt)
         .filter(value => value && Number.isFinite(new Date(value).getTime()))
         .map(value => new Date(value));
@@ -6571,6 +6345,7 @@ function testLabOrtakKarsilastirmaBaslangici() {
 
 
 function testLabDonemineGoreSec(tracker, date, cohort = 'current') {
+    if (tracker === coreShadowTracker || tracker === v19ShadowTracker) return [];
     const comparisonStart = testLabOrtakKarsilastirmaBaslangici();
     const signals = tracker === v21ShadowTracker
         ? v21History.select(tracker.list(100000), cohort) : tracker.list(100000);
@@ -7119,6 +6894,8 @@ app.get(
             marketTariff: {
                 enabled: DINO_V17_TARIFF_ENABLED,
                 version: marketTariff.VERSION,
+                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                deliveryDisabled: telegramDelivery.disabled,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
                 maximumOdd: marketTariff.MAXIMUM_ODD
@@ -7526,7 +7303,7 @@ app.get(
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="15">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Dino İstatistik Kapsamı</title>
+    <title>Maç Yakala İstatistik Kapsamı</title>
     <style>
         body{font-family:Arial,sans-serif;background:#111;color:#eee;margin:24px}
         h1{font-size:24px} .cards{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
@@ -7538,7 +7315,7 @@ app.get(
     </style>
 </head>
 <body>
-    <h1>📊 Dino Canlı İstatistik Kapsamı</h1>
+    <h1>📊 Maç Yakala Canlı İstatistik Kapsamı</h1>
     <div class="muted">Son güncelleme: ${coverageHtmlEscape(snapshot.updatedAt || 'Henüz tarama yapılmadı')} · Sayfa 15 saniyede yenilenir.</div>
     <div class="cards">
         <div class="card">Canlı aday<b>${snapshot.totalCandidates}</b></div>
@@ -7591,11 +7368,14 @@ app.get(
             marketTariff: {
                 enabled: DINO_V17_TARIFF_ENABLED,
                 version: marketTariff.VERSION,
+                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                deliveryDisabled: telegramDelivery.disabled,
                 minimumOdd: marketTariff.MINIMUM_ODD,
                 maximumOdd: marketTariff.MAXIMUM_ODD,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
-                maximumSignalsPerFixture: 1,
+                maximumSignalsPerFixture: 2,
+                maximumSignalsPerSourcePerFixture: 1,
                 underMarketsDisabled: true
             },
 
@@ -7735,20 +7515,20 @@ signalTracker.load();
 
 candidateTracker.load();
 
-coreShadowTracker.load();
+// Retired core history is not opened or rewritten.
 
 legacyV17ShadowTracker.load();
 
 v20ShadowTracker.load();
 
-v19ShadowTracker.load();
+// Retired V19 history is not opened or rewritten.
 v21ShadowTracker.load();
 v22ShadowTracker.load();
 v23ProfileCache.load();
 v23GoalLab.load();
 addSystemLog(`> 🧪 V23 KONTROL LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | yeni V21 + V22 ayrı kollar | onay / varsayımsal ret / gözlem / veri yetersiz | sinyal veto edilmez | Telegram YOK.`);
-addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Dino/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram YOK.`);
-importV19History(signalTracker, v19ShadowTracker);
+addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
+telegramDelivery.load();
 
 prematchOddsCache.load();
 
@@ -7765,7 +7545,7 @@ app.listen(
     () => {
 
         addSystemLog(
-            `> 🦖 DINO SERVER çalışıyor. Port: ${PORT}`
+            `> 📡 MAÇ YAKALA SERVER çalışıyor. Port: ${PORT}`
         );
 
 
@@ -7777,9 +7557,6 @@ app.listen(
             `> 🧠 V20 BAĞIMSIZ GÖLGE: ${DINO_V20_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | ${v20Engine.model?.version || v20Engine.error || 'model yok'} | taze veri + son fixture kontrolü | maç başına 1 | Telegram YOK.`
         );
 
-        addSystemLog(
-            `> 🧪 İKİ KURALLI ÇEKİRDEK: ${DINO_CORE_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | ${coreShadowTariff.VERSION} | MS2 + 2.5 ÜST | ortak taze doğrulama | maç başına en fazla 1 kayıt | Telegram YOK.`
-        );
 
         addSystemLog(
             `> 🧭 LEGACY V17 GÖLGE: ${DINO_LEGACY_V17_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | ${legacyV17Tariff.VERSION} | ilk + daha ileri dakika takip | ortak taze doğrulama | Telegram YOK.`
@@ -7788,11 +7565,7 @@ app.listen(
 
 
         addSystemLog(
-            DINO_V17_TARIFF_ENABLED
-                ? `> 🧭 TELEGRAM: V19 mevcut ÜST kuralları + Legacy V17 yalnız 2.5 ÜST | ortak maç kilidi | V19/V17 tüm mevcut marketleri labda korunur | V21 ÜST 3/3, EDGE −5…0 yalnız lab.`
-                : DINO_V2_SELECTOR_ENABLED
-                ? `> 🧬 V16 ikinci katman AKTİF: eşik %${dinoSelectorV2.MODEL.policy.threshold * 100} | dakika ${dinoSelectorV2.MODEL.policy.minimumMinute}-${dinoSelectorV2.MODEL.policy.maximumMinute} | oran ${DINO_V2_MIN_ODD}+ | EDGE kararı etkilemez.`
-                : `> 🎯 Legacy minimum EDGE: %${state.globalMinEdge}`
+            `> 🧭 TELEGRAM: V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} + V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} bağımsız ÜST | V20/V17 yalnız lab | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
         );
 
         addSystemLog(
@@ -7820,21 +7593,9 @@ app.listen(
             "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
-        addSystemLog(
-            DINO_V17_TARIFF_ENABLED
-                ? "> 🧠 Telegram: V19 mevcut ÜST pencereleri + Legacy V17 2.5 ÜST. V21 yalnız ÜST, 3/3 >%50, Pre >%50, EDGE −5…0; yalnız labda."
-                : DINO_V2_SELECTOR_ENABLED
-                ? "> 🧠 Seçim kuralı: Dino tek başına sınıf belirlemez; V16 bütün marketleri yeniden puanlar ve maç başına yalnız en güçlü doğrulanmış adayı seçer."
-                : "> ⚪ Gölge: Dino %60–69.9 (Telegram yok) | 🟡 Sürpriz: %70–74.9 ve 50–80. dakika | 🟢 Güçlü: %75+ ve 50–80. dakika."
-        );
+        addSystemLog("> 🧠 Telegram: V22 A/B/C ve V21 mevcut kuralları bağımsızdır; V23 kontrolü veto uygulamaz.");
 
-        addSystemLog(
-            DINO_V17_TARIFF_ENABLED
-                ? "> 🗃️ Telegram ortak kilidi: maç başına tek ÜST sinyali. Eski ilk/takip geçmişi korunur; lab kollarının kilitleri ayrıdır."
-                : DINO_V2_SELECTOR_ENABLED
-                ? "> 🗃️ Paylaşılan sinyal takibi aktif: V16 maç başına en fazla 1 doğrulanmış sinyal kaydeder."
-                : "> 🗃️ Paylaşılan sinyal takibi aktif: maç başına 1 sürpriz + 1 güçlü; yalnızca Telegram başarısından sonra kaydedilir."
-        );
+        addSystemLog("> 🗃️ Telegram kilidi model başına ayrıdır: V21 35' ve V22 60' aynı marketi ayrı paylaşabilir. Aynı girişte modeller tek mesajda listelenir.");
 
         addSystemLog(
             "> 🧪 Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir."

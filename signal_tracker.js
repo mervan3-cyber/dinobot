@@ -108,8 +108,9 @@ function addToBucket(bucket, signal) {
 }
 
 class SignalTracker {
-    constructor({ filePath, logger = () => {} }) {
+    constructor({ filePath, logger = () => {}, strict = false }) {
         this.filePath = filePath;
+        this.strict = strict;
         this.logger = logger;
         this.data = {
             version: HISTORY_VERSION,
@@ -127,6 +128,7 @@ class SignalTracker {
             }
 
             const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+            if (this.strict && (!Array.isArray(parsed?.signals) || parsed.signals.some(s => !Number.isFinite(Number(s.fixtureId)) || !s.signalId))) throw Error('Paylaşılan geçmiş şeması geçersiz');
             this.data = {
                 version: HISTORY_VERSION,
                 startedAt: parsed?.startedAt || null,
@@ -135,6 +137,7 @@ class SignalTracker {
             };
             this.logger(`> 📚 Paylaşılan sinyal geçmişi yüklendi: ${this.data.signals.length} kayıt.`);
         } catch (error) {
+            if (this.strict) throw error; // Never replace unreadable live shared history with an empty file.
             this.logger(`> ⚠️ Sinyal geçmişi yüklenemedi: ${error.message}`);
             this.data = {
                 version: HISTORY_VERSION,
@@ -152,7 +155,9 @@ class SignalTracker {
             this.data.startedAt = new Date().toISOString();
         }
         this.data.updatedAt = new Date().toISOString();
-        fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), 'utf8');
+        const temp = this.filePath + '.tmp';
+        fs.writeFileSync(temp, JSON.stringify(this.data, null, 2), 'utf8');
+        fs.renameSync(temp, this.filePath);
     }
 
     hasSignal(fixtureId, signalType) {
@@ -180,7 +185,8 @@ class SignalTracker {
         }
 
         const existing = this.data.signals.find(
-            signal => Number(signal.fixtureId) === fixtureId && signal.signalType === signalType
+            signal => payload.deliveryKey ? signal.deliveryKey === payload.deliveryKey :
+                !signal.deliveryKey && Number(signal.fixtureId) === fixtureId && signal.signalType === signalType
         );
         if (existing) return existing;
 
@@ -191,6 +197,8 @@ class SignalTracker {
             signalType,
             sentAt,
             telegramMessageId: payload.telegramMessageId ?? null,
+            ...(payload.deliveryKey ? { deliveryKey: payload.deliveryKey, telegramChatId: payload.telegramChatId,
+                sourcePolicies: payload.sourcePolicies || {} } : {}),
             match: payload.match || null,
             league: payload.league || null,
             minute: numberOrNull(payload.minute),
@@ -286,9 +294,13 @@ class SignalTracker {
 
         // Canlı 1X2 ve toplam gol marketleri normal sürenin sonucuna göre
         // değerlendirilir. Uzatma/penaltı oynandıysa API'nin fulltime alanını
-        // tercih et; yalnızca bu alan yoksa genel goals değerine dön.
+        // tercih et. Paylaşılan sinyalde uzatma/penaltı skoru normal süre yerine kullanılamaz.
         const fulltimeHome = numberOrNull(fixture?.score?.fulltime?.home);
         const fulltimeAway = numberOrNull(fixture?.score?.fulltime?.away);
+        if (this.strict && !isVoid && (
+            !FINAL_STATUSES.has(shortStatus) ||
+            (['AET', 'PEN'].includes(shortStatus) && (fulltimeHome === null || fulltimeAway === null))
+        )) return 0;
         const finalHome = fulltimeHome !== null
             ? fulltimeHome
             : numberOrNull(fixture?.goals?.home);

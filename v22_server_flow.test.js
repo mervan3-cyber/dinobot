@@ -51,7 +51,7 @@ function get(route,query={}){let body,headers={};const handler=routes.get(route)
     assert.equal(api.v22ShadowTracker.data.signals.length,1,'V22-only C triggers fresh path');
     assert.deepEqual(Array.from(api.v22ShadowTracker.data.signals[0].matchedFilters),['C']);
     assert.equal(api.v21ShadowTracker.hasSignal(2201,'strong'),false);
-    assert.equal(deliveries.length,0);await api.botuCalistir();assert.equal(api.v22ShadowTracker.data.signals.length,1);
+    assert.equal(deliveries.length,1);await api.botuCalistir();assert.equal(api.v22ShadowTracker.data.signals.length,1);
     match=mac(2202,'2.5_UST','0-0',60,.65);api.setup(match,dino('2.5_UST',61.5),dino('2.5_UST',61.5));await api.botuCalistir();
     assert(api.v21ShadowTracker.hasSignal(2202,'strong'),'V21 alone remains active');
     assert(!api.v22ShadowTracker.hasSignal(2202,'strong'));
@@ -71,7 +71,7 @@ function get(route,query={}){let body,headers={};const handler=routes.get(route)
     match=mac(2220,'2.5_UST','1-0',45,.45);api.setup(match,dino('2.5_UST',59),dino('2.5_UST',59));await api.botuCalistir();
     assert.deepEqual(Array.from(api.v22ShadowTracker.findSignal(2220,'strong').matchedFilters),['A','B']);
     assert.equal(JSON.stringify(api.v21ShadowTracker.data.signals),v21Before,'V22 does not mutate V21');
-    assert.equal(deliveries.length,0,'All V22-only candidates stay out of Telegram');
+    assert.equal(deliveries.length,4,'V22-only, V21-only and combined candidates all send independently');
     const beforeStart=get('/api/test-lab-comparison').body.comparisonStartedAt;
     const status=get('/api/status').body.testLabTracking;
     assert.equal(status.v22Shadow.telegram,false);assert.equal(status.v21Shadow.policy.edgeHigh,0);
@@ -95,6 +95,18 @@ function get(route,query={}){let body,headers={};const handler=routes.get(route)
     assert.equal(api.v22Lab.metadata().filterSummaries.C.wins,1);
     const persisted=JSON.parse(fs.readFileSync(path.join(root,'dino_v22_union_shadow_history.json'),'utf8'));
     assert.equal(persisted.signals.length,3);assert.equal(persisted.signals[0].settlement.result,'W');
-    assert.equal(deliveries.length,0);assert.equal(api.signalTracker.data.signals.length,0);
-    console.log('V22 server fresh flow, V21 preservation, no Telegram/backfill, API/date/CSV/tag summaries and settlement passed (offline).');
+    assert.equal(deliveries.length,5,'One reply for the one settled winner');assert.equal(api.signalTracker.data.signals.length,4);
+    // Production scan path: same fixture and same market at two different minutes.
+    match=mac(2230,'1.5_UST','0-0',35,.8);
+    api.setup(match,dino('1.5_UST',60),dino('1.5_UST',60));await api.botuCalistir();
+    let entries=api.signalTracker.data.signals.filter(s=>s.fixtureId===2230);
+    assert.equal(entries.length,1);assert.deepEqual(Array.from(entries[0].signalSources),['V21']);
+    match=mac(2230,'1.5_UST','1-0',60,.8);
+    api.setup(match,dino('1.5_UST',54),dino('1.5_UST',54));await api.botuCalistir();
+    entries=api.signalTracker.data.signals.filter(s=>s.fixtureId===2230);
+    assert.equal(entries.length,2);assert.deepEqual(Array.from(entries,s=>s.minute),[35,60]);
+    assert.deepEqual(Array.from(entries[1].signalSources),['V22']);
+    assert.equal(deliveries.length,7);await api.botuCalistir();assert.equal(deliveries.length,7);
+    assert(api.v21ShadowTracker.hasSignal(2230,'strong'));assert(api.v22ShadowTracker.hasSignal(2230,'strong'));
+    console.log('V22 server fresh flow, V21 preservation, independent Telegram including same market 35/60 minutes, API/date/CSV and settlement passed (offline).');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(root,{recursive:true,force:true}));

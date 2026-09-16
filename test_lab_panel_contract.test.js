@@ -14,11 +14,9 @@ assert.doesNotMatch(publicPanel, /V18-A|V18-B|v18-shadow-comparison|v18-a-shadow
 for (const requiredText of [
     '/api/test-lab-comparison',
     '/api/test-lab-results/refresh',
-    '/api/two-rule-core-shadow-history',
     '/api/v17-legacy-shadow-history',
     'TAZE DOĞRULAMA',
     '/api/v21-consensus-shadow-history',
-    '/api/v19-independent-shadow-history',
     'Pre destek',
     'V21 · ÜST · 3/3',
     '−5 ≤ Kayıt EDGE ≤ 0',
@@ -30,6 +28,8 @@ for (const requiredText of [
 }
 
 const scripts = [...publicPanel.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+assert.doesNotMatch(publicPanel, /id="testlab-(core|v19)-(rows|total|mode-badge)"|Dino Operations|Yeni [Çç]ekirdek/);
+assert.match(publicPanel, /Maç Yakala/);
 assert.doesNotMatch(publicPanel, /HAM GÖZLEM|hybrid-observation|Hibrit Gözlem/);
 assert.doesNotMatch(publicPanel, /V21 · ÜST \/ ALT|en az 2 model|negatiflerde alt sınır yok/);
 assert.ok(scripts.length > 0, 'Panel JavaScript bloğu bulunamadı.');

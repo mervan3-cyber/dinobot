@@ -287,7 +287,7 @@ async function test(name, run) {
         assert.equal(sends, 0);
     });
 
-    await test('a V20-only final-check rejection does not suppress an already eligible V19 branch', async () => {
+    await test('retired V19 route stays off even when its former inputs qualify during V20 refresh', async () => {
         const id = 91026;
         const mac = match(id);
         provider(id, { finalChange: f => { f.goals.home = 1; } });
@@ -302,7 +302,7 @@ async function test(name, run) {
         });
         await api.botuCalistir();
         assert.equal(api.v20ShadowTracker.hasSignal(id, 'strong'), false);
-        assert.equal(sends, 1, 'Legacy still reaches its own mocked final check and send');
+        assert.equal(sends, 0, 'The retired legacy Telegram route never sends');
     });
 
     await test('daily archive keeps all moments/context beyond ring cap and appends settlements', () => {

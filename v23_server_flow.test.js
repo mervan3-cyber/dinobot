@@ -44,7 +44,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(api.v21ShadowTracker.data.signals.length,1);assert.equal(api.v23GoalLab.data.signals.length,2);
     const observation=api.v23GoalLab.data.signals[0];assert.equal(observation.assessment.status,'insufficient');
     assert.equal(observation.baselineSignalId,api.v21ShadowTracker.data.signals[0].signalId);
-    assert.equal(deliveries.length,0);assert.equal(api.signalTracker.data.signals.length,0);
+    assert.equal(deliveries.length,1);assert.equal(api.signalTracker.data.signals.length,1);
     assert.equal(api.v23GoalLab.data.signals[1].sourceModel,'v22');
     await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2,'Repeat scan cannot rejudge either source');
     m=match(2302);api.setup(m,49);await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2,'Not a source candidate');
@@ -55,8 +55,8 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(api.v21ShadowTracker.hasSignal(2305,'strong'),false);
     assert.equal(api.v23GoalLab.data.signals[2].sourceModel,'v22');
     assert.equal(api.v23GoalLab.data.signals[2].matchedFilters.join('+'),'A');
-    assert.equal(deliveries.length,1,'Existing active V19 may still send this market; V23 must not veto it');
-    assert.equal(api.signalTracker.data.signals[0].fixtureId,2305);
+    assert.equal(deliveries.length,2,'V22 A sends independently; V23 does not veto it');
+    assert.equal(api.signalTracker.data.signals[1].fixtureId,2305);
     assert(api.v23GoalLab.data.signals.every(s=>s.telegramMessageId===null),'V23 itself never sends');
     api.v23GoalLab.observe=()=>{throw Error('V23 isolated failure');};
     m=match(2304);api.setup(m);await api.botuCalistir();assert(api.v21ShadowTracker.hasSignal(2304,'strong'));
@@ -85,11 +85,11 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(state._v23Events,null);
     const raw=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}},events:[],_dino_fixture_received_at:'2026-09-14T10:01:00Z'}])[0];
     assert.equal(raw._v23Events.length,0);assert.equal(raw._v23EventsAt,'2026-09-14T10:01:00Z');
-    assert.equal(deliveries.length,1,'No additional Telegram sends from lab results or exports');
+    assert.equal(deliveries.length,4,'Three independent signal messages plus one confirmed-win reply; exports do not send');
     const onlyV22=vm.createContext({require:context.require,__dirname:path.join(root,'v22-only'),
         process:{env:{...context.process.env,DINO_V21_SHADOW_ENABLED:'false',DINO_V22_SHADOW_ENABLED:'true'},platform:process.platform},
         console:context.console,Date,Buffer,URL,URLSearchParams,setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
     vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+';globalThis.sourceFlags=[DINO_V21_SHADOW_ENABLED,DINO_V22_SHADOW_ENABLED,v23GoalLab.enabled];',onlyV22);
     assert.deepEqual(Array.from(onlyV22.sourceFlags),[false,true,true],'V23 stays enabled with only the V22 source enabled');
-    console.log('V23 real server flow: fresh V21/V22 pairing, V22-only A, no backfill/reselection/extra Telegram, existing active delivery preserved, isolated failures, TSI/source exports, embedded events and dual settlement passed.');
+    console.log('V23 real server flow: fresh V21/V22 pairing, V22-only A, no backfill/reselection/extra Telegram, independent V21/V22 delivery, isolated failures, TSI/source exports, embedded events and dual settlement passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(root,{recursive:true,force:true}));
