@@ -3,24 +3,26 @@ const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=req
 const {createRequire}=require('module');
 const localRequire=createRequire(path.join(__dirname,'server.js'));
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'dino-v22-flow-'));
-const routes=new Map(),deliveries=[];
+const routes=new Map(),deliveries=[],xDeliveries=[];
 const app={use(){},get(route,handler){for(const r of [].concat(route))routes.set(r,handler);},post(){},listen(){}};
 function express(){return app;}express.json=express.static=()=>()=>{};
 const scores={v16:61,v18:62};
 const external={dotenv:{config(){}},express,cors:()=>()=>{},
     axios:{create:()=>({get(){throw Error('Live network forbidden');}})},
-    'node-telegram-bot-api':class{async sendMessage(channel,text){deliveries.push({channel,text});return {message_id:deliveries.length};}},
+    'node-telegram-bot-api':class{async sendMessage(channel,text,options){deliveries.push({channel,text,options});return {message_id:deliveries.length};}},
+    './x_publisher':{createXPublisher:()=>async payload=>{xDeliveries.push(payload);return {id:String(500+xDeliveries.length)};}},
     '@google/generative-ai':{GoogleGenerativeAI:class{}},child_process:{spawn(){throw Error('Live Python forbidden');}},
     './dino_selector_v2':{MODEL:{version:'test16',policy:{defaultMinimumOdd:1.5}},scoreMarket:()=>({selectorProbability:scores.v16,selectorRawProbability:scores.v16}),policyCheck:()=>({eligible:true})},
     './dino_selector_v18':{MODEL:{version:'test18'},scoreMarket:()=>({v18Probability:scores.v18,v18Edge:0})}};
 const context=vm.createContext({require:name=>Object.hasOwn(external,name)?external[name]:localRequire(name),__dirname:root,
     process:{env:{TELEGRAM_BOT_TOKEN:'offline',TELEGRAM_CHANNEL_ID:'offline',DINO_CORE_SHADOW_ENABLED:'false',
+        TELEGRAM_EXTRA_CHAT_ID:'-1002',X_API_KEY:'offline',X_API_SECRET:'offline',X_ACCESS_TOKEN:'offline',X_ACCESS_TOKEN_SECRET:'offline',
         DINO_LEGACY_V17_SHADOW_ENABLED:'false',DINO_V20_SHADOW_ENABLED:'false',DINO_V19_SHADOW_ENABLED:'false'},platform:process.platform},
     console:{log(){},warn(){},error(){}},Date,Buffer,URL,URLSearchParams,
     setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+`
 for(const tracker of [coreShadowTracker,legacyV17ShadowTracker,v20ShadowTracker])tracker.data.startedAt='1970-01-01T00:00:00Z';
-globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v22Lab,signalTracker,
+globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v22Lab,signalTracker,sharingSettings,sharingDelivery,
     setup(mac,initial,fresh,onVerify,valid=true){
         let calls=0;
         canliMaclariHazirla=async()=>[mac];hazirMacHalaUygunMu=()=>true;temelStatsTam=()=>true;
@@ -108,5 +110,21 @@ function get(route,query={}){let body,headers={};const handler=routes.get(route)
     assert.deepEqual(Array.from(entries[1].signalSources),['V22']);
     assert.equal(deliveries.length,7);await api.botuCalistir();assert.equal(deliveries.length,7);
     assert(api.v21ShadowTracker.hasSignal(2230,'strong'));assert(api.v22ShadowTracker.hasSignal(2230,'strong'));
+    // Actual server hook fans out only acknowledged primary signals; lab/stat counts stay independent.
+    api.sharingSettings.update({revision:0,extraTelegram:true,x:true});
+    match=mac(2240,'0.5_UST','0-0',65,.85);
+    api.setup(match,dino('0.5_UST',55.5),dino('0.5_UST',55.5));await api.botuCalistir();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(deliveries.length,9);assert.equal(xDeliveries.length,1);
+    assert.equal(deliveries[7].channel,'offline');assert.equal(deliveries[8].channel,'-1002');assert.equal(deliveries[7].text,deliveries[8].text);
+    assert.equal(api.signalTracker.data.signals.filter(s=>s.fixtureId===2240).length,1);
+    api.signalTracker.data.signals.find(s=>s.fixtureId===2240).settlement={result:'W'};
+    await api.sharingDelivery.flushWins();assert.equal(deliveries.length,10);assert.equal(xDeliveries.length,1,'No X result posts');
+    assert.equal(JSON.parse(deliveries[9].options.reply_parameters).message_id,9);
+    api.sharingSettings.update({revision:1,extraTelegram:false});
+    match=mac(2241,'0.5_UST','0-0',65,.85);
+    api.setup(match,dino('0.5_UST',55.5),dino('0.5_UST',55.5));await api.botuCalistir();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(deliveries.length,11,'Disabling extra group leaves primary active');assert.equal(xDeliveries.length,2,'X remains independent');
     console.log('V22 server fresh flow, V21 preservation, independent Telegram including same market 35/60 minutes, API/date/CSV and settlement passed (offline).');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(root,{recursive:true,force:true}));

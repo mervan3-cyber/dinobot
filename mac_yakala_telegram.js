@@ -79,6 +79,10 @@ class TelegramDelivery {
         return this.data.entries.some(e=>String(e.requestedChannel)===String(channel)&&e.payload.fixtureId===Number(fixtureId)&&e.payload.signalSources.includes(source)&&e.status!=='declined');
     }
     reconcile(){for(const e of this.data.entries)if(e.status==='sent'&&e.messageId)this.tracker.recordSent({...e.payload,deliveryKey:e.key,telegramMessageId:e.messageId,telegramChatId:e.chatId});}
+    findSent(channel,payload){
+        const key=crypto.createHash('sha256').update(JSON.stringify([channel,payload.fixtureId,payload.market,payload.minute,payload.score,payload.sentAt,payload.odds,payload.signalSources])).digest('hex');
+        return this.data.entries.find(e=>e.key===key&&e.status==='sent');
+    }
     async publish(channel,payload){
         if(this.disabled||this.busy||!channel||!payload||!payload.signalSources?.length||payload.signalSources.some(s=>!['V21','V22'].includes(s)||this.hasSource(channel,s,payload.fixtureId)))return false;
         if(payload.statsValidation?.status!=='passed'||!/^\d+\.5_UST$/.test(payload.market)||!Number.isFinite(payload.odds)||payload.odds<1.5||payload.odds>4)return false;

@@ -1,8 +1,10 @@
 # Maç Yakala — Ubuntu kurulumu
-Sürüm 2.4.0 · Build: mac-yakala-independent-telegram-2026-09-16
-Paket: mac-yakala-v21-v22-telegram-ubuntu-2026-09-16.zip
+Sürüm 2.5.0 · Build: mac-yakala-sharing-2026-09-16
+Paket: mac-yakala-paylasim-ayarlari-telegram-x-ubuntu-2026-09-16.zip
 
 Bu paket V22 + V21 bağımsız Telegram gönderimini açar. V20/V17 labda kalır. Ayrıntılar: [Değişiklik notları](MAC_YAKALA_DEGISIKLIKLER_2026-09-16.md).
+
+Yeni: [Ek Telegram / X ayarları ve .env açıklaması](PAYLASIM_AYARLARI.md). Panel girişi için `.env` içine **PANEL_ADMIN_PASSWORD** eklemek zorunludur; en az 12 karakterlik kendi şifrenizi yazın. Ek hedefler başlangıçta kapalıdır. X’in uzun metin kısıtı için bağlantılı notu okuyun; format kararı netleşmeden X’i açmayın.
 
 ## Güvenli güncelleme
 
@@ -14,7 +16,7 @@ Bu paket V22 + V21 bağımsız Telegram gönderimini açar. V20/V17 labda kalır
    ```
 
 3. Uygulama dizinini .env, geçmişler, önbellekler ve arşivlerle birlikte ayrı bir konuma yedekleyin; yedeğin açıldığını kontrol edin. Tek süreç çalıştığından emin olun.
-4. ZIP içindeki **bütün dosyaları** `/root/dinobot` içine yükleyin/üzerine yazın. Yalnız server.js yeterli değildir. Klasörü boşaltmayın.
+4. ZIP içindeki **bütün dosyaları** `/root/dinobot` içine yükleyin/üzerine yazın. Yalnız server.js yeterli değildir. Klasörü boşaltmayın. `.env.sharing.example` yalnız örnektir; mevcut `.env` dosyanızın yerine koymayın. Yeni satırları kendi değerlerinizle mevcut dosyaya ekleyin.
 5. Sunucuda:
 
    ```bash
@@ -57,5 +59,5 @@ Sunucudaki ana sistem/tarama anahtarının açık ve program saatinin uygun olma
 
 Test başarısızsa botu başlatmayın; hata çıktısını paylaşın. Kod yedeğine dönerken canlı geçmişleri eski kopyayla geriye almayın.
 Gönderim günlüğü uyarısında dosyaları silerek çözmeye çalışmayın: bot dururken geçmiş ve günlük birlikte incelenmeli.
-26 test dosyası gerçek API/Telegram çağrısı yapmaz; bağımlılık sürümleri değişmedi.
+27 test dosyası gerçek API/Telegram/X çağrısı yapmaz; bağımlılık sürümleri değişmedi.
 Botun Telegram profil adı, kullanıcı adı, kanal adı/biyografisi bu paket tarafından değiştirilmez; bunlar Telegram/BotFather üzerinden ayrıca düzenlenir.

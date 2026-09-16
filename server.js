@@ -4,7 +4,6 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
 const https = require('https');
 const TelegramBot = require('node-telegram-bot-api');
@@ -13,6 +12,11 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
 const { createRouter, TelegramDelivery, VERSION: TELEGRAM_VERSION } = require('./mac_yakala_telegram');
+const { createPanelAuth } = require('./panel_auth');
+const { SharingSettings } = require('./sharing_settings');
+const { SharingDelivery } = require('./sharing_delivery');
+const { createXPublisher } = require('./x_publisher');
+const crypto = require('crypto');
 const { CandidateTracker } = require('./candidate_tracker');
 const {
     parsePrematchOddsPayload,
@@ -56,10 +60,10 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-independent-telegram-2026-09-16';
+const BUILD_VERSION = 'mac-yakala-sharing-2026-09-16';
 
-app.use(cors());
-app.use(express.json());
+app.use(express.json({limit:'64kb'}));
+app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
 
 app.use(
     express.static(
@@ -484,6 +488,26 @@ const telegramRouter = createRouter({delivery: telegramDelivery, channel: kanalI
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
     alreadyDecided: toplamGolMarketiSkoraGoreSonuclanmisMi, liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
     v21Enabled: MY_V21_TELEGRAM_ENABLED, v22Enabled: MY_V22_TELEGRAM_ENABLED
+});
+
+const extraChatId = String(process.env.TELEGRAM_EXTRA_CHAT_ID || '').trim();
+const xCredentials = {apiKey:process.env.X_API_KEY || '',apiSecret:process.env.X_API_SECRET || '',
+    accessToken:process.env.X_ACCESS_TOKEN || '',accessSecret:process.env.X_ACCESS_TOKEN_SECRET || ''};
+const sameTelegramTarget = () => extraChatId===String(kanalID) || telegramDelivery.data.entries.some(e=>e.status==='sent'&&e.requestedChannel===String(kanalID)&&String(e.chatId)===extraChatId);
+const sharingSettings = new SharingSettings({filePath:path.join(__dirname,'mac_yakala_sharing_settings.json'),
+identities:()=>({extraTelegram:crypto.createHash('sha256').update(extraChatId).digest('hex'),x:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex')}),availability:()=>({
+    extraTelegram:{configured:!!bot && /^-\d+$/.test(extraChatId) && !sameTelegramTarget(),
+        reason:!bot?'Telegram bot ayarı eksik.':!extraChatId?'TELEGRAM_EXTRA_CHAT_ID .env içinde boş.':! /^-\d+$/.test(extraChatId)?'Ek grup için sayısal negatif chat ID gerekli.':sameTelegramTarget()?'Ek hedef ana kanalla aynı olamaz.':null},
+    x:{configured:Object.values(xCredentials).every(v=>!!v.trim()),reason:Object.values(xCredentials).every(v=>!!v.trim())?null:'Dört X OAuth 1.0a kullanıcı anahtarını .env içine girin.'}
+})});
+const sharingDelivery = new SharingDelivery({filePath:path.join(__dirname,'mac_yakala_sharing_delivery.json'),settings:sharingSettings,tracker:signalTracker,
+    extraChatId,xIdentity:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex'),
+    telegramSend:(chat,text,options)=>{if(!bot)throw Error('Telegram ayarı eksik');return bot.sendMessage(chat,text,options);},
+    xSend:createXPublisher({credentials:xCredentials}),logger:message=>addSystemLog(message)});
+app.get('/api/sharing-settings', (req,res)=>res.json({success:true,...sharingSettings.status(),delivery:sharingDelivery.status()}));
+app.post('/api/sharing-settings', (req,res)=>{
+    try { const status=sharingSettings.update(req.body); addSystemLog(`> 📣 Ek paylaşım ayarları güncellendi: ek Telegram ${status.extraTelegram.active?'açık':'kapalı'}, X ${status.x.active?'açık':'kapalı'}. Ana kanal değişmedi.`); res.json({success:true,...status,delivery:sharingDelivery.status()}); }
+    catch(error){res.status(400).json({success:false,error:error.message});}
 });
 
 const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fetchApi: apiGet,
@@ -5574,6 +5598,7 @@ async function botuCalistir() {
                 const payload = telegramRouter.record(mac,group,yorum,new Date().toISOString());
                 if (!payload) continue;
                 const sent = await telegramDelivery.publish(kanalID,payload);
+                if (sent) void sharingDelivery.publish(telegramDelivery.findSent(kanalID,payload)).catch(()=>addSystemLog('> ⚠️ Ek paylaşım hatası; ana sinyal korundu.'));
                 for (const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
                     record.decision = sent ? 'sent' : 'telegram_failed';
                     record.decisionDetail = sent ? 'V21/V22 bağımsız Telegram gönderimi başarılı.' : 'Telegram gönderilmedi; lab kaydı korundu.';
@@ -5823,6 +5848,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     ])];
     if (fixtureIDs.length === 0) {
         await telegramDelivery.flushWins();
+        await sharingDelivery.flushWins();
         return {
             success: true,
             checkedFixtures: 0,
@@ -5917,6 +5943,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
         };
     } finally {
         await telegramDelivery.flushWins();
+        await sharingDelivery.flushWins();
         isSignalResultRefreshing = false;
     }
 }
@@ -7529,6 +7556,8 @@ v23GoalLab.load();
 addSystemLog(`> 🧪 V23 KONTROL LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | yeni V21 + V22 ayrı kollar | onay / varsayımsal ret / gözlem / veri yetersiz | sinyal veto edilmez | Telegram YOK.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
+sharingSettings.load();
+sharingDelivery.load();
 
 prematchOddsCache.load();
 

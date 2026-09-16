@@ -86,6 +86,7 @@ try {
     );
 
     const requiredGetRoutes = [
+        '/api/sharing-settings',
         '/api/test-lab-comparison',
         '/api/two-rule-core-shadow-history',
         '/api/two-rule-core-shadow-history/export',
@@ -104,6 +105,13 @@ try {
         assert.ok(routes.get.has(route), `GET route eksik: ${route}`);
     }
     assert.ok(routes.post.has('/api/test-lab-results/refresh'));
+    assert.ok(routes.post.has('/api/sharing-settings'));
+    let sharing=null;
+    routes.get.get('/api/sharing-settings')({}, {json(value){sharing=value;}});
+    assert.equal(sharing.extraTelegram.enabled,false);
+    assert.equal(sharing.x.enabled,false);
+    assert(!JSON.stringify(sharing).includes('accessToken'));
+    assert(!JSON.stringify(sharing).includes('apiSecret'));
     assert.equal(routes.get.has('/api/v18-shadow-comparison'), false);
     assert.equal(routes.get.has('/api/v18-shadow-history'), false);
     assert.equal(routes.get.has('/api/v18-b-shadow-history/export'), false);
