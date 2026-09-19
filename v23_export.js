@@ -12,12 +12,13 @@ async function streamJson(res, payload) {
             res.once('drain',drained); res.once('close',closed); res.once('error',failed);
         });
     };
-    const { signals, profiles, ...meta } = payload;
+    const { signals, profiles, profileEntries, ...meta } = payload;
     await write(JSON.stringify(meta).slice(0,-1) + ',"signals":[');
-    for (let i=0; i<signals.length; i++) await write((i ? ',' : '') + JSON.stringify(signals[i]));
+    let i=0;
+    for (const signal of signals) await write((i++ ? ',' : '') + JSON.stringify(signal));
     await write('],"profiles":{');
     let first = true;
-    for (const [id,profile] of Object.entries(profiles)) {
+    for (const [id,profile] of profileEntries || Object.entries(profiles)) {
         await write((first ? '' : ',') + JSON.stringify(id) + ':' + JSON.stringify(profile)); first = false;
     }
     await write('}}'); res.end();

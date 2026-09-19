@@ -1,12 +1,15 @@
 'use strict';
 const fs = require('fs');
 const { SignalTracker, calculateMarketResult, profitForResult } = require('./signal_tracker');
-const { atomicJson, integer, COLLECTOR_VERSION } = require('./v23_goal_profile');
+const { integer, COLLECTOR_VERSION } = require('./v23_goal_profile');
+const { SettledArchive, durableJson, profileIds } = require('./v23_archive');
 const { VERSION, POLICY, evaluate, baselineCheck } = require('./v23_goal_policy');
 const baseline = require('./v21_tariff');
 const v22 = require('./v22_tariff');
 const { EventObservations } = require('./v23_events');
 const { VERSION: AUDIT_VERSION, DEFINITIONS, evaluateControls, comparison } = require('./v23_controls');
+// Old code must refuse the compact disk format rather than report incomplete evidence.
+const STORAGE_VERSION = `${VERSION}:settled-archive-v1`;
 const LABELS = Object.freeze({
     BASELINE_INVALID: 'Kaynak model koşulları doğrulanamadı', LIVE_STATE_MISSING: 'Canlı skor/dakika eksik',
     MARKET_ALREADY_DECIDED: 'Market girişte zaten sonuçlanmış', RED_CARD_DATA_MISSING: 'Kart verisi eksik',
@@ -35,24 +38,72 @@ class GoalLab extends SignalTracker {
         super({ filePath, logger });
         this.cache = cache; this.events = events; this.enabled = enabled; this.maxRecords = maxRecords; this.disabledReason = null;
         this.data = { version: VERSION, startedAt: null, updatedAt: null, signals: [], profiles: {} };
+        this.archive = new SettledArchive(filePath); this.archiveError = null;
     }
     load() {
         if (!fs.existsSync(this.filePath)) return;
         try {
             const data = JSON.parse(fs.readFileSync(this.filePath,'utf8'));
-            if (data.version !== VERSION || !Array.isArray(data.signals) || !data.profiles || typeof data.profiles !== 'object' || Array.isArray(data.profiles) ||
+            if (![VERSION, STORAGE_VERSION].includes(data.version) || !Array.isArray(data.signals) || !data.profiles || typeof data.profiles !== 'object' || Array.isArray(data.profiles) ||
                 !data.signals.every(s => s && integer(s.fixtureId) > 0 && Number.isFinite(Date.parse(s.sentAt)) &&
                     ['approve','reject','insufficient'].includes(s.assessment?.status) && Array.isArray(s.assessment?.reasons) &&
                     (!s.audit || (s.audit.version === AUDIT_VERSION && ['v21','v22'].includes(s.sourceModel) && Array.isArray(s.audit.controls) &&
                         s.audit.controls.length === DEFINITIONS.length && DEFINITIONS.every(d=>s.audit.controls.filter(c=>c?.id===d.id).length===1) &&
                         s.audit.controls.every(c => c && ['approve','reject','insufficient','observed'].includes(c.status) && Array.isArray(c.reasons) && Array.isArray(c.reasonLabels)))))) throw Error('history_schema');
+            for (const signal of data.signals) if (signal.archiveRef) this.archive.read(signal);
             this.data = data;
         } catch {
             this.disabledReason = 'history_unreadable';
             this.logger('> ⚠️ V23 geçmişi okunamadı. Dosya korunuyor; V23 kayıtları kapalı, mevcut modeller değişmedi.');
+            return;
+        }
+        this.archiveSettled();
+    }
+    save() {
+        this.data.updatedAt = new Date().toISOString();
+        durableJson(this.filePath,{...this.data,version:this.data.signals.some(s=>s.archiveRef) ? STORAGE_VERSION : VERSION});
+    }
+    archiveSettled() {
+        if (this.disabledReason === 'history_unreadable') return;
+        const finished = this.data.signals.filter(s=>!s.archiveRef && ['W','L','PUSH','VOID'].includes(s.settlement?.result));
+        if (!finished.length) return;
+        const previous = this.data;
+        try {
+            // First conversion leaves an exclusive, verified legacy snapshot on disk.
+            // It is a migration backup, not a rolling backup of future signals.
+            const backup = `${this.filePath}.pre-archive.bak`;
+            if (!previous.signals.some(s=>s.archiveRef) && fs.existsSync(backup)) {
+                const saved = JSON.parse(fs.readFileSync(backup,'utf8'));
+                if (saved.version!==VERSION || !Array.isArray(saved.signals) || saved.signals.some(s=>s.archiveRef))
+                    throw Error('archive_backup_invalid');
+            }
+            if (!previous.signals.some(s=>s.archiveRef) && fs.existsSync(this.filePath) && !fs.existsSync(backup)) {
+                const bytes = fs.readFileSync(this.filePath);
+                const fd = fs.openSync(backup,'wx');
+                try { fs.writeFileSync(fd,bytes); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+                if (!bytes.equals(fs.readFileSync(backup))) throw Error('archive_backup_verification_failed');
+            }
+            const indices = new Map(finished.map(s=>[s,this.archive.write(s,previous.profiles)]));
+            const signals = previous.signals.map(s=>indices.get(s)||s);
+            const keepProfiles = new Set(signals.filter(s=>!s.archiveRef).flatMap(profileIds));
+            const profiles = Object.fromEntries(Object.entries(previous.profiles).filter(([id])=>keepProfiles.has(id)));
+            this.data = {...previous, signals, profiles};
+            this.save(); // Commit only after every evidence file has been verified.
+            this.archiveError = null;
+        } catch {
+            this.data = previous; this.archiveError = 'archive_write_failed';
+            this.logger('> ⚠️ V23 arşive taşınamadı; tam kayıtlar korunuyor. Lab/sinyal kararı değişmedi.');
         }
     }
-    save() { this.data.updatedAt = new Date().toISOString(); atomicJson(this.filePath,this.data); }
+    maintain() {
+        this.events.prune?.();
+        this.cache.pruneExpired?.();
+        this.archiveSettled();
+    }
+    indexList(limit = 100000) { return super.list(limit); }
+    list(limit = 100, signals = this.data.signals) {
+        return super.list(limit,signals).map(s=>s.archiveRef ? this.archive.read(s).signal : s);
+    }
     capture(mac, capturedAt) {
         if (this.enabled && !this.disabledReason) this.events.capture(mac,capturedAt);
     }
@@ -148,6 +199,10 @@ class GoalLab extends SignalTracker {
                 throw error;
             }
         }
+        // Only a confirmed final status with a persisted settlement reaches cleanup.
+        this.events.releaseFixture?.(fixture?.fixture?.id);
+        this.cache.releaseFixture?.(fixture?.fixture?.id);
+        this.archiveSettled();
         return changed;
     }
     metadata(signals = this.data.signals) {
@@ -168,12 +223,43 @@ class GoalLab extends SignalTracker {
             retainedPercent: signals.length ? 100*buckets.approve.total/signals.length : null,
             assessedCoverage: signals.length ? 100*(buckets.approve.total+buckets.reject.total)/signals.length : null,
             comparableBaseline: this.summary(signals.filter(s => s.assessment.status !== 'insufficient')).overall,
-            cache: this.cache.metadata(), profileCoverage };
+            cache: this.cache.metadata(), profileCoverage,
+            storage: {mode:'settled-on-disk-active-in-memory',
+                archivedRecords:this.data.signals.filter(s=>s.archiveRef).length,
+                fullRecordsInMemory:this.data.signals.filter(s=>!s.archiveRef).length,
+                activeProfilesInMemory:Object.keys(this.data.profiles).length,
+                compactIndexRecords:this.data.signals.length, error:this.archiveError} };
     }
     export(signals = this.data.signals) {
-        const ids = new Set(signals.flatMap(s => Object.values(s.assessment.profileIds || {})).filter(Boolean));
-        return { ...this.metadata(signals), signals,
-            profiles: Object.fromEntries([...ids].filter(id => this.data.profiles[id]).map(id => [id,this.data.profiles[id]])) };
+        const profiles = {}, full = [];
+        for (const s of signals) {
+            if (s.archiveRef) { const data=this.archive.read(s); full.push(data.signal); Object.assign(profiles,data.profiles); }
+            else { full.push(s); for (const id of profileIds(s)) if (this.data.profiles[id]) profiles[id]=this.data.profiles[id]; }
+        }
+        return { ...this.metadata(signals), signals:full, profiles };
+    }
+    *fullSignals(signals) {
+        for (const s of signals) yield s.archiveRef ? this.archive.read(s).signal : s;
+    }
+    exportStream(signals = this.data.signals) {
+        // Streaming HTTP export holds at most one archived record at a time.
+        // Freeze the selection (not the evidence) across response backpressure.
+        const selected=[...signals];
+        const activeProfiles={...this.data.profiles};
+        const archive=this.archive;
+        function* profiles() {
+            const seen=new Set();
+            for (const s of selected) {
+                const ids=profileIds(s).filter(id=>!seen.has(id));
+                if(!ids.length)continue;
+                const source=s.archiveRef ? archive.read(s).profiles : activeProfiles;
+                for(const id of ids){if(!source[id])throw Error('export_profile_missing');seen.add(id);yield [id,source[id]];}
+            }
+        }
+        // Active records may settle during an await: copy just these entries so
+        // exported totals and records stay from the same point in time.
+        for(let i=0;i<selected.length;i++)if(!selected[i].archiveRef)selected[i]=JSON.parse(JSON.stringify(selected[i]));
+        return {...this.metadata(selected),signals:this.fullSignals(selected),profileEntries:profiles()};
     }
     csv(signals) {
         const quote = v => '"' + String(v ?? '').replace(/^[=+@-]/,"'$&").replace(/"/g,'""') + '"';
@@ -181,12 +267,12 @@ class GoalLab extends SignalTracker {
             'GerekenGol','KalanDakika','ReferansOlasilikKalibreDegil','EvProfil','DepProfil','Sonuc','Final']];
         rows[0].push('Kaynak','V22Filtre','DeneySurumu');
         for (const d of DEFINITIONS) rows[0].push(`${d.id}_karar`,`${d.id}_gerekce`,`${d.id}_degerler`);
-        for (const s of signals) rows.push([s.sentAt,s.match,s.minute,s.score,s.market,s.dinoProbability,s.selectorV2Probability,
+        for (const indexed of signals) { const s=indexed.archiveRef ? this.archive.read(indexed).signal : indexed; rows.push([s.sentAt,s.match,s.minute,s.score,s.market,s.dinoProbability,s.selectorV2Probability,
             s.v18Probability,s.prematchMarketSupport,s.edge,s.odds,s.assessment.status,s.assessment.reasonLabels.join(' | '),
             s.assessment.goalsNeeded,s.assessment.remainingMinutes,s.assessment.remainingProbability,
             s.assessment.profileIds?.home,s.assessment.profileIds?.away,s.settlement?.result,s.settlement?.finalScore,
             s.sourceModel || 'v21',s.matchedFilters?.join('+'),s.audit?.version || 'legacy',
-            ...DEFINITIONS.flatMap(d=>{const c=s.audit?.controls?.find(c=>c.id===d.id);return [c?.status,c?.reasonLabels?.join(' | '),c?JSON.stringify(c.values):null];})]);
+            ...DEFINITIONS.flatMap(d=>{const c=s.audit?.controls?.find(c=>c.id===d.id);return [c?.status,c?.reasonLabels?.join(' | '),c?JSON.stringify(c.values):null];})]); }
         return '\uFEFF' + rows.map(row => row.map(quote).join(',')).join('\r\n');
     }
 }

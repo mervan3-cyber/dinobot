@@ -153,6 +153,31 @@ class GoalProfileCache {
         const target = this.targets.get(Number(fixtureId));
         if (target) target.closedAt ||= new Date(this.now()).toISOString();
     }
+    releaseFixture(fixtureId) {
+        const id = Number(fixtureId), target = this.targets.get(id), keys = new Set();
+        if (target) for (const side of ['home','away']) { const info=identity(target.mac,side); if(info)keys.add(keyFor(info)); }
+        for (const [key,info] of this.queue) if (info.fixtureId===id) { keys.add(key); this.queue.delete(key); }
+        this.targets.delete(id);
+        // Never evict a team profile another tracked fixture still needs.
+        for (const other of this.targets.values()) for (const side of ['home','away']) {
+            const info=identity(other.mac,side); if(info)keys.delete(keyFor(info));
+        }
+        for (const key of this.queue.keys()) keys.delete(key);
+        this.evictEntries(keys);
+    }
+    evictEntries(keys) {
+        if (this.disabled) return;
+        const removed = new Map();
+        for (const key of keys) if (this.data.entries[key]) { removed.set(key,this.data.entries[key]); delete this.data.entries[key]; }
+        if (!removed.size) return;
+        try { this.save(); }
+        catch { for(const [key,entry] of removed)this.data.entries[key]=entry;
+            this.logger('> ⚠️ V23 geçici önbellek temizliği yazılamadı; önbellek korundu.'); }
+    }
+    pruneExpired() {
+        this.pruneQueue();
+        this.evictEntries(Object.keys(this.data.entries).filter(key=>this.data.entries[key].expiresAt<=this.now() && !this.queue.has(key)));
+    }
     request(mac, { priority = 50 } = {}) {
         if (this.disabled) return;
         this.pruneQueue();
@@ -268,6 +293,9 @@ class GoalProfileCache {
                             priorPending: false, attempts, lastError: detail };
                         this.logger(`> ⚠️ V23 LAB geçmişi (takım ${info.teamId}, ${detail.phase}): ${detail.code} ${detail.httpStatus || ''} ${detail.message}. Ana sinyal değişmedi.`);
                     }
+                    // A match can finish while the HTTP request is in flight.
+                    // Its attempt remains charged, but must not repopulate the cache.
+                    if (!this.queue.has(key)) break;
                     this.data.entries[key] = entry; this.trim(); this.save();
                     if (!entry.priorPending) { this.queue.delete(key); break; }
                     if (entry.retryAt > this.now()) break;

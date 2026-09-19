@@ -87,3 +87,8 @@ assert.equal(el('testlab-v23-pairs').querySelectorAll('img').length,0);
 context.renderV23ProfileStatus({enabled:true,waitReason:'early_budget_exhausted'},{});
 assert.match(el('testlab-v23-cache').textContent,/Erken hazırlık alt bütçesi doldu/);
 assert.match(el('testlab-v23-profile-coverage').textContent,/eski raporda/);
+context.renderV23ProfileStatus({}, {}, null, {archivedRecords:17,fullRecordsInMemory:3,compactIndexRecords:20,error:null});
+assert.match(el('testlab-v23-profile-coverage').textContent,/17 kayıt diskte/);
+assert.match(el('testlab-v23-profile-coverage').textContent,/RAM'de tam kayıt: 3/);
+context.renderV23ProfileStatus({}, {}, null, {error:'archive_write_failed'});
+assert.match(el('testlab-v23-profile-coverage').textContent,/tam kayıtlar korundu/);

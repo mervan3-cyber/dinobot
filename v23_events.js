@@ -39,6 +39,10 @@ class EventObservations {
     constructor({ maxFixtures = 300, maxSnapshots = 32 } = {}) {
         this.entries = new Map(); this.maxFixtures = maxFixtures; this.maxSnapshots = maxSnapshots;
     }
+    releaseFixture(fixtureId) { this.entries.delete(integer(fixtureId)); }
+    prune(now = Date.now()) {
+        for (const [id, entry] of this.entries) if (now-entry.lastAt>6*3600000) this.entries.delete(id);
+    }
     capture(mac, capturedAt) {
         const id = integer(mac?.fixture_id), at = time(capturedAt);
         if (!id || at === null || !['1H','2H'].includes(mac.status_short)) return;

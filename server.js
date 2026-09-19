@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v23-lab-ready-2026-09-19';
+const BUILD_VERSION = 'mac-yakala-v23-lab-archive-2026-09-19';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -557,6 +557,8 @@ function v23ErkenGecmisHazirla(fixtures, oddsMap) {
 
 async function v23ArkaPlanGecmisTurunuCalistir() {
     try {
+        // Local maintenance makes no API requests and can run while scans are paused.
+        v23GoalLab.maintain();
         if (!state.isRunning || !state.autoScanEnabled || isScanning || isSignalResultRefreshing ||
             !v23GoalLab.enabled || v23GoalLab.disabledReason) return;
         await v23ProfileCache.warm({canContinue:()=>state.isRunning && state.autoScanEnabled && !v23GoalLab.disabledReason});
@@ -6412,7 +6414,7 @@ function testLabOrtakKarsilastirmaBaslangici() {
 function testLabDonemineGoreSec(tracker, date, cohort = 'current') {
     if (tracker === coreShadowTracker || tracker === v19ShadowTracker) return [];
     const comparisonStart = testLabOrtakKarsilastirmaBaslangici();
-    const signals = tracker === v21ShadowTracker
+    const signals = tracker === v23GoalLab ? v23GoalLab.indexList(100000) : tracker === v21ShadowTracker
         ? v21History.select(tracker.list(100000), cohort) : tracker.list(100000);
     return signals.filter(signal => {
         if (comparisonStart && new Date(signal.sentAt) < new Date(comparisonStart)) return false;
@@ -6776,7 +6778,7 @@ for (const suffix of ['', '/export', '/export.csv']) {
         res.setHeader('Content-Type', csv ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="dino-v23-kontrol-${source.replace(':','-')}-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
         if (csv) return res.send(v23GoalLab.csv(selection.items));
-        try { await streamV23Json(res, { ...v23GoalLab.export(selection.items), filter: selection.filter, exportedAt: new Date().toISOString() }); }
+        try { await streamV23Json(res, { ...v23GoalLab.exportStream(selection.items), filter: selection.filter, exportedAt: new Date().toISOString() }); }
         catch { if (!res.destroyed) res.destroy(); }
     });
 }

@@ -82,6 +82,15 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     await api.settle({fixture:{id:2301,status:{short:'FT'}},score:{fulltime:{home:1,away:0}}});
     assert.equal(api.v23GoalLab.data.signals[0].settlement.result,'W','Even insufficient verdicts settle');
     assert.equal((await get('/api/status')).body.testLabTracking.v23Goal.summary.overall.wins,2);
+    assert.equal(api.v23GoalLab.metadata().storage.archivedRecords,2);
+    const archivedPage=await get('/api/test-lab-comparison',{date:'2026-09-15',limit:'1'});
+    assert.equal(archivedPage.body.v23Goal.summary.overall.wins,2);
+    assert.equal(archivedPage.body.v23Goal.signals.length,1);
+    const archivedJson=await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v22:C'});
+    assert.equal(archivedJson.body.signals[0].settlement.result,'W');
+    assert(archivedJson.body.signals[0].audit.events,'Archived details must be restored, not just the compact index');
+    assert.equal(archivedJson.body.signals[0].archiveRef,undefined);
+    assert.match((await get('/api/v23-goal-history/export.csv',{date:'2026-09-15'})).body,/Offline Home/);
     const state=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}}}])[0];
     assert.equal(state.fixture_kickoff,'2026-09-14T10:00:00Z');
     assert.equal(state._v23Events,null);

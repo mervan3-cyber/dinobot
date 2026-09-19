@@ -42,7 +42,9 @@ try {
     const original=JSON.stringify(record.audit);lab.capture({...mac(1),_v23EventsAt:'2026-09-14T11:00:00Z'},'2026-09-14T11:00:00Z');assert.equal(JSON.stringify(record.audit),original);
     const restart=new GoalLab({filePath:lab.filePath,cache});restart.load();assert.equal(restart.data.signals.length,4);
     assert.equal(restart.observe(signal(1,v22.VERSION),mac(1)),null);
-    const legacy=clone(restart.data.signals[0]);delete legacy.audit;delete legacy.sourceModel;legacy.fixtureId=50;
+    const fullHistory=restart.export();
+    const legacy=clone(fullHistory.signals[0]);delete legacy.audit;delete legacy.sourceModel;legacy.fixtureId=50;
+    Object.assign(restart.data.profiles,fullHistory.profiles);
     restart.data.signals.push(legacy);restart.save();restart.load();assert.equal(restart.metadata().experiment.legacy.total,1);
     assert.equal(restart.metadata().experiment.sources.v21.baseline.total,2,'Old entries excluded from new controls');
     assert.equal(selectSource(restart.data.signals,'legacy').length,1);assert.equal(selectSource(restart.data.signals,'v22:A').length,1);
