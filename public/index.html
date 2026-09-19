@@ -1808,6 +1808,8 @@
                 <div class="table-wrap"><table><thead><tr><th>Grup</th><th>Aday</th><th>K / Y</th><th>Bekleyen</th><th>İsabet</th><th>Teorik ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
                 <p class="muted" id="testlab-v23-impact">İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.</p>
                 <p class="muted" id="testlab-v23-cache">Profil önbelleği hazırlanmayı bekliyor.</p>
+                <p class="muted" id="testlab-v23-profile-coverage"></p>
+                <details><summary>Takım geçmişi hazır mı? · izlenen maçlar</summary><div class="muted" id="testlab-v23-pairs"></div></details>
                 <details><summary>Gol geçmişi toplama · son hata nedenleri</summary><div class="muted" id="testlab-v23-fetch-errors"></div></details>
                 <p class="muted" id="testlab-v23-cohort"></p>
                 <div class="test-lab-table-title">
@@ -3217,15 +3219,25 @@
                 daily_budget_exhausted:"Lab günlük bütçesi doldu",api_quota_reserve:"Ana API kota rezervi korunuyor",
                 api_quota_unknown:"API kalan kotası bilinmiyor",live_scan_priority:"Canlı tarama öncelikli",
                 rate_limited:"API hız sınırı; beklemede",provider_access:"API erişim / plan hatası",
-                provider_parameters:"API parametre hatası",cache_unreadable:"Önbellek okunamıyor",lab_disabled:"Lab kapalı"})[value] || value || "Hazırlama bekleniyor";
+                provider_parameters:"API parametre hatası",cache_unreadable:"Önbellek okunamıyor",lab_disabled:"Lab kapalı",
+                early_budget_exhausted:"Erken hazırlık alt bütçesi doldu",profile_retry_wait:"Hatalı istek yeniden deneme zamanını bekliyor",
+                profile_expired:"Profilin süresi dolmuş",system_stopped:"Ana şalter kapalı; arka plan hazırlığı durdu",
+                auto_scan_paused:"Otomatik tarama kapalı; arka plan hazırlığı durdu"})[value] || value || "Hazırlama bekleniyor";
         }
-        function renderV23ProfileStatus(cache, events) {
-            const target=document.getElementById("testlab-v23-cache"), errors=document.getElementById("testlab-v23-fetch-errors");
-            errors.replaceChildren();
+        function renderV23ProfileStatus(cache, events, coverage) {
+            const target=document.getElementById("testlab-v23-cache"), errors=document.getElementById("testlab-v23-fetch-errors"),
+                pairs=document.getElementById("testlab-v23-pairs"), entry=document.getElementById("testlab-v23-profile-coverage");
+            errors.replaceChildren();pairs.replaceChildren();
+            entry.textContent=coverage ? `Sinyal girişinde iki takım geçmişi bulunan: ${coverage.bothAtEntry}/${coverage.total} · Tek taraf: ${coverage.oneAtEntry} · İki taraf eksik: ${coverage.noneAtEntry} · Gol hesabı yapılabilen: ${coverage.judgedAtEntry} · Yeni veri hattıyla kaydedilen: ${coverage.newCollectorRecords}. Hazır takım sayısı onay sayısı değildir; sonradan gelen veri eski karara eklenmez.` : "Bu eski raporda giriş anındaki profil kapsamı ayrı ölçülmemiş.";
             if(!cache){target.textContent="Profil önbelleği hazırlanmayı bekliyor.";return;}
             const counts=cache.readyProfiles==null ? "Eski rapor: başarılı profil sayısı ayrı ölçülmemiş" :
                 `Hazır: ${cache.readyProfiles} · Kısmi: ${cache.partialProfiles||0} · Hatalı: ${cache.failedProfiles||0} · Süresi dolmuş: ${cache.expiredProfiles||0}`;
-            target.textContent=`${counts} · Sırada: ${cache.queued||0} · Lab ek API: ${cache.callsToday||0}/${cache.maxCallsPerDay||80} (UTC gün). Durum: ${!cache.enabled?"Toplama kapalı":cache.waitReason?v23ProfileState(cache.waitReason):cache.warming?"Toplanıyor":"Hazır / sonraki tarama bekleniyor"}. Events: ${events?.cachedFixtures||0} maç. Yalnız LAB; Telegram değişmez. Eski sinyaller sonradan doldurulmaz.`;
+            const early=cache.earlyCallsLimit==null ? "" : ` · Erken hazırlık: ${cache.earlyCallsToday||0}/${cache.earlyCallsLimit} · Geçişten korunan sınıflandırılmamış istek: ${cache.inheritedUnclassifiedCalls||0} (toplamın içinde)`;
+            target.textContent=`${counts} (takım profilleri) · Sırada: ${cache.queued||0} · Lab ek API: ${cache.callsToday||0}/${cache.maxCallsPerDay||80} (UTC gün)${early}. Durum: ${!cache.enabled?"Toplama kapalı":cache.waitReason?v23ProfileState(cache.waitReason):cache.warming?"Toplanıyor":"Boş aralıkta sonraki hazırlık turu bekleniyor"}. İzlenen maçlarda iki tarafı hazır: ${cache.readyFixturePairs??"-"}. Son hazırlık: ${cache.lastBatchAt?formatDateTime(cache.lastBatchAt):"henüz yok"} / ${cache.lastBatchCalls||0} istek. Events: ${events?.cachedFixtures||0} maç. Yalnız LAB; Telegram değişmez. Eski sinyaller sonradan doldurulmaz.`;
+            for(const fixture of cache.fixtures||[]){
+                const p=document.createElement("p");p.textContent=`${fixture.match} · Ev: ${v23ProfileState(fixture.home?.status)} · Deplasman: ${v23ProfileState(fixture.away?.status)} · ${fixture.closedAt?"Kaynak kayıtları oluştu; eski karar değiştirilmez":"Yeni kaynak sinyali öncesi hazırlık"}`;pairs.appendChild(p);
+            }
+            if(!pairs.children.length)pairs.textContent="Bu çalıştırmada izlenen yeni maç yok; eski sinyal profilleri yeniden doldurulmaz.";
             for(const error of cache.lastErrors||[]){
                 const p=document.createElement("p");p.textContent=`${formatDateTime(error.at)} · takım ${error.teamId??"-"} · ${error.phase==="previous_season"?"Önceki sezon (mevcut veri korunur)":"Güncel sezon"} · ${v23ProfileState(error.code)} · ${error.message||""}`;errors.appendChild(p);
             }
@@ -3243,7 +3255,7 @@
                 addRow(summary,[label,b.total,ky(b),b.pending,formatPercent(b.hitRate),formatPercent(b.roi)]);
             document.getElementById("testlab-v23-impact").textContent=`${e.sourceRecords} kaynak kaydı · ${e.uniqueEntries} tekil giriş · ${e.uniqueFixtures} maç · ${e.duplicateEntries} aynı giriş ortak · ${e.sharedFixtures} maç iki kaynakta. Farklı dakika/marketler ayrı tutulur.${data.disabledReason?" DURUM: "+data.disabledReason:""}`;
             document.getElementById("testlab-v23-cohort").textContent=`Yeni kontrol dönemi: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Eski kayıtlar yeniden değerlendirilmez. Gözlem etiketleri onay/red değildir; başarı veya nedensellik kanıtı değildir.`;
-            renderV23ProfileStatus(data.cache,data.eventCapture);
+            renderV23ProfileStatus(data.cache,data.eventCapture,data.profileCoverage);
             const container=document.getElementById("testlab-v23-controls");container.replaceChildren();
             const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
                 v23Source==="legacy"?[]:v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
@@ -3316,7 +3328,7 @@
             document.getElementById("testlab-v23-impact").textContent = data
                 ? `Ret ile elenen kayıp: ${data.avoidedLosses || 0} · Kaçırılan kazanan: ${data.missedWinners || 0} · Korunan aday: ${formatPercent(data.retainedPercent)} · Veri kapsamı: ${formatPercent(data.assessedCoverage)}${data.disabledReason ? " · DURUM: " + data.disabledReason : ""}`
                 : "İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.";
-            renderV23ProfileStatus(data?.cache,data?.eventCapture);
+            renderV23ProfileStatus(data?.cache,data?.eventCapture,data?.profileCoverage);
             const body = document.getElementById("testlab-v23-rows"); body.replaceChildren();
             for (const s of data?.signals || []) {
                 const a = s.assessment || {}, verdict = {approve:"Onay",reject:"Ret",insufficient:"Veri yetersiz"}[a.status] || "-";
