@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-sharing-2026-09-16';
+const BUILD_VERSION = 'mac-yakala-v23-datafix-2026-09-18';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -511,12 +511,28 @@ app.post('/api/sharing-settings', (req,res)=>{
 });
 
 const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fetchApi: apiGet,
+    maxCallsPerDay: process.env.DINO_V23_HISTORY_DAILY_LIMIT || 80,
+    maxCallsPerWarm: process.env.DINO_V23_HISTORY_BATCH_LIMIT || 6,
     // Low-priority warming only between scans; never await history on a signal.
     canFetch: () => DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED) && !isScanning && !isSignalResultRefreshing &&
         Number.isFinite(quotaRemaining) && quotaRemaining > SHADOW_MIN_QUOTA_REMAINING,
+    blockReason: () => !DINO_V23_SHADOW_ENABLED ? 'lab_disabled' : isScanning || isSignalResultRefreshing ? 'live_scan_priority' :
+        !Number.isFinite(quotaRemaining) ? 'api_quota_unknown' : quotaRemaining <= SHADOW_MIN_QUOTA_REMAINING ? 'api_quota_reserve' : null,
     logger: message => addSystemLog(message) });
 const v23GoalLab = new GoalLab({ filePath: V23_GOAL_HISTORY_FILE, cache: v23ProfileCache,
     enabled: DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED), logger: message => addSystemLog(message) });
+
+function v23GecmisKuyrugunaEkle(mac, priority = 50) {
+    // Lab-only, memory-only: never fetch/await here and never veto or mutate mac.
+    try {
+        if (!v23GoalLab.enabled || v23GoalLab.disabledReason) return;
+        const id = Number(mac?.fixture_id);
+        const waiting = (DINO_V21_SHADOW_ENABLED && !v21ShadowTracker.hasSignal(id, 'strong')) ||
+            (DINO_V22_SHADOW_ENABLED && !v22ShadowTracker.hasSignal(id, 'strong'));
+        if (waiting) v23ProfileCache.request(mac, { priority });
+        else v23ProfileCache.cancelFixture(id); // Frozen old decisions are never backfilled.
+    } catch { /* Lab collection must not interrupt active signals. */ }
+}
 
 const v20Engine = new V20Engine();
 
@@ -2766,18 +2782,6 @@ async function canliMaclariHazirla() {
             liveResponse.data?.response ||
             [];
 
-        // Warm early (5–24') too, before the existing 25–80' model gate.
-        // Queueing is memory-only and does not change that gate or fetch live stats.
-        if (DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED)) {
-            for (const fixture of allLiveFixtures) {
-                const minute = Number(fixture.fixture?.status?.elapsed);
-                if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25) continue;
-                v23ProfileCache.request({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
-                    league_id: fixture.league?.id, season: fixture.league?.season,
-                    home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id });
-            }
-        }
-
         for (const fixture of allLiveFixtures) {
             fixture._dino_fixture_request_started_at = liveFixtureRequestStartedAt;
             fixture._dino_fixture_received_at = liveFixtureReceivedAt;
@@ -2894,6 +2898,19 @@ async function canliMaclariHazirla() {
         );
 
         uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar);
+
+        // Small, low-priority early warm using ONLY already fetched coverage/odds.
+        // Never add API coverage/statistics calls for these 5–24' fixtures.
+        for (const fixture of allLiveFixtures) {
+            const minute = Number(fixture.fixture?.status?.elapsed);
+            const coverage = leagueCoverageCache.get(coverageKey(fixture.league?.id, fixture.league?.season));
+            const odds = oddsMap.get(Number(fixture.fixture?.id));
+            if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25 || coverage?.supported !== true ||
+                !odds || !Object.keys(odds).some(market => /_UST$/.test(market))) continue;
+            v23GecmisKuyrugunaEkle({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
+                league_id: fixture.league?.id, season: fixture.league?.season,
+                home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id }, 10);
+        }
 
         addSystemLog(
             `> 🧭 Coverage filtresi: ${statisticsCoverageSnapshot.supportedCount} destekli | ${statisticsCoverageSnapshot.unsupportedCount} desteklenmiyor | ${statisticsCoverageSnapshot.unknownCount} bilinmiyor.`
@@ -5054,6 +5071,7 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
             addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
         }
     }
+    v23GecmisKuyrugunaEkle(mac, 100);
     try {
         results.legacyV17 = legacyV17GolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
     } catch (error) {
@@ -5262,11 +5280,10 @@ async function botuCalistir() {
 
         const hazirlananMaclar = await canliMaclariHazirla();
         const canliMaclar = hazirlananMaclar.filter(hazirMacHalaUygunMu);
-        // Queue early live fixtures, including those not yet eligible at minute 25.
-        // Network work runs only after the scan. Cold-cache decisions stay insufficient.
+        // Event capture is independent of history availability. Cold-cache
+        // decisions stay insufficient; never wait for history before a signal.
         if (DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED)) {
             for (const mac of canliMaclar) {
-                v23ProfileCache.request(mac);
                 try { v23GoalLab.capture(mac,mac.observation_completed_at || new Date().toISOString()); } catch { /* Lab-only. */ }
             }
         }
@@ -5282,6 +5299,7 @@ async function botuCalistir() {
         // score_only modeli dosyada geriye dönük uyumluluk için kalır fakat
         // canlı sinyal hattında hiçbir zaman çağrılmaz.
         const macListesi = canliMaclar.filter(temelStatsTam);
+        for (const mac of macListesi) v23GecmisKuyrugunaEkle(mac, 50);
         const statsEksikMacSayisi = canliMaclar.length - macListesi.length;
 
         addSystemLog(
@@ -5414,6 +5432,7 @@ async function botuCalistir() {
                 dino,
                 liveOnlyDino
             });
+            if (initialTelegram.length || labGolgeOnAdayi) v23GecmisKuyrugunaEkle(mac, 100);
             const aktifFirsatVar = Array.isArray(firsatlar) && firsatlar.length > 0;
             if (!aktifFirsatVar && !labGolgeOnAdayi && !v20GolgeOnAdayi) {
                 addSystemLog(

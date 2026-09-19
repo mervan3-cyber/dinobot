@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const VERSION = 'v23-goal-profile-2026-09-14';
+const COLLECTOR_VERSION = 'v23-history-collector-2026-09-18';
 const DAY = 86400000;
 const finite = v => v === null || v === undefined || v === '' || typeof v === 'boolean' || !Number.isFinite(Number(v)) ? null : Number(v);
 const integer = v => { const n = finite(v); return n !== null && Number.isInteger(n) && n >= 0 ? n : null; };
@@ -28,9 +29,31 @@ function summarize(games) {
         failedToScoreRate: n ? games.filter(g => g.gf === 0).length / n : null,
         cleanSheetRate: n ? games.filter(g => g.ga === 0).length / n : null };
 }
+function safeMessage(value) {
+    return String(value || '').replace(/https?:\/\/\S+/gi, '[url]')
+        .replace(/(bearer\s+|(?:api[-_ ]?key|token|secret|password|authorization)[\s"':=]+)[^\s,;]+/gi, '$1[redacted]')
+        .replace(/[a-zA-Z0-9_-]{24,}/g, '[redacted]').replace(/[\r\n<>]/g, ' ').slice(0, 240);
+}
+function failure(error) {
+    const httpStatus = Number(error?.response?.status) || null;
+    const errors = error?.response?.data?.errors || error?.apiErrors;
+    const text = errors && typeof errors === 'object' ? Object.entries(errors).map(([key, value]) =>
+        /key|token|secret|password|authorization/i.test(key) ? `${key}: [redacted]` : `${key}: ${String(value)}`).join('; ') : error?.message;
+    const hint = `${Object.keys(errors || {}).join(' ')} ${text || ''}`;
+    const code = httpStatus === 429 || /rate.?limit|too many requests/i.test(hint) ? 'rate_limited' :
+        httpStatus === 401 || httpStatus === 403 || /api.?key|token|subscription|plan|access|permission/i.test(hint) ? 'provider_access' :
+        httpStatus === 400 || /parameter|field|invalid.*(from|to|season|team)|required/i.test(hint) ? 'provider_parameters' :
+        errors && Object.keys(errors).length ? 'provider_response_error' :
+        /ECONN|ETIMEDOUT|timeout/i.test(`${error?.code} ${hint}`) ? 'network_timeout' : 'profile_fetch_failed';
+    return { code, httpStatus, message: safeMessage(text || code) };
+}
+const enough = (games, side) => games.length >= 10 && games.filter(g => g.venue === side).length >= 5;
 function parseFixtures(payload, info) {
-    if (!Array.isArray(payload?.response) || Object.keys(payload?.errors || {}).length ||
-        Number(payload?.paging?.total || 1) > 1) throw new Error('incomplete_or_invalid_fixture_response');
+    if (Object.keys(payload?.errors || {}).length) {
+        const error = new Error('provider_response_error'); error.apiErrors = payload.errors; throw error;
+    }
+    if (!Array.isArray(payload?.response) || Number(payload?.paging?.total || 1) > 1)
+        throw new Error('incomplete_or_invalid_fixture_response');
     const games = new Map();
     for (const row of payload.response) {
         // Entire response must belong to the requested team/competition/season.
@@ -73,10 +96,13 @@ function buildProfile(games, info, fetchedAt) {
 
 class GoalProfileCache {
     constructor({ filePath, fetchApi, canFetch = () => true, logger = () => {}, now = Date.now,
-        maxCallsPerDay = 80, maxCallsPerWarm = 12, maxEntries = 600 }) {
-        Object.assign(this, { filePath, fetchApi, canFetch, logger, now, maxCallsPerDay, maxCallsPerWarm, maxEntries });
-        this.data = { version: VERSION, day: null, calls: 0, cooldownUntil: 0, entries: {} };
+        maxCallsPerDay = 80, maxCallsPerWarm = 12, maxEntries = 600, blockReason = () => null }) {
+        Object.assign(this, { filePath, fetchApi, canFetch, logger, now, maxEntries, blockReason });
+        this.maxCallsPerDay = Math.max(1, Math.min(1000, integer(maxCallsPerDay) || 80));
+        this.maxCallsPerWarm = Math.max(1, Math.min(12, integer(maxCallsPerWarm) || 12));
+        this.data = { version: VERSION, collectorVersion: COLLECTOR_VERSION, day: null, calls: 0, earlyCalls: 0, cooldownUntil: 0, entries: {} };
         this.queue = new Map(); this.running = false; this.disabled = false;
+        this.droppedRequests = 0; this.prunedRequests = 0;
     }
     load() {
         if (!fs.existsSync(this.filePath)) return;
@@ -84,18 +110,51 @@ class GoalProfileCache {
             const data = JSON.parse(fs.readFileSync(this.filePath,'utf8'));
             if (data.version !== VERSION || !data.entries || typeof data.entries !== 'object' || Array.isArray(data.entries) ||
                 integer(data.calls) === null || finite(data.cooldownUntil) === null) throw Error('cache_schema');
-            this.data = data;
+            if (Object.values(data.entries).some(e => !e || !Array.isArray(e.games) || !iso(e.fetchedAt) || finite(e.expiresAt) === null))
+                throw Error('cache_entry_schema');
+            // Keep successful legacy cache data and today's consumed quota. Old
+            // failures are retryable with the repaired query; history is untouched.
+            if (data.collectorVersion !== COLLECTOR_VERSION) for (const e of Object.values(data.entries)) {
+                if (!['ok','partial'].includes(e.status)) { e.expiresAt = 0; e.retryAt = 0; }
+                else if (e.games.length < 10 || !enough(e.games, 'home') || !enough(e.games, 'away')) {
+                    // The old collector could incorrectly cache incomplete data as
+                    // complete for 12 hours. Keep that evidence, but allow repair.
+                    e.status = 'partial'; e.priorPending = true; e.retryAt = 0;
+                }
+            }
+            this.data = { ...data, collectorVersion: COLLECTOR_VERSION, earlyCalls: integer(data.earlyCalls) ?? data.calls };
         } catch { this.disabled = true; this.logger('> ⚠️ V23 profil önbelleği okunamadı; dosya korunuyor, V23 veri toplama kapalı.'); }
     }
     save() { atomicJson(this.filePath, this.data); }
-    request(mac) {
+    resetDay() {
+        const day = new Date(this.now()).toISOString().slice(0,10);
+        if (this.data.day !== day) { this.data.day = day; this.data.calls = 0; this.data.earlyCalls = 0; }
+    }
+    pruneQueue() {
+        for (const [key, info] of this.queue) {
+            const age = this.now() - Date.parse(info.kickoff);
+            if (age < 0 || age > 6*3600000) { this.queue.delete(key); this.prunedRequests++; }
+        }
+    }
+    cancelFixture(fixtureId) {
+        for (const [key, info] of this.queue) if (info.fixtureId === Number(fixtureId)) this.queue.delete(key);
+    }
+    request(mac, { priority = 50 } = {}) {
         if (this.disabled) return;
+        this.pruneQueue();
         for (const side of ['home','away']) {
             const info = identity(mac, side);
             if (!info || Date.parse(info.kickoff) > this.now() || this.now() - Date.parse(info.kickoff) > 6*3600000) continue;
             const key = keyFor(info), cached = this.data.entries[key];
-            if (cached && cached.expiresAt > this.now()) continue;
-            if (this.queue.size < 200) this.queue.set(key, info);
+            if (cached && cached.expiresAt > this.now() && !cached.priorPending) continue;
+            const previous = this.queue.get(key);
+            const work = { ...info, priority: Math.max(previous?.priority || 0, finite(priority) || 0), enqueuedAt: previous?.enqueuedAt || this.now() };
+            if (!previous && this.queue.size >= 200) {
+                const lowest = [...this.queue].sort((a,b) => a[1].priority-b[1].priority || b[1].enqueuedAt-a[1].enqueuedAt)[0];
+                if (lowest[1].priority >= work.priority) { this.droppedRequests++; continue; }
+                this.queue.delete(lowest[0]); this.droppedRequests++;
+            }
+            this.queue.set(key, work);
         }
     }
     get(mac, side, capturedAt) {
@@ -103,66 +162,94 @@ class GoalProfileCache {
         const info = identity(mac,side);
         if (!info) return { status: 'identity_or_kickoff_missing', profile: null };
         const entry = this.data.entries[keyFor(info)];
-        if (!entry) return { status: 'profile_not_ready', profile: null };
+        if (!entry) return { status: this.waitReason() || 'profile_not_ready', profile: null };
         // A profile fetched after the signal can never be backfilled into that decision.
         if (entry.expiresAt <= Date.parse(capturedAt) || Date.parse(entry.fetchedAt) > Date.parse(capturedAt))
             return { status: 'profile_not_available_at_signal', profile: null };
-        if (entry.status !== 'ok') return { status: entry.status, profile: null };
-        return { status: 'ok', profile: buildProfile(entry.games, info, entry.fetchedAt) };
+        if (!['ok','partial'].includes(entry.status)) return { status: entry.status, profile: null, error: entry.lastError || null };
+        return { status: entry.status, profile: buildProfile(entry.games, info, entry.fetchedAt), error: entry.lastError || null };
+    }
+    waitReason() {
+        if (this.disabled) return 'cache_unreadable';
+        if (this.now() < this.data.cooldownUntil) return this.data.cooldownReason || 'rate_limited';
+        if (this.data.day === new Date(this.now()).toISOString().slice(0,10) && this.data.calls >= this.maxCallsPerDay) return 'daily_budget_exhausted';
+        return this.blockReason() || null;
+    }
+    trim() {
+        const keys = Object.keys(this.data.entries).sort((a,b) => this.data.entries[a].expiresAt - this.data.entries[b].expiresAt);
+        for (const key of keys.slice(0, Math.max(0, keys.length-this.maxEntries))) delete this.data.entries[key];
     }
     async warm() {
         if (this.running || this.disabled) return;
         this.running = true;
         try {
+            this.resetDay(); this.pruneQueue();
             let calls = 0;
-            for (const [key, info] of this.queue) {
-                const day = new Date(this.now()).toISOString().slice(0,10);
-                if (this.data.day !== day) { this.data.day = day; this.data.calls = 0; }
-                if (!this.canFetch() || this.now() < this.data.cooldownUntil ||
-                    this.data.calls >= this.maxCallsPerDay || calls >= this.maxCallsPerWarm) break;
-                this.queue.delete(key);
-                if (this.now() - Date.parse(info.kickoff) > 6*3600000) continue;
-                if (this.data.entries[key]?.expiresAt > this.now()) continue;
-                this.data.calls++; calls++;
-                this.save(); // Persist the quota counter before making a request, including across restarts.
-                let entry;
-                try {
-                    const query = new URLSearchParams({ team: info.teamId, league: info.leagueId, season: info.season,
-                        status: 'FT', to: info.kickoff.slice(0,10), timezone: 'UTC' });
-                    const response = await this.fetchApi(`/fixtures?${query}`, { timeout: 6000, dinoMaxAttempts: 1 });
-                    let games = parseFixtures(response.data, info);
-                    // Early-season samples may be too small. At most one prior-season
-                    // request, same competition, still strictly before this kickoff.
-                    const enough = rows => rows.length >= 10 && rows.filter(g=>g.venue==='home').length >= 5 && rows.filter(g=>g.venue==='away').length >= 5;
-                    if (!enough(games) && this.canFetch() && this.data.calls < this.maxCallsPerDay && calls < this.maxCallsPerWarm) {
-                        this.data.calls++; calls++; this.save();
-                        query.set('season',String(info.season-1));
-                        const prior = await this.fetchApi(`/fixtures?${query}`, { timeout: 6000, dinoMaxAttempts: 1 });
-                        const previous = parseFixtures(prior.data,{...info,season:info.season-1});
-                        const unique = new Map([...previous,...games].map(g=>[g.id,g]));
-                        games = [...unique.values()].sort((a,b)=>b.at.localeCompare(a.at)||b.id-a.id);
+            const allowed = info => this.canFetch() && this.now() >= this.data.cooldownUntil &&
+                this.data.calls < this.maxCallsPerDay && calls < this.maxCallsPerWarm &&
+                (info.priority >= 50 || this.data.earlyCalls < Math.floor(this.maxCallsPerDay/4));
+            const work = [...this.queue].sort((a,b) => b[1].priority-a[1].priority || a[1].enqueuedAt-b[1].enqueuedAt);
+            for (const [key, info] of work) {
+                if (!this.queue.has(key)) continue;
+                let entry = this.data.entries[key];
+                if (entry?.expiresAt > this.now() && !entry.priorPending) { this.queue.delete(key); continue; }
+                if (entry?.retryAt > this.now()) continue;
+                if (!allowed(info)) continue;
+                // Keep work queued until complete; an interrupted background batch
+                // must not turn a deferred previous-season request into a 12h hit.
+                for (let step = 0; step < 2 && allowed(info); step++) {
+                    const prior = entry?.expiresAt > this.now() && entry?.priorPending;
+                    const season = info.season - (prior ? 1 : 0);
+                    this.resetDay(); this.data.calls++; calls++;
+                    if (info.priority < 50) this.data.earlyCalls++;
+                    this.save();
+                    try {
+                        const query = new URLSearchParams({ team: info.teamId, league: info.leagueId, season,
+                            status: 'FT', from: new Date(Date.parse(info.kickoff)-365*DAY).toISOString().slice(0,10),
+                            to: info.kickoff.slice(0,10), timezone: 'UTC' });
+                        const response = await this.fetchApi(`/fixtures?${query}`, { timeout: 6000, dinoMaxAttempts: 1 });
+                        const fetched = parseFixtures(response.data, { ...info, season });
+                        const games = prior ? [...new Map([...fetched,...entry.games].map(g=>[g.id,g])).values()]
+                            .sort((a,b)=>b.at.localeCompare(a.at)||b.id-a.id) : fetched;
+                        const priorPending = !prior && !enough(games, info.side);
+                        entry = { status: enough(games, info.side) ? 'ok' : 'partial', games, side: info.side,
+                            fetchedAt: new Date(this.now()).toISOString(), expiresAt: this.now()+12*3600000,
+                            priorPending, priorCompleted: Boolean(prior), retryAt: 0, attempts: 0, lastError: null };
+                    } catch (error) {
+                        const detail = { ...failure(error), at: new Date(this.now()).toISOString(), phase: prior ? 'previous_season' : 'current_season' };
+                        const attempts = (entry?.attempts || 0)+1;
+                        const permanent = ['provider_access','provider_parameters'].includes(detail.code);
+                        const wait = permanent || attempts >= 3 ? 12*3600000 : detail.code === 'rate_limited' ? 30*60000 : Math.min(30, 2**attempts)*60000;
+                        if (detail.code === 'rate_limited' || (!prior && permanent)) {
+                            this.data.cooldownUntil = this.now()+30*60000; this.data.cooldownReason = detail.code;
+                        }
+                        if (prior) entry = { ...entry, priorPending: true, retryAt: this.now()+wait, attempts, lastError: detail };
+                        else entry = { status: detail.code === 'rate_limited' ? 'rate_limited' : 'profile_fetch_failed', games: [],
+                            fetchedAt: new Date(this.now()).toISOString(), expiresAt: this.now()+wait, retryAt: this.now()+wait,
+                            priorPending: false, attempts, lastError: detail };
+                        this.logger(`> ⚠️ V23 LAB geçmişi (takım ${info.teamId}, ${detail.phase}): ${detail.code} ${detail.httpStatus || ''} ${detail.message}. Ana sinyal değişmedi.`);
                     }
-                    entry = { status: 'ok', games,
-                        fetchedAt: new Date(this.now()).toISOString(), expiresAt: this.now() + 12*3600000 };
-                } catch (error) {
-                    const status = Number(error?.response?.status);
-                    if (status === 429) this.data.cooldownUntil = this.now() + 30*60000;
-                    entry = { status: status === 429 ? 'rate_limited' : 'profile_fetch_failed', games: [],
-                        fetchedAt: new Date(this.now()).toISOString(), expiresAt: this.now() + 30*60000 };
-                    this.logger(`> ⚠️ V23 gol geçmişi alınamadı (takım ${info.teamId}); mevcut sinyaller etkilenmedi.`);
+                    this.data.entries[key] = entry; this.trim(); this.save();
+                    if (!entry.priorPending) { this.queue.delete(key); break; }
+                    if (entry.retryAt > this.now()) break;
                 }
-                this.data.entries[key] = entry;
-                const keys = Object.keys(this.data.entries).sort((a,b) => this.data.entries[a].expiresAt - this.data.entries[b].expiresAt);
-                for (const old of keys.slice(0, Math.max(0, keys.length - this.maxEntries))) delete this.data.entries[old];
-                this.save();
             }
         } catch {
             this.disabled = true;
             this.logger('> ⚠️ V23 profil önbelleği yazılamadı; veri toplama durdu, mevcut modeller etkilenmedi.');
         } finally { this.running = false; }
     }
-    metadata() { return { enabled: !this.disabled, cachedTeams: Object.keys(this.data.entries).length,
+    metadata() {
+        const entries = Object.values(this.data.entries), current = entries.filter(e=>e.expiresAt>this.now());
+        const lastErrors = Object.entries(this.data.entries).filter(([,e])=>e.lastError)
+            .sort((a,b)=>b[1].lastError.at.localeCompare(a[1].lastError.at)).slice(0,5)
+            .map(([key,e])=>({ teamId:Number(key.split(':')[1]), ...e.lastError }));
+        return { enabled: !this.disabled, collectorVersion: COLLECTOR_VERSION, cachedTeams: entries.length,
+        readyProfiles: current.filter(e=>e.status==='ok').length, partialProfiles: current.filter(e=>e.status==='partial').length,
+        failedProfiles: current.filter(e=>!['ok','partial'].includes(e.status)).length, expiredProfiles: entries.length-current.length,
+        droppedRequests: this.droppedRequests, prunedRequests: this.prunedRequests, lastErrors,
+        waitReason: this.waitReason(), cooldownUntil: this.data.cooldownUntil || null, earlyCallsToday: this.data.earlyCalls,
         queued: this.queue.size, callsDayUTC: this.data.day, callsToday: this.data.calls,
         maxCallsPerDay: this.maxCallsPerDay, warming: this.running }; }
 }
-module.exports = { VERSION, DAY, finite, integer, iso, atomicJson, identity, parseFixtures, summarize, buildProfile, GoalProfileCache };
+module.exports = { VERSION, COLLECTOR_VERSION, DAY, finite, integer, iso, atomicJson, identity, parseFixtures, summarize, buildProfile, GoalProfileCache, failure, safeMessage };

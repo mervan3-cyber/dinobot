@@ -59,8 +59,10 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(api.signalTracker.data.signals[1].fixtureId,2305);
     assert(api.v23GoalLab.data.signals.every(s=>s.telegramMessageId===null),'V23 itself never sends');
     api.v23GoalLab.observe=()=>{throw Error('V23 isolated failure');};
+    api.v23ProfileCache.request=()=>{throw Error('Lab history queue failure must not stop Telegram');};
     m=match(2304);api.setup(m);await api.botuCalistir();assert(api.v21ShadowTracker.hasSignal(2304,'strong'));
     assert(api.v22ShadowTracker.hasSignal(2304,'strong'),'Other labs survive V23 failure');
+    assert.equal(api.signalTracker.data.signals.length,3,'History and V23 failures cannot veto active signals');
     const comparison=(await get('/api/test-lab-comparison',{date:'2026-09-15'})).body;
     assert.equal(comparison.v23Goal.summary.overall.total,3,'TSI day is UTC+3');
     assert.equal(comparison.v23Goal.experiment.sources.v21.baseline.total,1);

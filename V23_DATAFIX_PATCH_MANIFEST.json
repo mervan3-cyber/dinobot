@@ -1,0 +1,30 @@
+{
+  "build": "mac-yakala-v23-datafix-2026-09-18",
+  "version": "2.5.1",
+  "generatedAtUtc": "2026-09-19T08:24:28.4983890Z",
+  "mode": "delta-update-lab-only-no-signal-policy-changes",
+  "requiresBaseVersion": "2.5.0",
+  "baseArchiveSha256": "fe46b4f44d147ebac35200d4462281cc6bb46de9b1a47571566dfa7d5b79b08d",
+  "files": {
+    "server.js": "003caeaf85adebe6a3ea467a578f0d2cd9631d72e91215327dd5ba4205d09492",
+    "v23_goal_profile.js": "efedba48f4e263fbaa5b6b794786934ebe968c94899bc2698db2cfebe65ea29f",
+    "v23_goal_lab.js": "56f71d706c4e812faf0263fec9d293c13ec1495e40899533fddd0bc41ee93487",
+    "public/index.html": "4144db84cca015e83d60ced9d2939d8ec0af48d72f83d0833e05bacf18a3574d",
+    "index.html": "4144db84cca015e83d60ced9d2939d8ec0af48d72f83d0833e05bacf18a3574d",
+    "v23_server_flow.test.js": "0225aa620d7f501d0208986d1bdab50d31c4c465884ffd12ee9230d7faf12ef1",
+    "v23_panel.test.js": "846a105127d88db9d7721bcecf4bd63673d9bc2a38e2233d3bd0a13637a6fc7b",
+    "v23_history_collector.test.js": "019039be785f200d52ce861c1b03a60ec006ceb1c79c2735b1555c7b5ba5b599",
+    "package.json": "8c589f00ac5b03b3d91b935c968bf7e914081a1f67a0f98fda741657aec37eb2",
+    "package-lock.json": "afb340d2f9e56d37c03b68e7425b7e2b303cb743675acd1735b5abf97bd7f032",
+    "V23_VERI_DUZELTMESI_2026-09-18.md": "c93cb4e5398be064f8ca35b9c5532a204bb80d211cc219b3da638fb61e0beddc",
+    ".env.v23.history.example": "a6bba289fb8915859c81cdc1a71510a9cf53639ff71844d7d8e5ff284e201b67"
+  },
+  "exclusions": [
+    "mac_yakala_telegram.js",
+    ".env",
+    "mutable histories",
+    "API caches",
+    "model artifacts",
+    "node_modules"
+  ]
+}

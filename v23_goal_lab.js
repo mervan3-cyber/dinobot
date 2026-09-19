@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('fs');
 const { SignalTracker, calculateMarketResult, profitForResult } = require('./signal_tracker');
-const { atomicJson, integer } = require('./v23_goal_profile');
+const { atomicJson, integer, COLLECTOR_VERSION } = require('./v23_goal_profile');
 const { VERSION, POLICY, evaluate, baselineCheck } = require('./v23_goal_policy');
 const baseline = require('./v21_tariff');
 const v22 = require('./v22_tariff');
@@ -81,6 +81,8 @@ class GoalLab extends SignalTracker {
         }
         assessment.reasonLabels = assessment.reasons.map(code => LABELS[code] || code);
         assessment.noteLabels = assessment.notes.map(code => LABELS[code] || code);
+        assessment.collectorVersion = COLLECTOR_VERSION;
+        assessment.profileDiagnostics = { home: homeEntry?.error || null, away: awayEntry?.error || null };
         let audit;
         try {
             this.capture(mac,signal.sentAt);

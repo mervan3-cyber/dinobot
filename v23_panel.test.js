@@ -69,3 +69,8 @@ context.setV23Source('all');context.renderV23GoalLab({...data,experiment:compari
 assert.equal(el('testlab-v23-controls').children.length,2,'Empty arms remain visible');
 assert.match(el('testlab-v23-cohort').textContent,/ilk yeni sinyal bekleniyor/);
 console.log('V23 panel DOM: legacy compatibility, independent source/control metrics, reasons and measured values, safe text, A/B/C filter, source/date exports and empty states passed.');
+context.renderV23ProfileStatus({enabled:true,readyProfiles:2,partialProfiles:1,failedProfiles:3,expiredProfiles:5,queued:4,callsToday:80,maxCallsPerDay:80,waitReason:'daily_budget_exhausted',lastErrors:[{teamId:1,at:'2026-09-18T10:00:00Z',phase:'current_season',code:'provider_parameters',message:'<img src=x> from required'}]},{});
+assert.match(el('testlab-v23-cache').textContent,/Hazır: 2 · Kısmi: 1 · Hatalı: 3/);
+assert.match(el('testlab-v23-cache').textContent,/Lab günlük bütçesi doldu/);
+assert.match(el('testlab-v23-fetch-errors').textContent,/from required/);
+assert.equal(el('testlab-v23-fetch-errors').querySelectorAll('img').length,0);
