@@ -1808,6 +1808,7 @@
                 <div class="table-wrap"><table><thead><tr><th>Grup</th><th>Aday</th><th>K / Y</th><th>Bekleyen</th><th>İsabet</th><th>Teorik ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
                 <p class="muted" id="testlab-v23-impact">İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.</p>
                 <p class="muted" id="testlab-v23-cache">Profil önbelleği hazırlanmayı bekliyor.</p>
+                <details><summary>Gol geçmişi toplama · son hata nedenleri</summary><div class="muted" id="testlab-v23-fetch-errors"></div></details>
                 <p class="muted" id="testlab-v23-cohort"></p>
                 <div class="test-lab-table-title">
                     <label for="testlab-v23-source">Kaynak / deney grubu</label>
@@ -3210,6 +3211,26 @@
             return parts.join(" · ");
         }
 
+        function v23ProfileState(value) {
+            return ({ok:"Hazır",partial:"Kısmi geçmiş",profile_not_ready:"Sırada / henüz hazır değil",
+                profile_not_available_at_signal:"Sinyal anında hazır değildi",profile_fetch_failed:"Geçmiş isteği başarısız",
+                daily_budget_exhausted:"Lab günlük bütçesi doldu",api_quota_reserve:"Ana API kota rezervi korunuyor",
+                api_quota_unknown:"API kalan kotası bilinmiyor",live_scan_priority:"Canlı tarama öncelikli",
+                rate_limited:"API hız sınırı; beklemede",provider_access:"API erişim / plan hatası",
+                provider_parameters:"API parametre hatası",cache_unreadable:"Önbellek okunamıyor",lab_disabled:"Lab kapalı"})[value] || value || "Hazırlama bekleniyor";
+        }
+        function renderV23ProfileStatus(cache, events) {
+            const target=document.getElementById("testlab-v23-cache"), errors=document.getElementById("testlab-v23-fetch-errors");
+            errors.replaceChildren();
+            if(!cache){target.textContent="Profil önbelleği hazırlanmayı bekliyor.";return;}
+            const counts=cache.readyProfiles==null ? "Eski rapor: başarılı profil sayısı ayrı ölçülmemiş" :
+                `Hazır: ${cache.readyProfiles} · Kısmi: ${cache.partialProfiles||0} · Hatalı: ${cache.failedProfiles||0} · Süresi dolmuş: ${cache.expiredProfiles||0}`;
+            target.textContent=`${counts} · Sırada: ${cache.queued||0} · Lab ek API: ${cache.callsToday||0}/${cache.maxCallsPerDay||80} (UTC gün). Durum: ${!cache.enabled?"Toplama kapalı":cache.waitReason?v23ProfileState(cache.waitReason):cache.warming?"Toplanıyor":"Hazır / sonraki tarama bekleniyor"}. Events: ${events?.cachedFixtures||0} maç. Yalnız LAB; Telegram değişmez. Eski sinyaller sonradan doldurulmaz.`;
+            for(const error of cache.lastErrors||[]){
+                const p=document.createElement("p");p.textContent=`${formatDateTime(error.at)} · takım ${error.teamId??"-"} · ${error.phase==="previous_season"?"Önceki sezon (mevcut veri korunur)":"Güncel sezon"} · ${v23ProfileState(error.code)} · ${error.message||""}`;errors.appendChild(p);
+            }
+            if(!errors.children.length)errors.textContent="Kaydedilmiş geçmiş isteği hatası yok.";
+        }
         function renderV23Experiment(data) {
             const e=data.experiment, verdicts={approve:"Onay verirdi",reject:"Reddederdi",insufficient:"Veri yetersiz",observed:"Yalnız gözlem"};
             const make=(tag,value)=>{const el=document.createElement(tag);if(value!=null)el.textContent=value;return el;};
@@ -3222,7 +3243,7 @@
                 addRow(summary,[label,b.total,ky(b),b.pending,formatPercent(b.hitRate),formatPercent(b.roi)]);
             document.getElementById("testlab-v23-impact").textContent=`${e.sourceRecords} kaynak kaydı · ${e.uniqueEntries} tekil giriş · ${e.uniqueFixtures} maç · ${e.duplicateEntries} aynı giriş ortak · ${e.sharedFixtures} maç iki kaynakta. Farklı dakika/marketler ayrı tutulur.${data.disabledReason?" DURUM: "+data.disabledReason:""}`;
             document.getElementById("testlab-v23-cohort").textContent=`Yeni kontrol dönemi: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Eski kayıtlar yeniden değerlendirilmez. Gözlem etiketleri onay/red değildir; başarı veya nedensellik kanıtı değildir.`;
-            document.getElementById("testlab-v23-cache").textContent=`Profil: ${data.cache?.cachedTeams||0} takım/gün · ek API ${data.cache?.callsToday||0}/${data.cache?.maxCallsPerDay||80}. Events: ${data.eventCapture?.cachedFixtures||0} maç · ek API 0. Yeniden başlatma sonrası olay pencereleri yeniden birikir; eski kararlar değişmez.`;
+            renderV23ProfileStatus(data.cache,data.eventCapture);
             const container=document.getElementById("testlab-v23-controls");container.replaceChildren();
             const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
                 v23Source==="legacy"?[]:v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
@@ -3262,6 +3283,8 @@
                 if(s.audit) {
                     const details=make("details"),counts={};for(const c of s.audit.controls)counts[c.status]=(counts[c.status]||0)+1;
                     details.appendChild(make("summary",`${counts.approve||0} onay · ${counts.reject||0} ret · ${counts.observed||0} gözlem · ${counts.insufficient||0} yetersiz`));
+                    if(a.profileStatus)details.appendChild(make("p",`Girişte gol geçmişi: ev ${v23ProfileState(a.profileStatus.home)} / deplasman ${v23ProfileState(a.profileStatus.away)}`));
+                    for(const [side,error] of Object.entries(a.profileDiagnostics||{}))if(error)details.appendChild(make("p",`${side==="home"?"Ev":"Deplasman"}: ${v23ProfileState(error.code)} · ${error.message||""}`));
                     for(const c of s.audit.controls) {
                         const p=make("p",`${c.label}: ${verdicts[c.status]||c.status}. ${(c.reasonLabels||[]).join("; ")}`);p.style.maxWidth="480px";p.style.whiteSpace="normal";
                         const measurement=v23Measurement(c);if(measurement)p.appendChild(make("small"," "+measurement));details.appendChild(p);
@@ -3293,9 +3316,7 @@
             document.getElementById("testlab-v23-impact").textContent = data
                 ? `Ret ile elenen kayıp: ${data.avoidedLosses || 0} · Kaçırılan kazanan: ${data.missedWinners || 0} · Korunan aday: ${formatPercent(data.retainedPercent)} · Veri kapsamı: ${formatPercent(data.assessedCoverage)}${data.disabledReason ? " · DURUM: " + data.disabledReason : ""}`
                 : "İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.";
-            document.getElementById("testlab-v23-cache").textContent = data?.cache
-                ? `Önbellek: ${data.cache.cachedTeams} takım/gün · Sırada: ${data.cache.queued} · Ek API: ${data.cache.callsToday}/${data.cache.maxCallsPerDay} (UTC gün) · ${data.cache.enabled ? "Profil toplama açık" : "Profil toplama kapalı"} · İlk açılışta hazır olmayan veriler sonradan karara eklenmez.`
-                : "Profil önbelleği hazırlanmayı bekliyor.";
+            renderV23ProfileStatus(data?.cache,data?.eventCapture);
             const body = document.getElementById("testlab-v23-rows"); body.replaceChildren();
             for (const s of data?.signals || []) {
                 const a = s.assessment || {}, verdict = {approve:"Onay",reject:"Ret",insufficient:"Veri yetersiz"}[a.status] || "-";
