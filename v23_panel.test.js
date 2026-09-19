@@ -74,3 +74,16 @@ assert.match(el('testlab-v23-cache').textContent,/Hazır: 2 · Kısmi: 1 · Hata
 assert.match(el('testlab-v23-cache').textContent,/Lab günlük bütçesi doldu/);
 assert.match(el('testlab-v23-fetch-errors').textContent,/from required/);
 assert.equal(el('testlab-v23-fetch-errors').querySelectorAll('img').length,0);
+context.renderV23ProfileStatus({enabled:true,readyProfiles:3,partialProfiles:0,queued:37,callsToday:92,maxCallsPerDay:300,
+    earlyCallsToday:0,earlyCallsLimit:75,inheritedUnclassifiedCalls:92,readyFixturePairs:1,lastErrors:[],
+    fixtures:[{match:'<img src=x> Home - Away',home:{status:'ok'},away:{status:'profile_not_ready'},closedAt:null}]},{},
+    {total:15,bothAtEntry:2,oneAtEntry:1,noneAtEntry:12,judgedAtEntry:1,newCollectorRecords:3});
+assert.match(el('testlab-v23-cache').textContent,/Erken hazırlık: 0\/75/);
+assert.match(el('testlab-v23-cache').textContent,/iki tarafı hazır: 1/);
+assert.match(el('testlab-v23-profile-coverage').textContent,/iki takım geçmişi bulunan: 2\/15/);
+assert.match(el('testlab-v23-profile-coverage').textContent,/Gol hesabı yapılabilen: 1/);
+assert.match(el('testlab-v23-pairs').textContent,/Ev: Hazır/);
+assert.equal(el('testlab-v23-pairs').querySelectorAll('img').length,0);
+context.renderV23ProfileStatus({enabled:true,waitReason:'early_budget_exhausted'},{});
+assert.match(el('testlab-v23-cache').textContent,/Erken hazırlık alt bütçesi doldu/);
+assert.match(el('testlab-v23-profile-coverage').textContent,/eski raporda/);

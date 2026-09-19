@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v23-datafix-2026-09-18';
+const BUILD_VERSION = 'mac-yakala-v23-lab-ready-2026-09-19';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -517,6 +517,7 @@ const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fe
     canFetch: () => DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED) && !isScanning && !isSignalResultRefreshing &&
         Number.isFinite(quotaRemaining) && quotaRemaining > SHADOW_MIN_QUOTA_REMAINING,
     blockReason: () => !DINO_V23_SHADOW_ENABLED ? 'lab_disabled' : isScanning || isSignalResultRefreshing ? 'live_scan_priority' :
+        !state.isRunning ? 'system_stopped' : !state.autoScanEnabled ? 'auto_scan_paused' :
         !Number.isFinite(quotaRemaining) ? 'api_quota_unknown' : quotaRemaining <= SHADOW_MIN_QUOTA_REMAINING ? 'api_quota_reserve' : null,
     logger: message => addSystemLog(message) });
 const v23GoalLab = new GoalLab({ filePath: V23_GOAL_HISTORY_FILE, cache: v23ProfileCache,
@@ -532,6 +533,34 @@ function v23GecmisKuyrugunaEkle(mac, priority = 50) {
         if (waiting) v23ProfileCache.request(mac, { priority });
         else v23ProfileCache.cancelFixture(id); // Frozen old decisions are never backfilled.
     } catch { /* Lab collection must not interrupt active signals. */ }
+}
+
+function v23ErkenGecmisHazirla(fixtures, oddsMap) {
+    try {
+        if (!v23GoalLab.enabled || v23GoalLab.disabledReason) return;
+        for (const fixture of fixtures) {
+            const minute = Number(fixture.fixture?.status?.elapsed);
+            const coverage = leagueCoverageCache.get(coverageKey(fixture.league?.id, fixture.league?.season));
+            const odds = oddsMap.get(Number(fixture.fixture?.id));
+            // Unknown cached coverage must not block the first match of a league.
+            // This queues historical FT fixtures only; live signal coverage gates
+            // remain unchanged, and no extra coverage/live-stat call is made.
+            if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25 || coverage?.supported === false ||
+                !odds || !Object.keys(odds).some(market => /_UST$/.test(market))) continue;
+            v23GecmisKuyrugunaEkle({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
+                league_id: fixture.league?.id, season: fixture.league?.season,
+                mac_isim: `${fixture.teams?.home?.name || '?'} - ${fixture.teams?.away?.name || '?'}`,
+                home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id }, 10);
+        }
+    } catch { /* A history preparation error never interrupts active scanning. */ }
+}
+
+async function v23ArkaPlanGecmisTurunuCalistir() {
+    try {
+        if (!state.isRunning || !state.autoScanEnabled || isScanning || isSignalResultRefreshing ||
+            !v23GoalLab.enabled || v23GoalLab.disabledReason) return;
+        await v23ProfileCache.warm({canContinue:()=>state.isRunning && state.autoScanEnabled && !v23GoalLab.disabledReason});
+    } catch { /* Lab-only; timer failures never affect Telegram. */ }
 }
 
 const v20Engine = new V20Engine();
@@ -2899,18 +2928,8 @@ async function canliMaclariHazirla() {
 
         uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar);
 
-        // Small, low-priority early warm using ONLY already fetched coverage/odds.
-        // Never add API coverage/statistics calls for these 5–24' fixtures.
-        for (const fixture of allLiveFixtures) {
-            const minute = Number(fixture.fixture?.status?.elapsed);
-            const coverage = leagueCoverageCache.get(coverageKey(fixture.league?.id, fixture.league?.season));
-            const odds = oddsMap.get(Number(fixture.fixture?.id));
-            if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25 || coverage?.supported !== true ||
-                !odds || !Object.keys(odds).some(market => /_UST$/.test(market))) continue;
-            v23GecmisKuyrugunaEkle({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
-                league_id: fixture.league?.id, season: fixture.league?.season,
-                home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id }, 10);
-        }
+        // Only uses existing fixture/odds responses; never awaits history here.
+        v23ErkenGecmisHazirla(allLiveFixtures, oddsMap);
 
         addSystemLog(
             `> 🧭 Coverage filtresi: ${statisticsCoverageSnapshot.supportedCount} destekli | ${statisticsCoverageSnapshot.unsupportedCount} desteklenmiyor | ${statisticsCoverageSnapshot.unknownCount} bilinmiyor.`
@@ -7675,6 +7694,11 @@ app.listen(
                 SIGNAL_RESULT_REFRESH_MS
             );
         }
+
+        // Drain bounded history batches between 10-minute scans, not just once
+        // at scan end. The pump skips stopped/paused/scanning/result-refresh states
+        // and retains the same daily, per-batch, shared API and quota guards.
+        setInterval(v23ArkaPlanGecmisTurunuCalistir, 60000);
 
         setTimeout(
             () => {

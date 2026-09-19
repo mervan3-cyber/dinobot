@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const VERSION = 'v23-goal-profile-2026-09-14';
-const COLLECTOR_VERSION = 'v23-history-collector-2026-09-18';
+const COLLECTOR_VERSION = 'v23-history-ready-2026-09-19';
+const EARLY_ACCOUNTING_VERSION = 2;
 const DAY = 86400000;
 const finite = v => v === null || v === undefined || v === '' || typeof v === 'boolean' || !Number.isFinite(Number(v)) ? null : Number(v);
 const integer = v => { const n = finite(v); return n !== null && Number.isInteger(n) && n >= 0 ? n : null; };
@@ -100,8 +101,10 @@ class GoalProfileCache {
         Object.assign(this, { filePath, fetchApi, canFetch, logger, now, maxEntries, blockReason });
         this.maxCallsPerDay = Math.max(1, Math.min(1000, integer(maxCallsPerDay) || 80));
         this.maxCallsPerWarm = Math.max(1, Math.min(12, integer(maxCallsPerWarm) || 12));
-        this.data = { version: VERSION, collectorVersion: COLLECTOR_VERSION, day: null, calls: 0, earlyCalls: 0, cooldownUntil: 0, entries: {} };
+        this.data = { version: VERSION, collectorVersion: COLLECTOR_VERSION, earlyAccountingVersion: EARLY_ACCOUNTING_VERSION,
+            day: null, calls: 0, earlyCalls: 0, inheritedUnclassifiedCalls: 0, cooldownUntil: 0, entries: {} };
         this.queue = new Map(); this.running = false; this.disabled = false;
+        this.targets = new Map(); this.preferEarly = false; this.lastBatchAt = null; this.lastBatchCalls = 0;
         this.droppedRequests = 0; this.prunedRequests = 0;
     }
     load() {
@@ -114,7 +117,7 @@ class GoalProfileCache {
                 throw Error('cache_entry_schema');
             // Keep successful legacy cache data and today's consumed quota. Old
             // failures are retryable with the repaired query; history is untouched.
-            if (data.collectorVersion !== COLLECTOR_VERSION) for (const e of Object.values(data.entries)) {
+            if (!['v23-history-collector-2026-09-18', COLLECTOR_VERSION].includes(data.collectorVersion)) for (const e of Object.values(data.entries)) {
                 if (!['ok','partial'].includes(e.status)) { e.expiresAt = 0; e.retryAt = 0; }
                 else if (e.games.length < 10 || !enough(e.games, 'home') || !enough(e.games, 'away')) {
                     // The old collector could incorrectly cache incomplete data as
@@ -122,26 +125,45 @@ class GoalProfileCache {
                     e.status = 'partial'; e.priorPending = true; e.retryAt = 0;
                 }
             }
-            this.data = { ...data, collectorVersion: COLLECTOR_VERSION, earlyCalls: integer(data.earlyCalls) ?? data.calls };
+            // The prior migration classified ALL old calls as early preparation.
+            // Preserve the total quota, but never invent the split. This migration
+            // runs once; later restarts retain genuinely measured early calls.
+            const measured = data.earlyAccountingVersion === EARLY_ACCOUNTING_VERSION;
+            this.data = { ...data, collectorVersion: COLLECTOR_VERSION, earlyAccountingVersion: EARLY_ACCOUNTING_VERSION,
+                earlyCalls: measured ? integer(data.earlyCalls) || 0 : 0,
+                inheritedUnclassifiedCalls: measured ? integer(data.inheritedUnclassifiedCalls) || 0 : data.calls };
         } catch { this.disabled = true; this.logger('> ⚠️ V23 profil önbelleği okunamadı; dosya korunuyor, V23 veri toplama kapalı.'); }
     }
     save() { atomicJson(this.filePath, this.data); }
     resetDay() {
         const day = new Date(this.now()).toISOString().slice(0,10);
-        if (this.data.day !== day) { this.data.day = day; this.data.calls = 0; this.data.earlyCalls = 0; }
+        if (this.data.day !== day) {
+            this.data.day = day; this.data.calls = 0; this.data.earlyCalls = 0; this.data.inheritedUnclassifiedCalls = 0;
+        }
     }
     pruneQueue() {
         for (const [key, info] of this.queue) {
             const age = this.now() - Date.parse(info.kickoff);
             if (age < 0 || age > 6*3600000) { this.queue.delete(key); this.prunedRequests++; }
         }
+        for (const [id, target] of this.targets) if (this.now()-Date.parse(target.mac.fixture_kickoff)>6*3600000) this.targets.delete(id);
     }
     cancelFixture(fixtureId) {
         for (const [key, info] of this.queue) if (info.fixtureId === Number(fixtureId)) this.queue.delete(key);
+        const target = this.targets.get(Number(fixtureId));
+        if (target) target.closedAt ||= new Date(this.now()).toISOString();
     }
     request(mac, { priority = 50 } = {}) {
         if (this.disabled) return;
         this.pruneQueue();
+        const home = identity(mac,'home'), away = identity(mac,'away');
+        if (home && away && Date.parse(home.kickoff)<=this.now() && this.now()-Date.parse(home.kickoff)<=6*3600000) {
+            const old = this.targets.get(home.fixtureId);
+            this.targets.set(home.fixtureId,{ ...old, seenAt:this.now(), match:String(mac.mac_isim || old?.match || `Maç ${home.fixtureId}`),
+                mac:{fixture_id:home.fixtureId,fixture_kickoff:home.kickoff,league_id:home.leagueId,season:home.season,
+                    home_team_id:home.teamId,away_team_id:away.teamId} });
+            while(this.targets.size>200)this.targets.delete(this.targets.keys().next().value);
+        }
         for (const side of ['home','away']) {
             const info = identity(mac, side);
             if (!info || Date.parse(info.kickoff) > this.now() || this.now() - Date.parse(info.kickoff) > 6*3600000) continue;
@@ -173,22 +195,39 @@ class GoalProfileCache {
         if (this.disabled) return 'cache_unreadable';
         if (this.now() < this.data.cooldownUntil) return this.data.cooldownReason || 'rate_limited';
         if (this.data.day === new Date(this.now()).toISOString().slice(0,10) && this.data.calls >= this.maxCallsPerDay) return 'daily_budget_exhausted';
-        return this.blockReason() || null;
+        const blocked = this.blockReason();
+        if (blocked) return blocked;
+        const work = [...this.queue].filter(([key])=>{
+            const e=this.data.entries[key];return !(e?.expiresAt>this.now()&&!e.priorPending);
+        });
+        if (work.length && work.every(([,info])=>info.priority<50) && this.data.earlyCalls>=Math.floor(this.maxCallsPerDay/4))
+            return 'early_budget_exhausted';
+        if (work.length && work.every(([key])=>this.data.entries[key]?.retryAt>this.now())) return 'profile_retry_wait';
+        return null;
     }
     trim() {
         const keys = Object.keys(this.data.entries).sort((a,b) => this.data.entries[a].expiresAt - this.data.entries[b].expiresAt);
         for (const key of keys.slice(0, Math.max(0, keys.length-this.maxEntries))) delete this.data.entries[key];
     }
-    async warm() {
+    async warm({ canContinue = () => true } = {}) {
         if (this.running || this.disabled) return;
         this.running = true;
         try {
             this.resetDay(); this.pruneQueue();
+            this.save(); // Persist migration/day rollover even when no request can run.
             let calls = 0;
-            const allowed = info => this.canFetch() && this.now() >= this.data.cooldownUntil &&
+            const allowed = info => canContinue() && this.canFetch() && this.now() >= this.data.cooldownUntil &&
                 this.data.calls < this.maxCallsPerDay && calls < this.maxCallsPerWarm &&
                 (info.priority >= 50 || this.data.earlyCalls < Math.floor(this.maxCallsPerDay/4));
-            const work = [...this.queue].sort((a,b) => b[1].priority-a[1].priority || a[1].enqueuedAt-b[1].enqueuedAt);
+            let work = [...this.queue].sort((a,b) => b[1].priority-a[1].priority || a[1].enqueuedAt-b[1].enqueuedAt);
+            // Every other batch reserves its front for one early fixture pair.
+            // Normal candidates still get the first batch; early preparation must
+            // not starve behind an endless stream of already eligible fixtures.
+            if(this.preferEarly && this.data.earlyCalls<Math.floor(this.maxCallsPerDay/4)) {
+                const early=work.filter(([key,info])=>info.priority<50 && !(this.data.entries[key]?.retryAt>this.now()))
+                    .sort((a,b)=>a[1].kickoff.localeCompare(b[1].kickoff))[0];
+                if(early){const id=early[1].fixtureId;work=[...work.filter(([,i])=>i.fixtureId===id),...work.filter(([,i])=>i.fixtureId!==id)];}
+            }
             for (const [key, info] of work) {
                 if (!this.queue.has(key)) continue;
                 let entry = this.data.entries[key];
@@ -197,7 +236,7 @@ class GoalProfileCache {
                 if (!allowed(info)) continue;
                 // Keep work queued until complete; an interrupted background batch
                 // must not turn a deferred previous-season request into a 12h hit.
-                for (let step = 0; step < 2 && allowed(info); step++) {
+                for (let step = 0; step < 2 && this.queue.has(key) && allowed(info); step++) {
                     const prior = entry?.expiresAt > this.now() && entry?.priorPending;
                     const season = info.season - (prior ? 1 : 0);
                     this.resetDay(); this.data.calls++; calls++;
@@ -234,6 +273,8 @@ class GoalProfileCache {
                     if (entry.retryAt > this.now()) break;
                 }
             }
+            this.lastBatchAt = new Date(this.now()).toISOString(); this.lastBatchCalls = calls;
+            if(calls)this.preferEarly=!this.preferEarly;
         } catch {
             this.disabled = true;
             this.logger('> ⚠️ V23 profil önbelleği yazılamadı; veri toplama durdu, mevcut modeller etkilenmedi.');
@@ -244,11 +285,21 @@ class GoalProfileCache {
         const lastErrors = Object.entries(this.data.entries).filter(([,e])=>e.lastError)
             .sort((a,b)=>b[1].lastError.at.localeCompare(a[1].lastError.at)).slice(0,5)
             .map(([key,e])=>({ teamId:Number(key.split(':')[1]), ...e.lastError }));
+        const fixtures=[...this.targets.values()].filter(t=>this.now()-Date.parse(t.mac.fixture_kickoff)<=6*3600000)
+            .sort((a,b)=>b.seenAt-a.seenAt).map(t=>{
+                const team=side=>{const info=identity(t.mac,side),e=this.data.entries[keyFor(info)];
+                    const status=!e?'profile_not_ready':e.expiresAt<=this.now()?'profile_expired':e.status;
+                    return {teamId:info.teamId,status,ready:status==='ok',fetchedAt:e?.fetchedAt||null};};
+                return {fixtureId:t.mac.fixture_id,match:t.match,home:team('home'),away:team('away'),closedAt:t.closedAt||null};
+            });
         return { enabled: !this.disabled, collectorVersion: COLLECTOR_VERSION, cachedTeams: entries.length,
         readyProfiles: current.filter(e=>e.status==='ok').length, partialProfiles: current.filter(e=>e.status==='partial').length,
         failedProfiles: current.filter(e=>!['ok','partial'].includes(e.status)).length, expiredProfiles: entries.length-current.length,
         droppedRequests: this.droppedRequests, prunedRequests: this.prunedRequests, lastErrors,
         waitReason: this.waitReason(), cooldownUntil: this.data.cooldownUntil || null, earlyCallsToday: this.data.earlyCalls,
+        earlyCallsLimit: Math.floor(this.maxCallsPerDay/4), inheritedUnclassifiedCalls:this.data.inheritedUnclassifiedCalls,
+        lastBatchAt:this.lastBatchAt,lastBatchCalls:this.lastBatchCalls,
+        readyFixturePairs:fixtures.filter(f=>f.home.ready&&f.away.ready).length,fixtures:fixtures.slice(0,20),
         queued: this.queue.size, callsDayUTC: this.data.day, callsToday: this.data.calls,
         maxCallsPerDay: this.maxCallsPerDay, warming: this.running }; }
 }

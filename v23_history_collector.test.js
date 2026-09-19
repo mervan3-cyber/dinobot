@@ -112,7 +112,7 @@ async function test(name, fn) {now=start;await fn();passed++;console.log(`PASS $
         loaded.request(match());await loaded.warm();assert.equal(loaded.data.calls,3);assert.equal(loaded.get(match(),'home',new Date(now).toISOString()).profile.last10.n,10);
     });
     const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
-    assert(server.indexOf('v23GecmisKuyrugunaEkle({ fixture_id')>server.indexOf('uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar)'));
+    assert(server.indexOf('v23ErkenGecmisHazirla(allLiveFixtures, oddsMap)')>server.indexOf('uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar)'));
     assert.match(server,/maxCallsPerDay: process\.env\.DINO_V23_HISTORY_DAILY_LIMIT \|\| 80/);
     assert.match(server,/void v23ProfileCache\.warm\(\)/);
     console.log(`V23 collector: ${passed} regression scenarios passed; no live requests.`);

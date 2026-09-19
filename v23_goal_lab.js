@@ -153,6 +153,11 @@ class GoalLab extends SignalTracker {
     metadata(signals = this.data.signals) {
         const buckets = Object.fromEntries(['approve','reject','insufficient'].map(status =>
             [status,this.summary(signals.filter(s => s.assessment.status === status)).overall]));
+        const bothAtEntry = signals.filter(s=>s.assessment.profileIds?.home && s.assessment.profileIds?.away).length;
+        const oneAtEntry = signals.filter(s=>Boolean(s.assessment.profileIds?.home)!==Boolean(s.assessment.profileIds?.away)).length;
+        const profileCoverage = {total:signals.length,bothAtEntry,oneAtEntry,noneAtEntry:signals.length-bothAtEntry-oneAtEntry,
+            judgedAtEntry:buckets.approve.total+buckets.reject.total,
+            newCollectorRecords:signals.filter(s=>s.assessment.collectorVersion===COLLECTOR_VERSION).length};
         return { label: 'V23 · V21 / V22 Kontrol Laboratuvarı', enabled: this.enabled && !this.disabledReason,
             disabledReason: this.disabledReason, telegram: false, decisionImpact: false,
             tariffVersion: VERSION, policy: POLICY, startedAt: this.data.startedAt,
@@ -163,7 +168,7 @@ class GoalLab extends SignalTracker {
             retainedPercent: signals.length ? 100*buckets.approve.total/signals.length : null,
             assessedCoverage: signals.length ? 100*(buckets.approve.total+buckets.reject.total)/signals.length : null,
             comparableBaseline: this.summary(signals.filter(s => s.assessment.status !== 'insufficient')).overall,
-            cache: this.cache.metadata() };
+            cache: this.cache.metadata(), profileCoverage };
     }
     export(signals = this.data.signals) {
         const ids = new Set(signals.flatMap(s => Object.values(s.assessment.profileIds || {})).filter(Boolean));
