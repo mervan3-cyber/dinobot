@@ -3224,11 +3224,12 @@
                 profile_expired:"Profilin süresi dolmuş",system_stopped:"Ana şalter kapalı; arka plan hazırlığı durdu",
                 auto_scan_paused:"Otomatik tarama kapalı; arka plan hazırlığı durdu"})[value] || value || "Hazırlama bekleniyor";
         }
-        function renderV23ProfileStatus(cache, events, coverage) {
+        function renderV23ProfileStatus(cache, events, coverage, storage) {
             const target=document.getElementById("testlab-v23-cache"), errors=document.getElementById("testlab-v23-fetch-errors"),
                 pairs=document.getElementById("testlab-v23-pairs"), entry=document.getElementById("testlab-v23-profile-coverage");
             errors.replaceChildren();pairs.replaceChildren();
             entry.textContent=coverage ? `Sinyal girişinde iki takım geçmişi bulunan: ${coverage.bothAtEntry}/${coverage.total} · Tek taraf: ${coverage.oneAtEntry} · İki taraf eksik: ${coverage.noneAtEntry} · Gol hesabı yapılabilen: ${coverage.judgedAtEntry} · Yeni veri hattıyla kaydedilen: ${coverage.newCollectorRecords}. Hazır takım sayısı onay sayısı değildir; sonradan gelen veri eski karara eklenmez.` : "Bu eski raporda giriş anındaki profil kapsamı ayrı ölçülmemiş.";
+            if(storage)entry.textContent+=` V23 arşiv: ${storage.archivedRecords||0} kayıt diskte · RAM'de tam kayıt: ${storage.fullRecordsInMemory||0} · Hafif sonuç indeksi: ${storage.compactIndexRecords||0}.${storage.error ? " Arşive yazılamadı; tam kayıtlar korundu." : ""}`;
             if(!cache){target.textContent="Profil önbelleği hazırlanmayı bekliyor.";return;}
             const counts=cache.readyProfiles==null ? "Eski rapor: başarılı profil sayısı ayrı ölçülmemiş" :
                 `Hazır: ${cache.readyProfiles} · Kısmi: ${cache.partialProfiles||0} · Hatalı: ${cache.failedProfiles||0} · Süresi dolmuş: ${cache.expiredProfiles||0}`;
@@ -3255,7 +3256,7 @@
                 addRow(summary,[label,b.total,ky(b),b.pending,formatPercent(b.hitRate),formatPercent(b.roi)]);
             document.getElementById("testlab-v23-impact").textContent=`${e.sourceRecords} kaynak kaydı · ${e.uniqueEntries} tekil giriş · ${e.uniqueFixtures} maç · ${e.duplicateEntries} aynı giriş ortak · ${e.sharedFixtures} maç iki kaynakta. Farklı dakika/marketler ayrı tutulur.${data.disabledReason?" DURUM: "+data.disabledReason:""}`;
             document.getElementById("testlab-v23-cohort").textContent=`Yeni kontrol dönemi: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Eski kayıtlar yeniden değerlendirilmez. Gözlem etiketleri onay/red değildir; başarı veya nedensellik kanıtı değildir.`;
-            renderV23ProfileStatus(data.cache,data.eventCapture,data.profileCoverage);
+            renderV23ProfileStatus(data.cache,data.eventCapture,data.profileCoverage,data.storage);
             const container=document.getElementById("testlab-v23-controls");container.replaceChildren();
             const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
                 v23Source==="legacy"?[]:v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
@@ -3328,7 +3329,7 @@
             document.getElementById("testlab-v23-impact").textContent = data
                 ? `Ret ile elenen kayıp: ${data.avoidedLosses || 0} · Kaçırılan kazanan: ${data.missedWinners || 0} · Korunan aday: ${formatPercent(data.retainedPercent)} · Veri kapsamı: ${formatPercent(data.assessedCoverage)}${data.disabledReason ? " · DURUM: " + data.disabledReason : ""}`
                 : "İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.";
-            renderV23ProfileStatus(data?.cache,data?.eventCapture,data?.profileCoverage);
+            renderV23ProfileStatus(data?.cache,data?.eventCapture,data?.profileCoverage,data?.storage);
             const body = document.getElementById("testlab-v23-rows"); body.replaceChildren();
             for (const s of data?.signals || []) {
                 const a = s.assessment || {}, verdict = {approve:"Onay",reject:"Ret",insufficient:"Veri yetersiz"}[a.status] || "-";
