@@ -8,6 +8,7 @@ const baseline = require('./v21_tariff');
 const v22 = require('./v22_tariff');
 const { EventObservations } = require('./v23_events');
 const { VERSION: AUDIT_VERSION, DEFINITIONS, evaluateControls, comparison } = require('./v23_controls');
+const liveLab = require('./v23_live_lab');
 // Old code must refuse the compact disk format rather than report incomplete evidence.
 const STORAGE_VERSION = `${VERSION}:settled-archive-v1`;
 const LABELS = Object.freeze({
@@ -34,9 +35,10 @@ function selectSource(signals, source = 'all') {
         (!source.includes(':') || s.matchedFilters?.includes(source.split(':')[1])));
 }
 class GoalLab extends SignalTracker {
-    constructor({ filePath, cache, enabled = true, logger = () => {}, maxRecords = 12000, events = new EventObservations() }) {
+    constructor({ filePath, cache, enabled = true, logger = () => {}, maxRecords = 12000, events = new EventObservations(), live = new liveLab.LiveObservations() }) {
         super({ filePath, logger });
         this.cache = cache; this.events = events; this.enabled = enabled; this.maxRecords = maxRecords; this.disabledReason = null;
+        this.live = live;
         this.data = { version: VERSION, startedAt: null, updatedAt: null, signals: [], profiles: {} };
         this.archive = new SettledArchive(filePath); this.archiveError = null;
     }
@@ -50,7 +52,10 @@ class GoalLab extends SignalTracker {
                     (!s.audit || (s.audit.version === AUDIT_VERSION && ['v21','v22'].includes(s.sourceModel) && Array.isArray(s.audit.controls) &&
                         s.audit.controls.length === DEFINITIONS.length && DEFINITIONS.every(d=>s.audit.controls.filter(c=>c?.id===d.id).length===1) &&
                         s.audit.controls.every(c => c && ['approve','reject','insufficient','observed'].includes(c.status) && Array.isArray(c.reasons) && Array.isArray(c.reasonLabels)))))) throw Error('history_schema');
-            for (const signal of data.signals) if (signal.archiveRef) this.archive.read(signal);
+            for (const signal of data.signals) {
+                if (signal.audit?.live && !liveLab.validAudit(signal.audit.live)) throw Error('live_history_schema');
+                if (signal.archiveRef) this.archive.read(signal);
+            }
             this.data = data;
         } catch {
             this.disabledReason = 'history_unreadable';
@@ -97,6 +102,7 @@ class GoalLab extends SignalTracker {
     }
     maintain() {
         this.events.prune?.();
+        this.live.prune();
         this.cache.pruneExpired?.();
         this.archiveSettled();
     }
@@ -105,7 +111,10 @@ class GoalLab extends SignalTracker {
         return super.list(limit,signals).map(s=>s.archiveRef ? this.archive.read(s).signal : s);
     }
     capture(mac, capturedAt) {
-        if (this.enabled && !this.disabledReason) this.events.capture(mac,capturedAt);
+        if (!this.enabled || this.disabledReason) return;
+        // Isolated diagnostics cannot prevent each other or affect source signals.
+        try { this.events.capture(mac,capturedAt); } catch {}
+        try { this.live.capture(mac,capturedAt); } catch {}
     }
     // Only a NEW V21/V22 live record can enter. No scan selection, API call or
     // Telegram gate here; approval must never cause a later market re-selection.
@@ -148,6 +157,8 @@ class GoalLab extends SignalTracker {
             audit = {version:AUDIT_VERSION,capturedAt:signal.sentAt,decisionImpact:false,events:null,
                 controls:DEFINITIONS.map(d=>({...d,status:'insufficient',reasons:['CONTROL_EVALUATION_ERROR'],reasonLabels:['Kontrol hesaplanamadı'],values:{}}))};
         }
+        try { audit.live = liveLab.evaluate({signal,mac,observations:this.live}); }
+        catch { audit.live = liveLab.unavailable(signal.sentAt); }
         const copied = {};
         for (const field of ['fixtureId','sentAt','match','league','minute','score','market','odds','edge','dinoProbability',
             'selectorV2Probability','v18Probability','prematchMarketSupport','prematchMarketSource','statsValidation','liveStats']) copied[field] = signal[field] ?? null;
@@ -201,6 +212,7 @@ class GoalLab extends SignalTracker {
         }
         // Only a confirmed final status with a persisted settlement reaches cleanup.
         this.events.releaseFixture?.(fixture?.fixture?.id);
+        this.live.releaseFixture(fixture?.fixture?.id);
         this.cache.releaseFixture?.(fixture?.fixture?.id);
         this.archiveSettled();
         return changed;
@@ -219,6 +231,7 @@ class GoalLab extends SignalTracker {
             auditVersion: AUDIT_VERSION, sourcePolicies: {v21:baseline.POLICY,v22:v22.POLICY},
             validationMode: 'fresh-v21-v22-independent-controls', summary: this.summary(signals), groups: buckets,
             experiment: comparison(signals,rows=>this.summary(rows)), eventCapture: this.events.metadata(),
+            liveExperiment: liveLab.comparison(signals,rows=>this.summary(rows)), liveCapture: this.live.metadata(),
             avoidedLosses: buckets.reject.losses, missedWinners: buckets.reject.wins,
             retainedPercent: signals.length ? 100*buckets.approve.total/signals.length : null,
             assessedCoverage: signals.length ? 100*(buckets.approve.total+buckets.reject.total)/signals.length : null,
@@ -267,12 +280,16 @@ class GoalLab extends SignalTracker {
             'GerekenGol','KalanDakika','ReferansOlasilikKalibreDegil','EvProfil','DepProfil','Sonuc','Final']];
         rows[0].push('Kaynak','V22Filtre','DeneySurumu');
         for (const d of DEFINITIONS) rows[0].push(`${d.id}_karar`,`${d.id}_gerekce`,`${d.id}_degerler`);
+        rows[0].push('CanliDeneySurumu');
+        for (const d of liveLab.DEFINITIONS) rows[0].push(`live_${d.id}_karar`,`live_${d.id}_gerekce`,`live_${d.id}_degerler`);
         for (const indexed of signals) { const s=indexed.archiveRef ? this.archive.read(indexed).signal : indexed; rows.push([s.sentAt,s.match,s.minute,s.score,s.market,s.dinoProbability,s.selectorV2Probability,
             s.v18Probability,s.prematchMarketSupport,s.edge,s.odds,s.assessment.status,s.assessment.reasonLabels.join(' | '),
             s.assessment.goalsNeeded,s.assessment.remainingMinutes,s.assessment.remainingProbability,
             s.assessment.profileIds?.home,s.assessment.profileIds?.away,s.settlement?.result,s.settlement?.finalScore,
             s.sourceModel || 'v21',s.matchedFilters?.join('+'),s.audit?.version || 'legacy',
-            ...DEFINITIONS.flatMap(d=>{const c=s.audit?.controls?.find(c=>c.id===d.id);return [c?.status,c?.reasonLabels?.join(' | '),c?JSON.stringify(c.values):null];})]); }
+            ...DEFINITIONS.flatMap(d=>{const c=s.audit?.controls?.find(c=>c.id===d.id);return [c?.status,c?.reasonLabels?.join(' | '),c?JSON.stringify(c.values):null];}),
+            s.audit?.live?.version,
+            ...liveLab.DEFINITIONS.flatMap(d=>{const c=s.audit?.live?.controls?.find(c=>c.id===d.id);return [c?.status,c?.reasonLabels?.join(' | '),c?JSON.stringify(c.values):null];})]); }
         return '\uFEFF' + rows.map(row => row.map(quote).join(',')).join('\r\n');
     }
 }

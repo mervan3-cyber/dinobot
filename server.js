@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v23-lab-archive-2026-09-19';
+const BUILD_VERSION = 'mac-yakala-v23-live-lab-2026-09-20';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -2073,7 +2073,10 @@ const STAT_ALIASES = Object.freeze({
     fouls: ['fouls', 'fouls committed'],
     offsides: ['offsides', 'offside'],
     goalkeeper_saves: ['goalkeeper saves', 'goal keeper saves', 'saves'],
-    expected_goals: ['expected goals', 'expected goal', 'xg']
+    expected_goals: ['expected goals', 'expected goal', 'xg'],
+    shots_insidebox: ['shots insidebox', 'shots inside box'],
+    shots_outsidebox: ['shots outsidebox', 'shots outside box'],
+    blocked_shots: ['blocked shots', 'shots blocked']
 });
 
 
@@ -2093,6 +2096,7 @@ const PARSED_STAT_FIELDS = [
     'home_offsides', 'away_offsides',
     'home_saves', 'away_saves',
     'home_xg', 'away_xg',
+    '_v23LiveStats', // LAB-only optional channels; never a model-required field.
     'stats_team_count', 'stats_source',
     'stats_home_mapping_method', 'stats_away_mapping_method',
     'stats_identity_verified',
@@ -2507,6 +2511,10 @@ function enrichFixturesWithStats(fixtures) {
             away_saves: getStat(awayStats, 'goalkeeper_saves'),
             home_xg: getStat(homeStats, 'expected_goals'),
             away_xg: getStat(awayStats, 'expected_goals'),
+            _v23LiveStats: {
+                home: {shotsInsidebox:getStat(homeStats,'shots_insidebox'),shotsOutsidebox:getStat(homeStats,'shots_outsidebox'),blockedShots:getStat(homeStats,'blocked_shots')},
+                away: {shotsInsidebox:getStat(awayStats,'shots_insidebox'),shotsOutsidebox:getStat(awayStats,'shots_outsidebox'),blockedShots:getStat(awayStats,'blocked_shots')}
+            },
             stats_team_count: statistics.length,
             stats_home_mapping_method: homeMatch.method,
             stats_away_mapping_method: awayMatch.method,

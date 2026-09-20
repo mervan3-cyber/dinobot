@@ -17,7 +17,7 @@ const context=vm.createContext({require:name=>Object.hasOwn(external,name)?exter
 vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+`
 for(const tracker of [coreShadowTracker,legacyV17ShadowTracker,v20ShadowTracker])tracker.data.startedAt='1970-01-01T00:00:00Z';
 globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v23GoalLab,v23ProfileCache,signalTracker,
-    enrichFixturesWithStats,
+    enrichFixturesWithStats, tazeStatlariMacaUygula,
     setup(mac,p=60,valid=true){
         canliMaclariHazirla=async()=>[mac];hazirMacHalaUygunMu=()=>true;temelStatsTam=()=>true;
         golgeGucBaglamlariniTopla=async()=>new Map();
@@ -40,9 +40,18 @@ class Response extends EventEmitter { constructor(){super();this.parts=[];this.h
 async function get(route,query={}){const res=new Response();await routes.get(route)({query},res);return res;}
 (async()=>{
     assert.equal(api.v23GoalLab.data.signals.length,0);assert.equal(api.v23GoalLab.metadata().startedAt,null);
-    let m=match(2301);api.setup(m);await api.botuCalistir();
+    let m={...match(2301),home_shot:10,away_shot:8,home_sot:4,away_sot:3,home_corner:3,away_corner:2,
+        home_xg:1.2,away_xg:.9,stats_identity_verified:true,stats_received_at:'2026-09-14T21:30:00.000Z',
+        observation_completed_at:'2026-09-14T21:30:00.000Z',
+        _v23LiveStats:{home:{shotsInsidebox:6},away:{shotsInsidebox:5}}};
+    api.v23GoalLab.capture({...m,dakika:50,home_shot:6,away_shot:6,home_sot:2,away_sot:2,home_xg:.8,away_xg:.7,
+        stats_received_at:'2026-09-14T21:20:00.000Z',_v23LiveStats:{home:{shotsInsidebox:4},away:{shotsInsidebox:3}}},'2026-09-14T21:20:00.000Z');
+    api.setup(m);await api.botuCalistir();
     assert.equal(api.v21ShadowTracker.data.signals.length,1);assert.equal(api.v23GoalLab.data.signals.length,2);
     const observation=api.v23GoalLab.data.signals[0];assert.equal(observation.assessment.status,'insufficient');
+    assert.equal(observation.audit.live.controls.find(c=>c.id==='tempo10').status,'approve','Actual source flow uses warmed live observations');
+    assert.equal(observation.audit.live.controls.find(c=>c.id==='combined_xg').status,'approve');
+    assert.equal(observation.audit.live.decisionImpact,false);
     assert.equal(observation.baselineSignalId,api.v21ShadowTracker.data.signals[0].signalId);
     assert.equal(deliveries.length,1);assert.equal(api.signalTracker.data.signals.length,1);
     assert.equal(api.v23GoalLab.data.signals[1].sourceModel,'v22');
@@ -67,6 +76,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(comparison.v23Goal.summary.overall.total,3,'TSI day is UTC+3');
     assert.equal(comparison.v23Goal.experiment.sources.v21.baseline.total,1);
     assert.equal(comparison.v23Goal.experiment.sources.v22.baseline.total,2);
+    assert.equal(comparison.v23Goal.liveExperiment.sources.v21.controls.find(c=>c.id==='tempo10').approve.pending,1);
     assert.equal((await get('/api/test-lab-comparison',{date:'2026-09-14'})).body.v23Goal.summary.overall.total,0);
     const json=await get('/api/v23-goal-history/export',{date:'2026-09-15'});
     assert.equal(json.body.signals.length,3);assert.equal(json.body.telegram,false);
@@ -89,6 +99,8 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     const archivedJson=await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v22:C'});
     assert.equal(archivedJson.body.signals[0].settlement.result,'W');
     assert(archivedJson.body.signals[0].audit.events,'Archived details must be restored, not just the compact index');
+    assert.equal(archivedJson.body.signals[0].audit.live.controls.find(c=>c.id==='tempo10').values.totals.shot,6);
+    assert(archivedJson.body.signals[0].audit.live.evidence.windows['10'].from);
     assert.equal(archivedJson.body.signals[0].archiveRef,undefined);
     assert.match((await get('/api/v23-goal-history/export.csv',{date:'2026-09-15'})).body,/Offline Home/);
     const state=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}}}])[0];
@@ -96,6 +108,12 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(state._v23Events,null);
     const raw=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}},events:[],_dino_fixture_received_at:'2026-09-14T10:01:00Z'}])[0];
     assert.equal(raw._v23Events.length,0);assert.equal(raw._v23EventsAt,'2026-09-14T10:01:00Z');
+    const statTeam=(id,inside)=>({team:{id},statistics:[{type:'Total Shots',value:10},{type:'Shots on Goal',value:4},
+        {type:'Corner Kicks',value:3},{type:'Shots insidebox',value:inside},{type:'Shots outside box',value:2},{type:'Blocked Shots',value:1},{type:'expected_goals',value:1.2}]});
+    const rich=api.enrichFixturesWithStats([{fixture:{id:1},teams:{home:{id:10},away:{id:20}},statistics:[statTeam(20,5),statTeam(10,6)]}])[0];
+    assert.equal(rich._v23LiveStats.home.shotsInsidebox,6);assert.equal(rich._v23LiveStats.away.shotsInsidebox,5,'Reversed team order mapped by identity');
+    assert.equal(rich._v23LiveStats.home.shotsOutsidebox,2);assert.equal(rich._v23LiveStats.home.blockedShots,1);
+    api.tazeStatlariMacaUygula(rich,state);assert.equal(rich._v23LiveStats.home.shotsInsidebox,null,'Missing fresh optional stat must not borrow old value');
     assert.equal(deliveries.length,4,'Three independent signal messages plus one confirmed-win reply; exports do not send');
     const onlyV22=vm.createContext({require:context.require,__dirname:path.join(root,'v22-only'),
         process:{env:{...context.process.env,DINO_V21_SHADOW_ENABLED:'false',DINO_V22_SHADOW_ENABLED:'true'},platform:process.platform},

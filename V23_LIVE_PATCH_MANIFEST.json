@@ -1,0 +1,36 @@
+{
+  "version": "2.5.4",
+  "build": "mac-yakala-v23-live-lab-2026-09-20",
+  "generatedAtUtc": "2026-09-20T14:03:58.7078796Z",
+  "mode": "lab-only-delta-on-2.5.3",
+  "supportedBaseVersions": [
+    "2.5.3"
+  ],
+  "priorPatchSha256": "94fbec1ebf5109dedd77a9be56cb8ee59ac12da90e764c71026c9893e9aa9a58",
+  "files": {
+    "server.js": "b006382f573d2b2bfeb662f7d1e5acb0270c876b8a72cd742d48cea512869d6e",
+    "v23_archive.js": "89f9b92bfaa9fd00654de229da9d0c7b0bb5f88e0c4c6a6d957375ba14dab7c9",
+    "v23_goal_lab.js": "9bc4d522d66684fe45787b574ac7dcdaa15ba40a46de6e90f4e2b16f3a194c23",
+    "v23_live_lab.js": "c0ea1ffcdb8d8e14413a97a37d775bd0d1245bff64caedb1c29bf5354d63ef2a",
+    "v23_live_lab.test.js": "478d49247a3bb41ed25132971668f0ce870dfed0b124dbcbd875db941db9f0d7",
+    "index.html": "b459623cbc95c736fae14d5355165498b708caab73107a324ad468b6b275524c",
+    "public/index.html": "b459623cbc95c736fae14d5355165498b708caab73107a324ad468b6b275524c",
+    "v23_server_flow.test.js": "515692c61723aecc8ceffa032b987ded34d18a1a625ab391a26b3329fc259b01",
+    "v23_panel.test.js": "82133493d18b224fcbc67f62606caf5b1fde9e07607e5f622a55b6c13f5d7779",
+    "package.json": "fe5f94af3f51648b1a09417f536518a4f1c485723d3b8eef85655f8f2883658e",
+    "package-lock.json": "a821402b46f187b745eb8776639a45c89f861c50e2a3f682c226cfda84ca0ac0",
+    "V23_CANLI_LAB_2026-09-20.md": "ee1b03830b0d0923aa35adff6cf2e231aa7dad7ec9c00d82dd082420c2f62056"
+  },
+  "exclusions": [
+    ".env",
+    "mac_yakala_telegram.js",
+    "histories",
+    "API caches",
+    "models",
+    "candidate_tracker.js",
+    "node_modules"
+  ],
+  "experiment": "v23-live-lab-v1-2026-09-20",
+  "additionalApiCalls": 0,
+  "telegramDecisionImpact": false
+}

@@ -92,3 +92,25 @@ assert.match(el('testlab-v23-profile-coverage').textContent,/17 kayıt diskte/);
 assert.match(el('testlab-v23-profile-coverage').textContent,/RAM'de tam kayıt: 3/);
 context.renderV23ProfileStatus({}, {}, null, {error:'archive_write_failed'});
 assert.match(el('testlab-v23-profile-coverage').textContent,/tam kayıtlar korundu/);
+// Prospective live experiment is separate, including decisions before settlement.
+const liveLab=require('./v23_live_lab');
+const liveAudit=liveLab.unavailable(signal.sentAt);
+liveAudit.controls[0]={...liveAudit.controls[0],status:'approve',reasonLabels:['<img src=x> live reason'],
+    values:{windowMinutes:7,goalsNeeded:1,totals:{shot:4,sot:2,corner:0,xg:null},per10:{shot:5.71,sot:2.86,xg:null},deltas:{home:{shot:3,sot:1},away:{shot:1,sot:1}}}};
+const liveSignal={...newSignal,audit:{...newSignal.audit,live:liveAudit},settlement:{result:null}};
+const liveData={...data,experiment:comparison([liveSignal],r=>tracker.summary(r)),liveExperiment:liveLab.comparison([liveSignal],r=>tracker.summary(r)),
+    liveCapture:{cachedFixtures:2,snapshots:8},signals:[liveSignal]};
+context.renderV23GoalLab(liveData);
+assert.equal(el('testlab-v23-controls').children.length,3,'Old controls plus separate prospective live block');
+assert.match(el('testlab-v23-controls').textContent,/Yeni API isteği: 0/);
+assert.match(el('testlab-v23-controls').textContent,/1 · 0 \/ 0 · 1 bekleyen/,'Approval visible while outcome still pending');
+assert.match(el('testlab-v23-controls').textContent,/V22 · yalnız C/);
+assert.match(el('testlab-v23-rows').textContent,/Gerçek pencere: 7 dk/);
+assert.match(el('testlab-v23-rows').textContent,/xG \+yok/,'Missing xG never displayed as zero');
+assert.equal(el('testlab-v23-rows').querySelectorAll('img').length,0);assert.equal(el('testlab-v23-controls').querySelectorAll('img').length,0);
+context.setV23Source('v21');assert.match(el('testlab-v23-controls').textContent,/Canlı üretim deneyi/);
+context.setV23Source('v22:C');assert.match(el('testlab-v23-controls').textContent,/V22 · yalnız C/);
+context.setV23Source('legacy');assert.equal(el('testlab-v23-controls').children.length,0);
+context.setV23Source('all');context.renderV23GoalLab({...data,experiment,signals:[newSignal]});
+assert.equal(el('testlab-v23-controls').children.length,2,'Older exports work without new live metadata');
+console.log('Live LAB panel: separate cohort, pending approvals, exact observed minutes, missing xG, source filters and safe text passed.');

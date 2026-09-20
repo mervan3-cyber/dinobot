@@ -35,6 +35,10 @@ function indexRecord(signal, ref) {
         id:c.id, status:c.status, reasons:c.reasons, reasonLabels:c.reasonLabels,
         values:c.values?.tag ? {tag:c.values.tag} : {}
     })) };
+    // Conditional addition preserves byte-for-byte indices/checksums of old files.
+    if (signal.audit?.live) index.audit.live = {version:signal.audit.live.version,controls:signal.audit.live.controls.map(c=>({
+        id:c.id,status:c.status,reasons:c.reasons,reasonLabels:c.reasonLabels,values:c.values?.tag?{tag:c.values.tag}:{}
+    }))};
     index.archiveRef = ref;
     return JSON.parse(JSON.stringify(index));
 }
