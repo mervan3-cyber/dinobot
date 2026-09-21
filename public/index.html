@@ -1299,6 +1299,24 @@
             .brand-mark::after { animation: none; }
             *, *::before, *::after { transition: none !important; }
         }
+        .filterlab-model { margin:16px 0; padding:16px; border:1px solid #304952; border-radius:14px; background:#11191f; }
+        .filterlab-v21 { border-top:3px solid #ecc35c; }
+        .filterlab-v22 { border-top:3px solid #4db6ac; }
+        .filterlab-model h4 { margin:0 0 6px; font-size:17px; }
+        .filterlab-baseline { color:#d3e3eb; margin:5px 0; }
+        .filterlab-scroll { overflow-x:auto; margin-top:12px; }
+        .filterlab-table { min-width:1080px; width:100%; border-collapse:collapse; }
+        .filterlab-table th { font-size:12px; white-space:normal; background:#1d2a34; padding:12px 10px; }
+        .filterlab-table td { font-size:13px; padding:14px 10px; vertical-align:top; border-bottom:1px solid #293740; }
+        .filterlab-table th:first-child,.filterlab-table td:first-child { min-width:250px; max-width:330px; }
+        .filterlab-table details summary { cursor:pointer; font-weight:600; }
+        .filterlab-table details p { white-space:normal; color:#aebec8; font-size:12px; margin:8px 0; }
+        .filterlab-quality-row { background:#14242a; }
+        .filterlab-positive { color:#79dbad; font-weight:600; }
+        .filterlab-negative { color:#f3a294; font-weight:600; }
+        .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
+        #testlab-v23-rows details { min-width:240px; }
+        #testlab-v23-rows details p { white-space:normal; max-width:550px; }
     </style>
 </head>
 <body>
@@ -1422,6 +1440,18 @@
                     </div>
                     <div class="control-actions">
                         <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+                    </div>
+                    <div class="adaptive-scan-control" style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+                        <div class="control-card__top">
+                            <label for="adaptive-scan-enabled"><strong>Tam-stat varsa 5 dk</strong></label>
+                            <label class="switch" title="Uygun tam-stat maç varken taramayı hızlandır">
+                                <input type="checkbox" id="adaptive-scan-enabled" onchange="saveAdaptiveScan(this.checked)">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <p>Normal döngü 10 dk. Açıkken uygun tam-stat maç varsa 5 dk; maç kalmazsa tekrar 10 dk.</p>
+                        <p id="adaptive-scan-status" aria-live="polite" style="color:var(--primary);">Kapalı · normal 10 dakika</p>
+                        <small class="muted">API tüketimi artabilir. Kota/hata koruması vardır. Ana tarama ve çalışma saatleri geçerlidir; özel programdaki sabit 5 dk seçimi ayrıdır.</small>
                     </div>
                 </div>
 
@@ -1803,29 +1833,28 @@
             </div>
 
             <div class="v18-arm-card" id="testlab-v23-card" style="margin:14px 0;border-color:#4db6ac;">
-                <div class="v18-arm-title"><span>🌱 V23 · V21 / V22 Kontrol Laboratuvarı</span><span class="mini-badge bg-info" id="testlab-v23-mode">SİNYAL ELENMEZ</span></div>
-                <p class="muted">V21 ve V22 sinyalleri kendi kurallarıyla devam eder. Her kontrol bağımsızdır: “ret”, uygulanmış olsaydı elerdi demektir. Bütün kayıtlar sonuçlandırılır. Olay sonrası üretim yalnız gözlemdir; henüz veto eşiği yoktur. Telegram değişmez.</p>
-                <div class="table-wrap"><table><thead><tr><th>Grup</th><th>Aday</th><th>K / Y</th><th>Bekleyen</th><th>İsabet</th><th>Teorik ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
-                <p class="muted" id="testlab-v23-impact">İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.</p>
-                <p class="muted" id="testlab-v23-cache">Profil önbelleği hazırlanmayı bekliyor.</p>
-                <p class="muted" id="testlab-v23-profile-coverage"></p>
-                <details><summary>Takım geçmişi hazır mı? · izlenen maçlar</summary><div class="muted" id="testlab-v23-pairs"></div></details>
-                <details><summary>Gol geçmişi toplama · son hata nedenleri</summary><div class="muted" id="testlab-v23-fetch-errors"></div></details>
+                <div class="v18-arm-title"><span>🧪 V21 / V22 · Yeni filtre deneyleri</span><span class="mini-badge bg-info" id="testlab-v23-mode">YALNIZ LAB</span></div>
+                <p class="filterlab-notice">“Elenirdi” yalnız simülasyondur. Gerçek sinyaller ve Telegram değişmez. Her deney mevcut sistemle ayrı karşılaştırılır; filtreler birbirine eklenmez.</p>
+                <div class="table-wrap"><table><thead><tr><th>Kontrol grubu</th><th>Sinyal</th><th>Kazanç / Kayıp</th><th>Bekleyen</th><th>İsabet</th><th>Net birim</th><th>ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
+                <p class="muted" id="testlab-v23-impact">İlk yeni kaynak sinyali bekleniyor.</p>
+                <p class="muted" id="testlab-v23-storage">Eski deneyler kapalı. Yeni testler mevcut giriş verisini kullanır.</p>
                 <p class="muted" id="testlab-v23-cohort"></p>
                 <div class="test-lab-table-title">
                     <label for="testlab-v23-source">Kaynak / deney grubu</label>
                     <select id="testlab-v23-source" onchange="setV23Source(this.value)" aria-label="V23 kaynak filtresi">
                         <option value="all">V21 + V22 · ayrı karşılaştırma</option><option value="v21">V21</option><option value="v22">V22</option>
-                        <option value="v22:A">V22 · A</option><option value="v22:B">V22 · B</option><option value="v22:C">V22 · C</option><option value="legacy">Eski V23 · yeni kontrol yok</option>
+                        <option value="v22:A">V22 · A dahil</option><option value="v22:B">V22 · B dahil</option><option value="v22:C">V22 · C dahil</option>
                     </select>
                 </div>
+                <p class="muted">Kural ve gerekçeleri açmak için deney adına tıkla. Dar ekranda tabloları yana kaydırabilirsin.</p>
                 <div id="testlab-v23-controls"></div>
                 <div class="test-lab-table-title">
                     <h4>Sinyaller · gerekçeler ve ölçümler satırda açılır</h4>
                     <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v23','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v23','csv')">CSV</button></div>
                 </div>
-                <div class="table-wrap"><table><thead><tr><th>Tarih / Kaynak</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Temel / V16 / V18</th><th>Pre / EDGE</th><th>Gereken gol</th><th>Gol referansı*</th><th>Kontroller / Gerekçeler</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
-                <p class="muted">* Sabit Poisson referansı; kalibre edilmiş başarı olasılığı değil. Onay/ret tahmini uygulamadır, gerçek sinyal engellenmez. Yalnız ret filtresi simülasyonunda yetersiz/gözlem kayıtları korunur. Δ kâr: aynı giriş oranında birim bahislerle bazdan fark. A/B/C ve gerekçe grupları çakışır; toplanmaz. Özetler tüm seçili güne, satırlar son kayıtlara aittir; JSON/CSV tamdır.</p>
+                <div class="table-wrap"><table><thead><tr><th>Tarih / Kaynak</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Deney kararları / Gerekçeler</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
+                <p class="muted">K/Y = kazanç / kayıp. Kararlar sinyal anında görünür; kazanç/kayıp sonuç geldikçe güncellenir. Filtre sonrası: yalnız “elenirdi” kayıtları çıkarılır; yetersiz ve kapsam dışı kayıtlar korunur. Δ birim, mevcut modele göre farktır. Her sinyal 1 birim, giriş oranı sabittir. Bekleyenler ROI’ye girmez; iptal/iade ayrı saklanır. Şutlar girişe kadar biriken toplamdır, son 10 dakika değildir. Özetler tüm seçili döneme, satırlar son kayıtlara aittir; JSON/CSV tamdır.</p>
+                <details><summary>Eski deney arşivi · durduruldu</summary><p class="muted">Eski sonuçlar son saklandıkları haliyle korunur; yeniden hesaplanmaz ve yeni testlere katılmaz. Geçmiş toplama / pencere hazırlığı kapalıdır.</p><button type="button" onclick="downloadRetiredV23('json')">Eski LAB · tüm JSON</button><button type="button" onclick="downloadRetiredV23('csv')">Eski LAB · tüm CSV</button></details>
             </div>
 
             <div class="v18-table-grid">
@@ -1957,7 +1986,7 @@
 
         <div class="card" id="section-schedule">
             <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
-            <p class="muted" style="margin-bottom:12px;">Kapalı bırakırsan otomatik sistem gün boyu 10 dakikada bir çalışır. Açarsan yalnızca aşağıdaki saat aralıklarında çalışır.</p>
+            <p class="muted" style="margin-bottom:12px;">Kapalıysa normal döngü gün boyu 10 dk; tam-stat hızlandırma açıksa uygun maç varken 5 dk olur. Açarsan yalnız aşağıdaki saatlerde çalışır. Sabit 5 dk ve tek sefer programları kendi kurallarını korur.</p>
             <div class="flex-between" style="margin-bottom:15px;">
                 <label class="muted" for="schedule-enabled">Özel saat programını aktifleştir</label>
                 <input type="checkbox" id="schedule-enabled">
@@ -2011,6 +2040,7 @@
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
+    <script src="/v23_filter_panel.js?v=20260921"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
@@ -2032,6 +2062,9 @@
         let isBotRunning = false;
         let isScanning = false;
         let autoScanEnabled = true;
+        let adaptiveScanEnabled = false;
+        let latestAdaptiveScan = null;
+        let adaptiveScanSaving = false;
         let schedules = [];
         let autoScroll = true;
         let coverageMatches = [];
@@ -2080,6 +2113,7 @@
         }
 
         function updateNextRunCountdown() {
+            renderAdaptiveScanState();
             const element = document.getElementById("next-run-countdown");
             if (!element) return;
             if (!autoScanEnabled) {
@@ -2505,7 +2539,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "25–80. dakikada veri toplar; markete özel V17 penceresi uygunsa taze doğrulanmış Telegram sinyali üretir."
+                ? "25–80. dakikadaki maçları tarar. V21/V22 kuralları ve taze veri doğrulaması değişmez."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -2516,6 +2550,8 @@
                 isBotRunning = Boolean(data.isRunning);
                 isScanning = Boolean(data.isScanning);
                 autoScanEnabled = data.autoScanEnabled !== false;
+                latestAdaptiveScan = data.adaptiveScan || null;
+                if (!adaptiveScanSaving) adaptiveScanEnabled = data.adaptiveScan?.enabled === true;
                 renderBotState();
                 renderAutoScanState();
 
@@ -2550,6 +2586,8 @@
                     document.getElementById("min-edge").value = data.globalMinEdge;
                 }
                 autoScanEnabled = data.autoScanEnabled !== false;
+                if (!adaptiveScanSaving) adaptiveScanEnabled = data.adaptiveScanEnabled === true;
+                renderAdaptiveScanState();
                 renderAutoScanState();
                 document.getElementById("schedule-enabled").checked = Boolean(data.scheduleEnabled);
                 schedules = Array.isArray(data.schedules) ? data.schedules : [];
@@ -2736,7 +2774,7 @@
                 autoScanEnabled = Boolean(enabled);
                 renderAutoScanState();
                 showToast(autoScanEnabled
-                    ? "10 dakikalık otomatik tarama açıldı."
+                    ? "Otomatik tarama açıldı."
                     : "Otomatik tarama kapatıldı; manuel tarama kullanılabilir.");
                 await Promise.allSettled([checkStatus(), fetchLogs()]);
             } catch (error) {
@@ -2746,6 +2784,36 @@
             } finally {
                 checkbox.disabled = false;
             }
+        }
+
+        function renderAdaptiveScanState() {
+            const checkbox = document.getElementById("adaptive-scan-enabled");
+            const status = document.getElementById("adaptive-scan-status");
+            if (!checkbox || !status) return;
+            checkbox.checked = adaptiveScanEnabled;
+            const cadence = latestAdaptiveScan;
+            const label = cadence?.reasonLabel || (adaptiveScanEnabled ? "Açık · ilk tarama / güncel durum bekleniyor" : "Kapalı · normal 10 dakika");
+            const left = Math.max(0, Math.ceil((nextRunTarget - Date.now()) / 1000));
+            const countdown = !isBotRunning || !autoScanEnabled ? "" : isScanning ? " · Tarama sürüyor" : nextRunTarget > 0
+                ? ` · Sonraki: ${Math.floor(left / 60)}:${String(left % 60).padStart(2,"0")}` : "";
+            status.textContent = `${label}${cadence ? " · Son taramada " + cadence.candidateCount + " uygun maç" : ""}${countdown}`;
+        }
+
+        async function saveAdaptiveScan(enabled) {
+            const checkbox = document.getElementById("adaptive-scan-enabled"), previous = adaptiveScanEnabled;
+            checkbox.disabled = true; adaptiveScanSaving = true;
+            try {
+                const result = await apiFetch("/api/settings", {method:"POST",body:JSON.stringify({adaptiveScanEnabled:Boolean(enabled)})});
+                if (result.success === false) throw new Error(result.message || "Hızlandırma ayarı kaydedilemedi.");
+                adaptiveScanEnabled = result.state?.adaptiveScanEnabled === true;
+                latestAdaptiveScan = null;
+                showToast(adaptiveScanEnabled ? "Tam-stat hızlandırma açıldı; uygun maç varsa 5 dk." : "Hızlandırma kapatıldı; normal döngü 10 dk.");
+            } catch (error) {
+                adaptiveScanEnabled = previous; showToast(error.message, true);
+            } finally {
+                adaptiveScanSaving = false; checkbox.disabled = false; renderAdaptiveScanState();
+            }
+            await checkStatus();
         }
 
         function renderSchedules() {
@@ -3198,204 +3266,9 @@
             filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
         }
 
-        function v23Measurement(c) {
-            const v = c.values || {}, parts = [];
-            if (v.remainingProbability != null) parts.push(`Referans ${formatPercent(100*v.remainingProbability)} / eşik %50`);
-            for (const [side,label] of [["home","Ev"],["away","Dep"]]) if (v[side]?.n != null)
-                parts.push(`${label}: ${v[side].n} maç · atılan ${Number(v[side].goalsFor).toFixed(2)} / yenilen ${Number(v[side].goalsAgainst).toFixed(2)}`);
-            if (v.goalCount != null) parts.push(`Olay golü ${v.goalCount} / skor toplamı ${v.scoreTotal}`);
-            if (v.event) parts.push(`Olay ${v.event.minute}${v.event.extra ? "+"+v.event.extra : ""}' · ilk görüldü ${formatDateTime(v.event.firstObservedAt)}`);
-            if (v.windowMinutes != null) parts.push(`Ölçüm penceresi ${v.windowMinutes} dk.`);
-            for (const [side,label] of [["home","Ev"],["away","Dep"]]) if(v.deltas?.[side])
-                parts.push(`${label}: +${v.deltas[side].shot} şut / +${v.deltas[side].sot} isabet / +${v.deltas[side].corner} korner`);
-            if (v.homeFailedToScoreRate != null) parts.push(`Gol atamama: ev ${formatPercent(100*v.homeFailedToScoreRate)} / dep ${formatPercent(100*v.awayFailedToScoreRate)}`);
-            if (v.homeRed != null) parts.push(`Kırmızı: ev ${v.homeRed} / dep ${v.awayRed} · skor ${v.score || "-"}`);
-            return parts.join(" · ");
-        }
-
-        function v23ProfileState(value) {
-            return ({ok:"Hazır",partial:"Kısmi geçmiş",profile_not_ready:"Sırada / henüz hazır değil",
-                profile_not_available_at_signal:"Sinyal anında hazır değildi",profile_fetch_failed:"Geçmiş isteği başarısız",
-                daily_budget_exhausted:"Lab günlük bütçesi doldu",api_quota_reserve:"Ana API kota rezervi korunuyor",
-                api_quota_unknown:"API kalan kotası bilinmiyor",live_scan_priority:"Canlı tarama öncelikli",
-                rate_limited:"API hız sınırı; beklemede",provider_access:"API erişim / plan hatası",
-                provider_parameters:"API parametre hatası",cache_unreadable:"Önbellek okunamıyor",lab_disabled:"Lab kapalı",
-                early_budget_exhausted:"Erken hazırlık alt bütçesi doldu",profile_retry_wait:"Hatalı istek yeniden deneme zamanını bekliyor",
-                profile_expired:"Profilin süresi dolmuş",system_stopped:"Ana şalter kapalı; arka plan hazırlığı durdu",
-                auto_scan_paused:"Otomatik tarama kapalı; arka plan hazırlığı durdu"})[value] || value || "Hazırlama bekleniyor";
-        }
-        function renderV23ProfileStatus(cache, events, coverage, storage) {
-            const target=document.getElementById("testlab-v23-cache"), errors=document.getElementById("testlab-v23-fetch-errors"),
-                pairs=document.getElementById("testlab-v23-pairs"), entry=document.getElementById("testlab-v23-profile-coverage");
-            errors.replaceChildren();pairs.replaceChildren();
-            entry.textContent=coverage ? `Sinyal girişinde iki takım geçmişi bulunan: ${coverage.bothAtEntry}/${coverage.total} · Tek taraf: ${coverage.oneAtEntry} · İki taraf eksik: ${coverage.noneAtEntry} · Gol hesabı yapılabilen: ${coverage.judgedAtEntry} · Yeni veri hattıyla kaydedilen: ${coverage.newCollectorRecords}. Hazır takım sayısı onay sayısı değildir; sonradan gelen veri eski karara eklenmez.` : "Bu eski raporda giriş anındaki profil kapsamı ayrı ölçülmemiş.";
-            if(storage)entry.textContent+=` V23 arşiv: ${storage.archivedRecords||0} kayıt diskte · RAM'de tam kayıt: ${storage.fullRecordsInMemory||0} · Hafif sonuç indeksi: ${storage.compactIndexRecords||0}.${storage.error ? " Arşive yazılamadı; tam kayıtlar korundu." : ""}`;
-            if(!cache){target.textContent="Profil önbelleği hazırlanmayı bekliyor.";return;}
-            const counts=cache.readyProfiles==null ? "Eski rapor: başarılı profil sayısı ayrı ölçülmemiş" :
-                `Hazır: ${cache.readyProfiles} · Kısmi: ${cache.partialProfiles||0} · Hatalı: ${cache.failedProfiles||0} · Süresi dolmuş: ${cache.expiredProfiles||0}`;
-            const early=cache.earlyCallsLimit==null ? "" : ` · Erken hazırlık: ${cache.earlyCallsToday||0}/${cache.earlyCallsLimit} · Geçişten korunan sınıflandırılmamış istek: ${cache.inheritedUnclassifiedCalls||0} (toplamın içinde)`;
-            target.textContent=`${counts} (takım profilleri) · Sırada: ${cache.queued||0} · Lab ek API: ${cache.callsToday||0}/${cache.maxCallsPerDay||80} (UTC gün)${early}. Durum: ${!cache.enabled?"Toplama kapalı":cache.waitReason?v23ProfileState(cache.waitReason):cache.warming?"Toplanıyor":"Boş aralıkta sonraki hazırlık turu bekleniyor"}. İzlenen maçlarda iki tarafı hazır: ${cache.readyFixturePairs??"-"}. Son hazırlık: ${cache.lastBatchAt?formatDateTime(cache.lastBatchAt):"henüz yok"} / ${cache.lastBatchCalls||0} istek. Events: ${events?.cachedFixtures||0} maç. Yalnız LAB; Telegram değişmez. Eski sinyaller sonradan doldurulmaz.`;
-            for(const fixture of cache.fixtures||[]){
-                const p=document.createElement("p");p.textContent=`${fixture.match} · Ev: ${v23ProfileState(fixture.home?.status)} · Deplasman: ${v23ProfileState(fixture.away?.status)} · ${fixture.closedAt?"Kaynak kayıtları oluştu; eski karar değiştirilmez":"Yeni kaynak sinyali öncesi hazırlık"}`;pairs.appendChild(p);
-            }
-            if(!pairs.children.length)pairs.textContent="Bu çalıştırmada izlenen yeni maç yok; eski sinyal profilleri yeniden doldurulmaz.";
-            for(const error of cache.lastErrors||[]){
-                const p=document.createElement("p");p.textContent=`${formatDateTime(error.at)} · takım ${error.teamId??"-"} · ${error.phase==="previous_season"?"Önceki sezon (mevcut veri korunur)":"Güncel sezon"} · ${v23ProfileState(error.code)} · ${error.message||""}`;errors.appendChild(p);
-            }
-            if(!errors.children.length)errors.textContent="Kaydedilmiş geçmiş isteği hatası yok.";
-        }
-        function v23LiveMeasurement(c) {
-            const v=c.values||{},t=v.totals,p=v.per10;
-            const show=n=>n==null?"yok":Number(n).toFixed(2).replace(/\.00$/,"");
-            if(c.id==="context")return `${v.minute??"-"}' · ${v.score||"-"} · ${v.goalsNeeded??"-"} gol gerekli`;
-            if(v.components)return `Pencere ${v.windowMinutes??"-"} dk · ${Object.entries(v.components).map(([k,s])=>k+": "+s).join(" / ")}`;
-            if(!t)return "";
-            return `Gerçek pencere: ${v.windowMinutes} dk. Yeni şut ${show(t.shot)}, isabet ${show(t.sot)}, korner ${show(t.corner)}, içeriden ${show(t.shotsInsidebox)}, dışarıdan ${show(t.shotsOutsidebox)}, blok ${show(t.blockedShots)}, xG +${show(t.xg)}. Ev/dep yeni şut: ${show(v.deltas?.home?.shot)}/${show(v.deltas?.away?.shot)}; isabet: ${show(v.deltas?.home?.sot)}/${show(v.deltas?.away?.sot)}. 10 dk hızı: şut ${show(p?.shot)}, isabet ${show(p?.sot)}, xG ${show(p?.xg)}. Değişiklik olayı: ${show(v.substitutions)}. ${v.goalsNeeded} gol gerekli.`;
-        }
-        function renderV23LiveExperiment(data,container) {
-            const e=data.liveExperiment;if(!e||v23Source==="legacy")return;
-            const make=(tag,value)=>{const el=document.createElement(tag);if(value!=null)el.textContent=value;return el;};
-            const addRow=(body,values)=>{const row=make("tr");for(const v of values)row.appendChild(make("td",v));body.appendChild(row);return row;};
-            const ky=b=>`${b.wins} / ${b.losses}`;
-            const section=make("section");section.className="v18-arm-card";section.style.margin="16px 0";
-            section.appendChild(make("h3","Canlı üretim deneyi · YALNIZ LAB"));
-            section.appendChild(make("p",`${e.sourceRecords} yeni kaynak kaydı · ${e.uniqueFixtures} maç · ${e.oldRecordsExcluded} eski kayıt deney dışında. Başlangıç: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Yeni API isteği: 0. Gözlem tamponu: ${data.liveCapture?.cachedFixtures||0} maç / ${data.liveCapture?.snapshots||0} anlık kayıt.`));
-            section.appendChild(make("p","Başlangıç eşikleri henüz doğrulanmadı; başarı veya gol olasılığı değildir. Yalnız yeni sinyaller değerlendirilir. Yeniden başlatmada pencere tekrar birikir. Onay/ret sayısı hemen, K/Y ve ROI sonuçlanınca artar. Eksik veri ret sayılmaz; Telegram değişmez."));
-            const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
-                v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
-            const tableFor=(parent,label,r)=>{
-                if(!r)return;
-                parent.appendChild(make("h4",`${label} · ${r.baseline.total} sinyal · ${ky(r.baseline)} K/Y · ${r.baseline.pending} bekleyen · ROI ${formatPercent(r.baseline.roi)}`));
-                const wrap=make("div");wrap.className="table-wrap";const table=make("table"),head=make("thead"),body=make("tbody"),hr=make("tr");
-                for(const title of ["Deney / kural","Onay: toplam · K/Y · bekleyen","Ret: toplam · K/Y · bekleyen","Yetersiz / gözlem","Onay ROI","Ret uygulanırsa ROI","Δ kâr"])hr.appendChild(make("th",title));
-                head.appendChild(hr);table.appendChild(head);
-                for(const c of r.controls){
-                    const obs=c.mode==="observation",counts=b=>`${b.total} · ${ky(b)} · ${b.pending} bekleyen`;
-                    const row=addRow(body,[c.label,obs?"—":counts(c.approve),obs?"—":counts(c.reject),`${c.insufficient.total} / ${c.observed.total}`,
-                        obs?"—":formatPercent(c.approve.roi),obs?"—":formatPercent(c.rejectOnly.roi),obs?"—":Number(c.profitDifference).toFixed(2)]);
-                    const detail=make("details");detail.appendChild(make("summary","Kural, gerekçeler ve kaybedilen kazananlar"));detail.appendChild(make("p",c.rule));
-                    detail.appendChild(make("p",`Önleyebileceği kayıp: ${c.avoidedLosses} · Gereksiz eleyeceği kazanan: ${c.missedWinners} · Onay/ret kapsamı: ${formatPercent(c.coveredPercent)}. Ret simülasyonu yetersiz ve gözlem kayıtlarını korur; aynı oran, 1 birim.`));
-                    for(const b of Object.values(c.reasons||{}))detail.appendChild(make("p",`${b.label}: ${b.total} kayıt · ${ky(b)} K/Y · ${b.pending} bekleyen`));
-                    for(const [tag,b] of Object.entries(c.tags||{}))detail.appendChild(make("p",`${tag}: ${b.total} kayıt · ${ky(b)} K/Y · ROI ${formatPercent(b.roi)}`));
-                    row.children[0].appendChild(detail);
-                }
-                table.appendChild(body);wrap.appendChild(table);parent.appendChild(wrap);
-            };
-            for(const [label,r]of reports)tableFor(section,label,r);
-            const focus=make("details");focus.appendChild(make("summary","Özel gruplar: V21 0-0 → 1.5 ÜST / V22 yalnız C"));
-            if(["all","v21"].includes(v23Source))tableFor(focus,"V21 · 0-0 / 1.5 ÜST",e.focus.v21ZeroZero);
-            if(["all","v22","v22:C"].includes(v23Source))tableFor(focus,"V22 · yalnız C (A/B ile ortak değil)",e.focus.v22COnly);
-            section.appendChild(focus);container.appendChild(section);
-        }
-        function renderV23Experiment(data) {
-            const e=data.experiment, verdicts={approve:"Onay verirdi",reject:"Reddederdi",insufficient:"Veri yetersiz",observed:"Yalnız gözlem"};
-            const make=(tag,value)=>{const el=document.createElement(tag);if(value!=null)el.textContent=value;return el;};
-            const addRow=(body,values)=>{const tr=make("tr");for(const value of values)tr.appendChild(make("td",value));body.appendChild(tr);return tr;};
-            const ky=b=>`${b?.wins||0} / ${b?.losses||0}`;
-            document.getElementById("testlab-v23-mode").textContent=data.enabled?"SİNYAL ELENMEZ":"KAPALI";
-            const summary=document.getElementById("testlab-v23-summary-rows");summary.replaceChildren();
-            for(const [label,b] of [["Yeni deney · V21",e.sources.v21.baseline],["Yeni deney · V22",e.sources.v22.baseline],
-                ["Birleşik · aynı giriş tekil",e.unique.baseline],["Eski V23 · ayrı dönem",e.legacy]])
-                addRow(summary,[label,b.total,ky(b),b.pending,formatPercent(b.hitRate),formatPercent(b.roi)]);
-            document.getElementById("testlab-v23-impact").textContent=`${e.sourceRecords} kaynak kaydı · ${e.uniqueEntries} tekil giriş · ${e.uniqueFixtures} maç · ${e.duplicateEntries} aynı giriş ortak · ${e.sharedFixtures} maç iki kaynakta. Farklı dakika/marketler ayrı tutulur.${data.disabledReason?" DURUM: "+data.disabledReason:""}`;
-            document.getElementById("testlab-v23-cohort").textContent=`Yeni kontrol dönemi: ${e.startedAt?formatDateTime(e.startedAt):"ilk yeni sinyal bekleniyor"}. Eski kayıtlar yeniden değerlendirilmez. Gözlem etiketleri onay/red değildir; başarı veya nedensellik kanıtı değildir.`;
-            renderV23ProfileStatus(data.cache,data.eventCapture,data.profileCoverage,data.storage);
-            const container=document.getElementById("testlab-v23-controls");container.replaceChildren();
-            const reports=v23Source==="all"?[["V21",e.sources.v21],["V22",e.sources.v22]]:
-                v23Source==="legacy"?[]:v23Source.includes(":")?[[v23Source.toUpperCase(),e.v22Filters[v23Source.split(":")[1]]]]:[[v23Source.toUpperCase(),e.sources[v23Source]]];
-            for(const [label,r] of reports) {
-                if(!r)continue;
-                const card=make("section");card.className="v18-arm-card";card.style.margin="12px 0";card.style.borderColor=label==="V21"?"#d9b455":"#4db6ac";
-                card.appendChild(make("h4",`${label} · ${r.baseline.total} sinyal · ${ky(r.baseline)} K/Y · ${formatPercent(r.baseline.hitRate)} başarı · ${formatPercent(r.baseline.roi)} ROI`));
-                const wrap=make("div");wrap.className="table-wrap";const table=make("table"),head=make("thead"),hr=make("tr");
-                for(const title of ["Bağımsız kontrol","Onay K/Y","Ret K/Y","Yetersiz / Gözlem","Onay isabet / ROI","Ret filtresi K/Y · ROI","Δ kâr (birim)"])hr.appendChild(make("th",title));
-                head.appendChild(hr);table.appendChild(head);const body=make("tbody");
-                for(const c of r.controls) {
-                    const diagnostic=c.mode==="observation";
-                    const row=addRow(body,[c.label,diagnostic?"—":ky(c.approve),diagnostic?"—":ky(c.reject),`${c.insufficient.total} / ${c.observed.total}`,
-                        diagnostic?"Veto eşiği yok":`${formatPercent(c.approve.hitRate)} / ${formatPercent(c.approve.roi)}`,
-                        diagnostic?"Uygulanmaz":`${ky(c.rejectOnly)} · ${formatPercent(c.rejectOnly.roi)}`,diagnostic?"—":Number(c.profitDifference).toFixed(2)]);
-                    row.children[2].title=`Önleyebileceği kayıp: ${c.avoidedLosses} · Gereksiz eleyeceği kazanan: ${c.missedWinners}`;
-                    const details=make("details"),caption=make("summary",c.mode==="data-quality"?"Veri kalitesi · gerekçeler":"Kural / gerekçeler / gözlem grupları");details.appendChild(caption);
-                    details.appendChild(make("p",c.rule));
-                    details.appendChild(make("p",`Önleyebileceği kayıp: ${c.avoidedLosses} · Gereksiz eleyeceği kazanan: ${c.missedWinners} · Onay/red kapsamı: ${formatPercent(c.coveredPercent)} · Yetersiz K/Y: ${ky(c.insufficient)}`));
-                    const tagLabels={NO_SHOTS_OBSERVED:"Pencerede yeni şut yok",SHOTS_WITHOUT_SOT:"Şut var, yeni isabet yok",SOT_OBSERVED:"Yeni isabetli şut var"};
-                    for(const [tag,b]of Object.entries(c.tags||{}))details.appendChild(make("p",`${tagLabels[tag]||tag}: ${b.total} kayıt · ${ky(b)} K/Y · ${b.pending} bekleyen · ${formatPercent(b.hitRate)} · ROI ${formatPercent(b.roi)}`));
-                    for(const b of Object.values(c.reasons||{}))details.appendChild(make("p",`${b.label}: ${b.total} kayıt · ${ky(b)} K/Y · ${b.pending} bekleyen`));
-                    row.children[0].appendChild(details);
-                }
-                table.appendChild(body);wrap.appendChild(table);card.appendChild(wrap);container.appendChild(card);
-            }
-            renderV23LiveExperiment(data,container);
-            const signals=(data.signals||[]).filter(s=>v23Source==="all"?true:v23Source==="legacy"?!s.audit:
-                !!s.audit&&(s.sourceModel||"v21")===v23Source.split(":")[0]&&(!v23Source.includes(":")||s.matchedFilters?.includes(v23Source.split(":")[1])));
-            const body=document.getElementById("testlab-v23-rows");body.replaceChildren();
-            for(const s of signals) {
-                const a=s.assessment||{},source=(s.sourceModel||"v21").toUpperCase(),filters=s.matchedFilters?.length?" · "+s.matchedFilters.join("+"):"";
-                const row=addRow(body,[`${formatDateTime(s.sentAt)} · ${source}${filters}${s.audit?"":" · eski"}`,s.match||"-",`${s.minute??"-"}' / ${s.score||"-"}`,
-                    `${String(s.market||"-").replace("_UST"," ÜST")} / ${Number(s.odds).toFixed(3)}`,
-                    [s.dinoProbability,s.selectorV2Probability,s.v18Probability].map(v=>formatPercent(v)).join(" / "),
-                    `${formatPercent(s.prematchMarketSupport)} / ${formatPercent(s.edge)}`,a.goalsNeeded??"-",a.remainingProbability==null?"-":formatPercent(100*a.remainingProbability),"",
-                    `${{W:"Kazandı",L:"Kaybetti",VOID:"İptal",PUSH:"İade"}[s.settlement?.result]||"Bekliyor"} / ${s.settlement?.finalScore||"-"}`]);
-                if(s.audit) {
-                    const details=make("details"),counts={};for(const c of s.audit.controls)counts[c.status]=(counts[c.status]||0)+1;
-                    details.appendChild(make("summary",`${counts.approve||0} onay · ${counts.reject||0} ret · ${counts.observed||0} gözlem · ${counts.insufficient||0} yetersiz`));
-                    if(a.profileStatus)details.appendChild(make("p",`Girişte gol geçmişi: ev ${v23ProfileState(a.profileStatus.home)} / deplasman ${v23ProfileState(a.profileStatus.away)}`));
-                    for(const [side,error] of Object.entries(a.profileDiagnostics||{}))if(error)details.appendChild(make("p",`${side==="home"?"Ev":"Deplasman"}: ${v23ProfileState(error.code)} · ${error.message||""}`));
-                    for(const c of s.audit.controls) {
-                        const p=make("p",`${c.label}: ${verdicts[c.status]||c.status}. ${(c.reasonLabels||[]).join("; ")}`);p.style.maxWidth="480px";p.style.whiteSpace="normal";
-                        const measurement=v23Measurement(c);if(measurement)p.appendChild(make("small"," "+measurement));details.appendChild(p);
-                    }
-                    row.children[8].appendChild(details);
-                    if(s.audit.live){
-                        const live=make("details"),counts={};for(const c of s.audit.live.controls)counts[c.status]=(counts[c.status]||0)+1;
-                        live.appendChild(make("summary",`Canlı deney: ${counts.approve||0} onay · ${counts.reject||0} ret · ${counts.observed||0} gözlem · ${counts.insufficient||0} yetersiz`));
-                        for(const c of s.audit.live.controls){
-                            const p=make("p",`${c.label||c.id}: ${verdicts[c.status]||c.status}. ${(c.reasonLabels||[]).join("; ")} ${v23LiveMeasurement(c)}`);
-                            p.style.maxWidth="520px";p.style.whiteSpace="normal";live.appendChild(p);
-                        }
-                        row.children[8].appendChild(live);
-                    }
-                } else row.children[8].textContent=`Eski V23 · ${verdicts[a.status]||"-"} · ${(a.reasonLabels||[]).join("; ")}`;
-            }
-            if(!body.children.length){const row=addRow(body,["Bu kaynak/dönemde listelenen V23 kaydı yok. Tam kayıtlar JSON/CSV'dedir."]);row.children[0].colSpan=10;}
-        }
-
         function renderV23GoalLab(data) {
-            latestV23Data=data;
-            if(data?.experiment)return renderV23Experiment(data);
-            document.getElementById("testlab-v23-controls").replaceChildren();
-            document.getElementById("testlab-v23-cohort").textContent="";
-            document.getElementById("testlab-v23-mode").textContent = data ? (data.enabled ? "YALNIZ GÖZLEM" : "KAPALI") : "HAZIR DEĞİL";
-            const summary = document.getElementById("testlab-v23-summary-rows"); summary.replaceChildren();
-            const addRow = (body, values) => {
-                const tr = document.createElement("tr");
-                for (const value of values) { const td = document.createElement("td"); td.textContent = value; tr.appendChild(td); }
-                body.appendChild(tr); return tr;
-            };
-            for (const [label,bucket] of [["Tüm eşleşen V21 (baz)",data?.summary?.overall],
-                ["Verisi yeterli baz",data?.comparableBaseline],["Onay",data?.groups?.approve],
-                ["Ret",data?.groups?.reject],["Veri yetersiz",data?.groups?.insufficient]]) {
-                addRow(summary,[label,bucket?.total || 0,`${bucket?.wins || 0} / ${bucket?.losses || 0}`,
-                    bucket?.pending || 0,formatPercent(bucket?.hitRate),formatPercent(bucket?.roi)]);
-            }
-            document.getElementById("testlab-v23-impact").textContent = data
-                ? `Ret ile elenen kayıp: ${data.avoidedLosses || 0} · Kaçırılan kazanan: ${data.missedWinners || 0} · Korunan aday: ${formatPercent(data.retainedPercent)} · Veri kapsamı: ${formatPercent(data.assessedCoverage)}${data.disabledReason ? " · DURUM: " + data.disabledReason : ""}`
-                : "İlk yeni V21 adayı bekleniyor; geçmiş aktarılmaz.";
-            renderV23ProfileStatus(data?.cache,data?.eventCapture,data?.profileCoverage,data?.storage);
-            const body = document.getElementById("testlab-v23-rows"); body.replaceChildren();
-            for (const s of data?.signals || []) {
-                const a = s.assessment || {}, verdict = {approve:"Onay",reject:"Ret",insufficient:"Veri yetersiz"}[a.status] || "-";
-                const row = addRow(body,[formatDateTime(s.sentAt),s.match || "-",`${s.minute ?? "-"}' / ${s.score || "-"}`,
-                    `${String(s.market || "-").replace("_UST"," ÜST")} / ${Number(s.odds).toFixed(3)}`,
-                    [s.dinoProbability,s.selectorV2Probability,s.v18Probability].map(v=>formatPercent(v)).join(" / "),
-                    `${formatPercent(s.prematchMarketSupport)} / ${formatPercent(s.edge)}`,a.goalsNeeded ?? "-",
-                    a.remainingProbability == null ? "-" : formatPercent(100*a.remainingProbability),
-                    `${verdict} · ${(a.reasonLabels || []).join("; ")}`,
-                    `${{W:"Kazandı",L:"Kaybetti",VOID:"İptal",PUSH:"İade"}[s.settlement?.result] || "Bekliyor"} / ${s.settlement?.finalScore || "-"}`]);
-                row.children[8].title = (a.noteLabels || []).join("; ");
-            }
-            if (!body.children.length) { const row=addRow(body,["Bu dönemde V23 gözlemi yok."]); row.children[0].colSpan=10; }
+            latestV23Data = data;
+            renderEntryFilterLab(data, v23Source);
         }
 
         function renderTestLabHistory(data) {
