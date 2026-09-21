@@ -42,9 +42,9 @@ const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
 const v22Tariff = require('./v22_tariff');
 const { createV22Lab } = require('./v22_lab');
-const { GoalProfileCache } = require('./v23_goal_profile');
-const { GoalLab, selectSource: selectV23Source } = require('./v23_goal_lab');
+const { FilterLab, selectSource: selectV23Source, readRetired: readRetiredV23 } = require('./v23_filter_lab');
 const { streamJson: streamV23Json } = require('./v23_export');
+const { AdaptiveScan, providerTrouble } = require('./adaptive_scan');
 const { createIndependentLab, importV19History } = require('./independent_lab');
 const legacyV17Tariff = require('./market_tariff');
 const dinoSelectorV18 = require('./dino_selector_v18');
@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v23-live-lab-2026-09-20';
+const BUILD_VERSION = 'mac-yakala-v23-adaptive-scan-2026-09-21';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -243,11 +243,11 @@ const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
     : path.join(__dirname, 'dino_v22_union_shadow_history.json');
 const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V23_SHADOW_ENABLED = String(process.env.DINO_V23_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
-const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_goal_history.json');
-const V23_GOAL_CACHE_FILE = path.join(__dirname, 'dino_v23_goal_cache.json');
+const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_filter_history.json');
+const V23_RETIRED_HISTORY_FILE = path.join(__dirname, 'dino_v23_goal_history.json');
 if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
     V21_SHADOW_HISTORY_FILE, V22_SHADOW_HISTORY_FILE, CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE]
-    .some(file => [V23_GOAL_HISTORY_FILE, V23_GOAL_CACHE_FILE].includes(path.resolve(file)))) {
+    .some(file => [V23_GOAL_HISTORY_FILE, V23_RETIRED_HISTORY_FILE].includes(path.resolve(file)))) {
     throw new Error('V23 dosya yolları diğer geçmişlerden ayrı olmalıdır.');
 }
 if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
@@ -403,6 +403,7 @@ let state = {
     // Ana sistem açıkken periyodik taramayı ayrıca açıp kapatır.
     // Kapalıyken paneldeki manuel "Şimdi Tara" çalışmaya devam eder.
     autoScanEnabled: true,
+    adaptiveScanEnabled: false,
 
     scheduleEnabled: false,
 
@@ -418,6 +419,7 @@ let state = {
 let isScanning = false;
 
 let nextRunTime = 0;
+const adaptiveScan = new AdaptiveScan();
 
 let masterInterval = null;
 
@@ -510,58 +512,14 @@ app.post('/api/sharing-settings', (req,res)=>{
     catch(error){res.status(400).json({success:false,error:error.message});}
 });
 
-const v23ProfileCache = new GoalProfileCache({ filePath: V23_GOAL_CACHE_FILE, fetchApi: apiGet,
-    maxCallsPerDay: process.env.DINO_V23_HISTORY_DAILY_LIMIT || 80,
-    maxCallsPerWarm: process.env.DINO_V23_HISTORY_BATCH_LIMIT || 6,
-    // Low-priority warming only between scans; never await history on a signal.
-    canFetch: () => DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED) && !isScanning && !isSignalResultRefreshing &&
-        Number.isFinite(quotaRemaining) && quotaRemaining > SHADOW_MIN_QUOTA_REMAINING,
-    blockReason: () => !DINO_V23_SHADOW_ENABLED ? 'lab_disabled' : isScanning || isSignalResultRefreshing ? 'live_scan_priority' :
-        !state.isRunning ? 'system_stopped' : !state.autoScanEnabled ? 'auto_scan_paused' :
-        !Number.isFinite(quotaRemaining) ? 'api_quota_unknown' : quotaRemaining <= SHADOW_MIN_QUOTA_REMAINING ? 'api_quota_reserve' : null,
-    logger: message => addSystemLog(message) });
-const v23GoalLab = new GoalLab({ filePath: V23_GOAL_HISTORY_FILE, cache: v23ProfileCache,
+// Retired profile collectors are not instantiated, loaded, queued or scheduled.
+const v23GoalLab = new FilterLab({ filePath: V23_GOAL_HISTORY_FILE,
     enabled: DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED), logger: message => addSystemLog(message) });
 
-function v23GecmisKuyrugunaEkle(mac, priority = 50) {
-    // Lab-only, memory-only: never fetch/await here and never veto or mutate mac.
+function v23YerelArsivBakimi() {
     try {
-        if (!v23GoalLab.enabled || v23GoalLab.disabledReason) return;
-        const id = Number(mac?.fixture_id);
-        const waiting = (DINO_V21_SHADOW_ENABLED && !v21ShadowTracker.hasSignal(id, 'strong')) ||
-            (DINO_V22_SHADOW_ENABLED && !v22ShadowTracker.hasSignal(id, 'strong'));
-        if (waiting) v23ProfileCache.request(mac, { priority });
-        else v23ProfileCache.cancelFixture(id); // Frozen old decisions are never backfilled.
-    } catch { /* Lab collection must not interrupt active signals. */ }
-}
-
-function v23ErkenGecmisHazirla(fixtures, oddsMap) {
-    try {
-        if (!v23GoalLab.enabled || v23GoalLab.disabledReason) return;
-        for (const fixture of fixtures) {
-            const minute = Number(fixture.fixture?.status?.elapsed);
-            const coverage = leagueCoverageCache.get(coverageKey(fixture.league?.id, fixture.league?.season));
-            const odds = oddsMap.get(Number(fixture.fixture?.id));
-            // Unknown cached coverage must not block the first match of a league.
-            // This queues historical FT fixtures only; live signal coverage gates
-            // remain unchanged, and no extra coverage/live-stat call is made.
-            if (fixture.fixture?.status?.short !== '1H' || minute < 5 || minute >= 25 || coverage?.supported === false ||
-                !odds || !Object.keys(odds).some(market => /_UST$/.test(market))) continue;
-            v23GecmisKuyrugunaEkle({ fixture_id: fixture.fixture?.id, fixture_kickoff: fixture.fixture?.date,
-                league_id: fixture.league?.id, season: fixture.league?.season,
-                mac_isim: `${fixture.teams?.home?.name || '?'} - ${fixture.teams?.away?.name || '?'}`,
-                home_team_id: fixture.teams?.home?.id, away_team_id: fixture.teams?.away?.id }, 10);
-        }
-    } catch { /* A history preparation error never interrupts active scanning. */ }
-}
-
-async function v23ArkaPlanGecmisTurunuCalistir() {
-    try {
-        // Local maintenance makes no API requests and can run while scans are paused.
+        // Disk archive retry only. No history fetch and no rolling observations.
         v23GoalLab.maintain();
-        if (!state.isRunning || !state.autoScanEnabled || isScanning || isSignalResultRefreshing ||
-            !v23GoalLab.enabled || v23GoalLab.disabledReason) return;
-        await v23ProfileCache.warm({canContinue:()=>state.isRunning && state.autoScanEnabled && !v23GoalLab.disabledReason});
     } catch { /* Lab-only; timer failures never affect Telegram. */ }
 }
 
@@ -676,6 +634,7 @@ async function apiGet(url, config = {}) {
                     if (remaining !== undefined) {
                         quotaRemaining = Number(remaining);
                     }
+                    if (providerTrouble(result)) adaptiveScan.providerFailure();
 
                     return result;
                 } catch (error) {
@@ -686,6 +645,9 @@ async function apiGet(url, config = {}) {
                         error.code === 'ETIMEDOUT' ||
                         !error.response;
                     const retryable = status === 429 || status >= 500 || timeoutOrNetwork;
+                    if (retryable) adaptiveScan.providerFailure();
+                    const errorRemaining = error.response?.headers?.['x-ratelimit-requests-remaining'];
+                    if (errorRemaining !== undefined) quotaRemaining = Number(errorRemaining);
 
                     if (!retryable || attempt >= maximumAttempts) {
                         error.message = `${url}: ${error.message}`;
@@ -999,6 +961,7 @@ function loadData() {
                 ...state,
                 ...savedState
             };
+            state.adaptiveScanEnabled = savedState.adaptiveScanEnabled === true;
 
 
             if (
@@ -1188,12 +1151,14 @@ function saveData() {
             )
 
         );
+        return true;
 
     } catch (err) {
 
         addSystemLog(
             "> ⚠️ Hafıza kaydedilemedi."
         );
+        return false;
 
     }
 
@@ -2762,7 +2727,6 @@ async function sinyalOncesiVerileriYenileVeDogrula(mac) {
         // a prior scan's timeline must not masquerade as a fresh response.
         mac._v23Events = Array.isArray(latest.events) ? latest.events : null;
         mac._v23EventsAt = fixtureReceivedAt;
-        try { v23GoalLab.capture(mac,verifiedAt); } catch { /* Observation cannot block a signal. */ }
 
         addSystemLog(
             `> ✅ ${mac.mac_isim}: sinyal öncesi skor + canlı stats + oran taze doğrulandı (${mac.dakika}' / ${mac.skor}).`
@@ -2939,7 +2903,6 @@ async function canliMaclariHazirla() {
         uygunMaclar = await istatistikCoverageFiltrele(uygunMaclar);
 
         // Only uses existing fixture/odds responses; never awaits history here.
-        v23ErkenGecmisHazirla(allLiveFixtures, oddsMap);
 
         addSystemLog(
             `> 🧭 Coverage filtresi: ${statisticsCoverageSnapshot.supportedCount} destekli | ${statisticsCoverageSnapshot.unsupportedCount} desteklenmiyor | ${statisticsCoverageSnapshot.unknownCount} bilinmiyor.`
@@ -5095,12 +5058,11 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
     for (const source of ['v21','v22']) {
         try {
             const observed = v23GoalLab.observe(results[source],mac);
-            if (observed) addSystemLog(`> 🧪 V23 [${source.toUpperCase()}]: ${mac.mac_isim} | ${observed.market} | tüm kontroller ayrı gözlem; sinyal elenmedi, Telegram yok.`);
+            if (observed) addSystemLog(`> 🧪 YENİ LAB [${source.toUpperCase()}]: ${mac.mac_isim} | ${observed.market} | giriş filtreleri ayrı simülasyon; gerçek sinyal elenmedi.`);
         } catch {
             addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
         }
     }
-    v23GecmisKuyrugunaEkle(mac, 100);
     try {
         results.legacyV17 = legacyV17GolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
     } catch (error) {
@@ -5300,6 +5262,8 @@ async function telegramSinyaliGonder() {
 async function botuCalistir() {
     if (isScanning) return;
     isScanning = true;
+    adaptiveScan.begin();
+    let cadenceScanFailed = false;
     const scanId = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const scanCapturedAt = new Date().toISOString();
     const candidateAuditRows = [];
@@ -5309,13 +5273,6 @@ async function botuCalistir() {
 
         const hazirlananMaclar = await canliMaclariHazirla();
         const canliMaclar = hazirlananMaclar.filter(hazirMacHalaUygunMu);
-        // Event capture is independent of history availability. Cold-cache
-        // decisions stay insufficient; never wait for history before a signal.
-        if (DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED)) {
-            for (const mac of canliMaclar) {
-                try { v23GoalLab.capture(mac,mac.observation_completed_at || new Date().toISOString()); } catch { /* Lab-only. */ }
-            }
-        }
 
         if (canliMaclar.length !== hazirlananMaclar.length) {
             addSystemLog(
@@ -5328,7 +5285,7 @@ async function botuCalistir() {
         // score_only modeli dosyada geriye dönük uyumluluk için kalır fakat
         // canlı sinyal hattında hiçbir zaman çağrılmaz.
         const macListesi = canliMaclar.filter(temelStatsTam);
-        for (const mac of macListesi) v23GecmisKuyrugunaEkle(mac, 50);
+        adaptiveScan.observe(macListesi);
         const statsEksikMacSayisi = canliMaclar.length - macListesi.length;
 
         addSystemLog(
@@ -5461,7 +5418,6 @@ async function botuCalistir() {
                 dino,
                 liveOnlyDino
             });
-            if (initialTelegram.length || labGolgeOnAdayi) v23GecmisKuyrugunaEkle(mac, 100);
             const aktifFirsatVar = Array.isArray(firsatlar) && firsatlar.length > 0;
             if (!aktifFirsatVar && !labGolgeOnAdayi && !v20GolgeOnAdayi) {
                 addSystemLog(
@@ -5696,6 +5652,7 @@ async function botuCalistir() {
         }
 
     } catch (error) {
+        cadenceScanFailed = true;
         addSystemLog(`> ❌ ANA TARAMA HATASI: ${error.message}`);
     } finally {
         try {
@@ -5709,7 +5666,9 @@ async function botuCalistir() {
             addSystemLog(`> ⚠️ Aday denetim geçmişi yazılamadı: ${error.message}`);
         }
         isScanning = false;
-        void v23ProfileCache.warm();
+        adaptiveScan.finish({failed:cadenceScanFailed});
+        const cadence = refreshScanCadence();
+        if (state.adaptiveScanEnabled) addSystemLog(`> ⏱️ Tarama ritmi: ${cadence.reasonLabel} | ${cadence.candidateCount} uygun maç.`);
     }
 }
 
@@ -5717,153 +5676,38 @@ async function botuCalistir() {
 // ZAMANLAYICI
 // =========================================================
 
+function currentScanSchedule(resetSingles = false) {
+    if (!state.scheduleEnabled) return {mode:'loop'};
+    const clock = getCurrentTimeTR(); let active = null, changed = false;
+    for (const entry of state.schedules || []) {
+        const inside = entry.start <= entry.end ? clock >= entry.start && clock <= entry.end : clock >= entry.start || clock <= entry.end;
+        if (inside) active = entry;
+        else if (resetSingles && entry.hasRanSingle) { entry.hasRanSingle = false; changed = true; }
+    }
+    if (changed) saveData();
+    return active;
+}
+
+function refreshScanCadence() {
+    const cadence = adaptiveScan.status({enabled:state.adaptiveScanEnabled,running:state.isRunning,
+        auto:state.autoScanEnabled,schedule:currentScanSchedule(),quota:quotaRemaining,reserve:SHADOW_MIN_QUOTA_REMAINING});
+    nextRunTime = cadence.nextRunTime;
+    return cadence;
+}
+
 function masterClock() {
-
-    if (
-        !state.isRunning ||
-        !state.autoScanEnabled
-    ) {
-
-        return;
-
-    }
-
-
-    const nowTime =
-        getCurrentTimeTR();
-
-
-    let activeSchedule =
-        null;
-
-
-    if (
-        state.scheduleEnabled &&
-        state.schedules.length > 0
-    ) {
-
-        for (
-            const s
-            of state.schedules
-        ) {
-
-            const inWindow =
-                (
-                    s.start <=
-                    s.end
-                )
-                    ? (
-                        nowTime >= s.start &&
-                        nowTime <= s.end
-                    )
-                    : (
-                        nowTime >= s.start ||
-                        nowTime <= s.end
-                    );
-
-
-            if (
-                inWindow
-            ) {
-
-                activeSchedule =
-                    s;
-
-            } else if (
-                s.hasRanSingle
-            ) {
-
-                s.hasRanSingle =
-                    false;
-
-                saveData();
-
-            }
-
-        }
-
-    } else if (
-        !state.scheduleEnabled
-    ) {
-
-        activeSchedule = {
-            mode:
-                'loop'
-        };
-
-    }
-
-
-    if (
-        !activeSchedule
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        state.scheduleEnabled &&
-        activeSchedule.mode ===
-        'single'
-    ) {
-
-        if (
-            !activeSchedule.hasRanSingle
-        ) {
-
+    const schedule = currentScanSchedule(true);
+    const cadence = refreshScanCadence();
+    if (!state.isRunning || !state.autoScanEnabled || !schedule || isScanning || isSignalResultRefreshing) return;
+    if (schedule.mode === 'single') {
+        if (!schedule.hasRanSingle) {
             botuCalistir();
-
-            activeSchedule.hasRanSingle =
-                true;
-
+            schedule.hasRanSingle = true;
             saveData();
-
         }
-
-
         return;
-
     }
-
-
-    let beklemeSuresi =
-        10 *
-        60 *
-        1000;
-
-
-    if (
-        activeSchedule.mode ===
-        '5 Dakikada Bir Tara'
-    ) {
-
-        beklemeSuresi =
-            5 *
-            60 *
-            1000;
-
-    }
-
-
-    const nowMs =
-        Date.now();
-
-
-    if (
-        nowMs >=
-        nextRunTime
-    ) {
-
-        botuCalistir();
-
-        nextRunTime =
-            nowMs +
-            beklemeSuresi;
-
-    }
-
+    if (!cadence.nextRunTime || Date.now() >= cadence.nextRunTime) botuCalistir();
 }
 
 
@@ -6784,10 +6628,30 @@ for (const suffix of ['', '/export', '/export.csv']) {
             signals: v23GoalLab.list(req.query.limit,selection.items) });
         const csv = suffix.endsWith('.csv');
         res.setHeader('Content-Type', csv ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="dino-v23-kontrol-${source.replace(':','-')}-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="mac-yakala-yeni-filtre-${source.replace(':','-')}-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
         if (csv) return res.send(v23GoalLab.csv(selection.items));
         try { await streamV23Json(res, { ...v23GoalLab.exportStream(selection.items), filter: selection.filter, exportedAt: new Date().toISOString() }); }
         catch { if (!res.destroyed) res.destroy(); }
+    });
+}
+
+// Retired evidence is opened only for an explicit export, never during scans.
+for (const suffix of ['/export', '/export.csv']) {
+    app.get(`/api/v23-retired-history${suffix}`, async (req, res) => {
+        try {
+            const retired = readRetiredV23(V23_RETIRED_HISTORY_FILE);
+            const selection = gecmisSeciminiHazirla(req, res, retired.indexList(100000), 'sentAt');
+            if (!selection) return;
+            const csv = suffix.endsWith('.csv');
+            res.setHeader('Content-Type', csv ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="mac-yakala-eski-lab-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
+            if (csv) return res.send(retired.csv(selection.items));
+            await streamV23Json(res, {...retired.exportStream(selection.items), retired:true, filter:selection.filter,
+                note:'Eski deneyler durduruldu; kayıtlar son saklandıkları haliyle korunur. Yeni filtre dönemine katılmaz.'});
+        } catch {
+            if (!res.headersSent) res.status(503).json({success:false,message:'Eski LAB arşivi okunamadı; dosyalar değiştirilmedi.'});
+            else if (!res.destroyed) res.destroy();
+        }
     });
 }
 
@@ -7045,6 +6909,7 @@ app.post(
 
         state.isRunning =
             true;
+        adaptiveScan.resetClock();
 
 
         saveData();
@@ -7215,6 +7080,13 @@ app.post(
     (req, res) => {
 
         let autoScanYeniAcildi = false;
+        const previousSettings = {...state};
+        if (req.body.adaptiveScanEnabled !== undefined) {
+            if (typeof req.body.adaptiveScanEnabled !== 'boolean') {
+                return res.status(400).json({success:false,message:'Hızlı tarama ayarı true/false olmalıdır.'});
+            }
+            state.adaptiveScanEnabled = req.body.adaptiveScanEnabled;
+        }
 
         if (
             req.body.oran !== undefined
@@ -7286,11 +7158,15 @@ app.post(
         }
 
 
-        saveData();
-
+        if (!saveData()) {
+            state = previousSettings;
+            return res.status(500).json({success:false,message:'Ayar diske kaydedilemedi; önceki ayar korundu.'});
+        }
+        if (autoScanYeniAcildi) adaptiveScan.resetClock();
+        const cadence = refreshScanCadence();
 
         addSystemLog(
-            `> ⚙️ Ayarlar güncellendi. Minimum EDGE: %${state.globalMinEdge} | Otomatik 10 dk tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'}`
+            `> ⚙️ Ayarlar güncellendi. Minimum EDGE: %${state.globalMinEdge} | Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Tam-stat hızlandırma: ${state.adaptiveScanEnabled ? 'AÇIK' : 'KAPALI'} | ${cadence.reasonLabel}`
         );
 
 
@@ -7416,6 +7292,7 @@ app.get(
 app.get(
     '/api/status',
     (req, res) => {
+        const cadence = refreshScanCadence();
 
         res.json({
 
@@ -7432,7 +7309,8 @@ app.get(
                 state.autoScanEnabled,
 
             scanIntervalMinutes:
-                10,
+                cadence.intervalMinutes,
+            adaptiveScan: cadence,
 
             minEdge:
                 state.globalMinEdge,
@@ -7599,9 +7477,8 @@ v20ShadowTracker.load();
 // Retired V19 history is not opened or rewritten.
 v21ShadowTracker.load();
 v22ShadowTracker.load();
-v23ProfileCache.load();
 v23GoalLab.load();
-addSystemLog(`> 🧪 V23 KONTROL LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | yeni V21 + V22 ayrı kollar | onay / varsayımsal ret / gözlem / veri yetersiz | sinyal veto edilmez | Telegram YOK.`);
+addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21: 2 / V22: 3 deney + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0 | Telegram değişmez.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
 sharingSettings.load();
@@ -7657,7 +7534,7 @@ app.listen(
 
 
         addSystemLog(
-            `> 🔄 Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Döngü: 10 dakika | Maç aralığı: 25-80. dakika.`
+            `> 🔄 Otomatik tarama: ${state.autoScanEnabled ? 'AÇIK' : 'KAPALI'} | Normal 10 dk; tam-stat hızlandırma ${state.adaptiveScanEnabled ? 'AÇIK' : 'KAPALI'} | Maç aralığı: 25-80. dakika.`
         );
 
 
@@ -7705,10 +7582,8 @@ app.listen(
             );
         }
 
-        // Drain bounded history batches between 10-minute scans, not just once
-        // at scan end. The pump skips stopped/paused/scanning/result-refresh states
-        // and retains the same daily, per-batch, shared API and quota guards.
-        setInterval(v23ArkaPlanGecmisTurunuCalistir, 60000);
+        // Local settled-record archive only; retired API collectors never run.
+        setInterval(v23YerelArsivBakimi, 60000);
 
         setTimeout(
             () => {

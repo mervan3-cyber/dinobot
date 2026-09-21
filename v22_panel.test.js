@@ -21,6 +21,7 @@ const document={body:new Element('body'),getElementById:id=>elements.get(id)||nu
     createElement(tag){const e=new Element(tag);if(tag==='a')anchors.push(e);return e;}};
 const context=vm.createContext({document,window:{location:{protocol:'https:',origin:'https://offline.test'}},URLSearchParams,
     setInterval(){},setTimeout(){},clearTimeout(){},fetch(){throw Error('Live network forbidden');}});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'public/v23_filter_panel.js'),'utf8'),context);
 for(const [,script]of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi))vm.runInContext(script,context);
 const signal={sentAt:'2026-09-13T10:00:00Z',match:'Home <img src=x> - Away',minute:35,score:'1-0',market:'2.5_UST',
     matchedFilters:['A','B'],goalsNeeded:2,dinoProbability:59,selectorV2Probability:61,v18Probability:62,voteCount:3,

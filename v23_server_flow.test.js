@@ -16,7 +16,7 @@ const context=vm.createContext({require:name=>Object.hasOwn(external,name)?exter
     console:{log(){},warn(){},error(){}},Date,Buffer,URL,URLSearchParams,setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+`
 for(const tracker of [coreShadowTracker,legacyV17ShadowTracker,v20ShadowTracker])tracker.data.startedAt='1970-01-01T00:00:00Z';
-globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v23GoalLab,v23ProfileCache,signalTracker,
+globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v23GoalLab,signalTracker,
     enrichFixturesWithStats, tazeStatlariMacaUygula,
     setup(mac,p=60,valid=true){
         canliMaclariHazirla=async()=>[mac];hazirMacHalaUygunMu=()=>true;temelStatsTam=()=>true;
@@ -33,92 +33,80 @@ globalThis.api={botuCalistir,v21ShadowTracker,v22ShadowTracker,v23GoalLab,v23Pro
 const api=context.api;
 const match=id=>({fixture_id:id,fixture_kickoff:'2026-09-14T20:30:00Z',league_id:39,season:2026,home_team_id:1,away_team_id:2,
     mac_isim:'Offline Home - Away',lig:'Offline',dakika:60,skor:'0-0',status_short:'2H',home_red:0,away_red:0,
-    canli_oranlar:{'0.5_UST':{oran:1.6,bookmaker:'Offline'}},prematch_totals:{'0.5':{over:.85,under:.15}}});
+    stats_identity_verified:true,stats_received_at:'2026-09-14T21:30:00.000Z',home_shot:10,away_shot:8,home_sot:4,away_sot:3,
+    _v23EventsAt:'2026-09-14T21:30:00.000Z',_v23Events:[],canli_oranlar:{'0.5_UST':{oran:1.6,bookmaker:'Offline'}},prematch_totals:{'0.5':{over:.85,under:.15}}});
 class Response extends EventEmitter { constructor(){super();this.parts=[];this.headers={};this.destroyed=false;this.statusCode=200;}
     json(body){this.body=body;}send(body){this.body=body;}write(part){this.parts.push(part);return true;}end(){this.body=JSON.parse(this.parts.join(''));}
     setHeader(k,v){this.headers[k]=v;}status(v){this.statusCode=v;return this;}destroy(){this.destroyed=true;} }
 async function get(route,query={}){const res=new Response();await routes.get(route)({query},res);return res;}
 (async()=>{
-    assert.equal(api.v23GoalLab.data.signals.length,0);assert.equal(api.v23GoalLab.metadata().startedAt,null);
-    let m={...match(2301),home_shot:10,away_shot:8,home_sot:4,away_sot:3,home_corner:3,away_corner:2,
-        home_xg:1.2,away_xg:.9,stats_identity_verified:true,stats_received_at:'2026-09-14T21:30:00.000Z',
-        observation_completed_at:'2026-09-14T21:30:00.000Z',
-        _v23LiveStats:{home:{shotsInsidebox:6},away:{shotsInsidebox:5}}};
-    api.v23GoalLab.capture({...m,dakika:50,home_shot:6,away_shot:6,home_sot:2,away_sot:2,home_xg:.8,away_xg:.7,
-        stats_received_at:'2026-09-14T21:20:00.000Z',_v23LiveStats:{home:{shotsInsidebox:4},away:{shotsInsidebox:3}}},'2026-09-14T21:20:00.000Z');
-    api.setup(m);await api.botuCalistir();
-    assert.equal(api.v21ShadowTracker.data.signals.length,1);assert.equal(api.v23GoalLab.data.signals.length,2);
-    const observation=api.v23GoalLab.data.signals[0];assert.equal(observation.assessment.status,'insufficient');
-    assert.equal(observation.audit.live.controls.find(c=>c.id==='tempo10').status,'approve','Actual source flow uses warmed live observations');
-    assert.equal(observation.audit.live.controls.find(c=>c.id==='combined_xg').status,'approve');
-    assert.equal(observation.audit.live.decisionImpact,false);
-    assert.equal(observation.baselineSignalId,api.v21ShadowTracker.data.signals[0].signalId);
-    assert.equal(deliveries.length,1);assert.equal(api.signalTracker.data.signals.length,1);
-    assert.equal(api.v23GoalLab.data.signals[1].sourceModel,'v22');
-    await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2,'Repeat scan cannot rejudge either source');
-    m=match(2302);api.setup(m,49);await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2,'Not a source candidate');
-    m=match(2303);api.setup(m,60,false);await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2,'Fresh stats failed');
-    m={...match(2305),dakika:70,skor:'2-1',canli_oranlar:{'4.5_UST':{oran:1.8,bookmaker:'Offline'}},prematch_totals:{'4.5':{over:.25,under:.75}}};
-    api.setup(m,52);await api.botuCalistir();
-    assert.equal(api.v23GoalLab.data.signals.length,3,'V22 A is observed even when V21 rejects the source');
-    assert.equal(api.v21ShadowTracker.hasSignal(2305,'strong'),false);
-    assert.equal(api.v23GoalLab.data.signals[2].sourceModel,'v22');
-    assert.equal(api.v23GoalLab.data.signals[2].matchedFilters.join('+'),'A');
-    assert.equal(deliveries.length,2,'V22 A sends independently; V23 does not veto it');
-    assert.equal(api.signalTracker.data.signals[1].fixtureId,2305);
-    assert(api.v23GoalLab.data.signals.every(s=>s.telegramMessageId===null),'V23 itself never sends');
-    api.v23GoalLab.observe=()=>{throw Error('V23 isolated failure');};
-    api.v23ProfileCache.request=()=>{throw Error('Lab history queue failure must not stop Telegram');};
-    m=match(2304);api.setup(m);await api.botuCalistir();assert(api.v21ShadowTracker.hasSignal(2304,'strong'));
-    assert(api.v22ShadowTracker.hasSignal(2304,'strong'),'Other labs survive V23 failure');
-    assert.equal(api.signalTracker.data.signals.length,3,'History and V23 failures cannot veto active signals');
+    assert.equal(api.v23GoalLab.data.signals.length,0);
+    api.setup(match(2301));await api.botuCalistir();
+    assert.equal(api.v23GoalLab.data.signals.length,2);
+    assert.equal(deliveries.length,1,'Same-entry V21/V22 combined delivery unchanged');
+    const first=api.v23GoalLab.data.signals[0];
+    assert.equal(first.baselineSignalId,api.v21ShadowTracker.data.signals[0].signalId);
+    assert(first.filterAudit);assert.equal(first.audit,undefined,'No retired audit computed');
+    assert.equal(first.filterAudit.controls.find(c=>c.id==='event_score').status,'approve');
+    assert.equal(first.filterAudit.controls.find(c=>c.id==='v21_score').status,'unaffected');
+    await api.botuCalistir();assert.equal(api.v23GoalLab.data.signals.length,2);
+    api.setup({...match(2302),dakika:75});await api.botuCalistir();
+    const late=api.v23GoalLab.data.signals.find(s=>s.fixtureId===2302&&s.sourceModel==='v22');
+    assert.equal(late.filterAudit.controls.find(c=>c.id==='v22_minute').status,'reject');
+    assert.equal(deliveries.length,2,'LAB rejection never blocks Telegram');
+    const zero={...match(2303),canli_oranlar:{'1.5_UST':{oran:1.6}},prematch_totals:{'1.5':{over:.85,under:.15}}};
+    api.setup(zero);await api.botuCalistir();
+    assert.equal(api.v23GoalLab.data.signals.at(-1).filterAudit.controls.find(c=>c.id==='v21_score').status,'reject');
+    assert.equal(deliveries.length,3,'0-0 1.5 rejection is LAB-only');
+    api.setup({...match(2304),skor:'1-0',dakika:78,canli_oranlar:{'1.5_UST':{oran:1.6}},prematch_totals:{'1.5':{over:.85,under:.15}}});
+    await api.botuCalistir();
+    const protectedEntry=api.v23GoalLab.data.signals.find(s=>s.fixtureId===2304&&s.sourceModel==='v22');
+    assert.equal(protectedEntry.matchedFilters.join('+'),'A+C');
+    assert.equal(protectedEntry.filterAudit.controls.find(c=>c.id==='v22_minute').status,'unaffected');
+    assert.equal(deliveries.length,4);
+    api.setup(match(2305),49);await api.botuCalistir();
+    api.setup(match(2306),60,false);await api.botuCalistir();
+    assert.equal(api.v23GoalLab.data.signals.length,7,'No new record for source/fresh validation failures');
+    api.v23GoalLab.observe=()=>{throw Error('isolated LAB failure');};
+    api.setup(match(2307));await api.botuCalistir();assert.equal(deliveries.length,5);
+    assert(api.v21ShadowTracker.hasSignal(2307,'strong'));assert(api.v22ShadowTracker.hasSignal(2307,'strong'));
     const comparison=(await get('/api/test-lab-comparison',{date:'2026-09-15'})).body;
-    assert.equal(comparison.v23Goal.summary.overall.total,3,'TSI day is UTC+3');
-    assert.equal(comparison.v23Goal.experiment.sources.v21.baseline.total,1);
-    assert.equal(comparison.v23Goal.experiment.sources.v22.baseline.total,2);
-    assert.equal(comparison.v23Goal.liveExperiment.sources.v21.controls.find(c=>c.id==='tempo10').approve.pending,1);
+    assert.equal(comparison.v23Goal.summary.overall.total,7);
+    assert.equal(comparison.v23Goal.filters.sources.v21.baseline.total,4);
+    assert.equal(comparison.v23Goal.filters.sources.v22.baseline.total,3);
+    assert.equal(comparison.v23Goal.filters.sources.v22.controls.find(c=>c.id==='v22_minute').reject.pending,1);
     assert.equal((await get('/api/test-lab-comparison',{date:'2026-09-14'})).body.v23Goal.summary.overall.total,0);
-    const json=await get('/api/v23-goal-history/export',{date:'2026-09-15'});
-    assert.equal(json.body.signals.length,3);assert.equal(json.body.telegram,false);
-    assert.match(json.headers['Content-Disposition'],/2026-09-15.json/);
-    assert.equal((await get('/api/v23-goal-history/export',{date:'2026-09-14'})).body.signals.length,0);
+    for(const [source,count]of [['all',7],['v21',4],['v22:C',3],['v22:A',1]]) {
+        const json=await get('/api/v23-goal-history/export',{date:'2026-09-15',source});
+        assert.equal(json.body.signals.length,count);assert.equal(json.body.decisionImpact,false);
+        assert.equal(json.body.additionalApiCalls,0);assert.equal(Object.keys(json.body.profiles).length,0);
+    }
     assert.equal((await get('/api/v23-goal-history',{date:'nonsense'})).statusCode,400);
     assert.equal((await get('/api/v23-goal-history',{source:'invalid'})).statusCode,400);
-    assert.equal((await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v21'})).body.signals.length,1);
-    assert.equal((await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v22:C'})).body.signals.length,1);
-    assert.equal((await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v22:A'})).body.signals[0].fixtureId,2305);
-    assert.equal((await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'legacy'})).body.signals.length,0);
-    assert.match((await get('/api/v23-goal-history/export.csv',{date:'2026-09-15'})).body,/insufficient/);
+    assert.equal((await get('/api/v23-goal-history',{source:'legacy'})).statusCode,400,'Retired archive is separate');
+    const retired=await get('/api/v23-retired-history/export');
+    assert.equal(retired.body.retired,true);assert.equal(retired.body.enabled,false);
+    assert(!fs.existsSync(path.join(root,'dino_v23_goal_cache.json')),'No retired collector file created');
+    assert(!fs.existsSync(path.join(root,'dino_v23_goal_history.json')),'No retired history written');
+    assert(fs.existsSync(path.join(root,'dino_v23_filter_history.json')));
     await api.settle({fixture:{id:2301,status:{short:'FT'}},score:{fulltime:{home:1,away:0}}});
-    assert.equal(api.v23GoalLab.data.signals[0].settlement.result,'W','Even insufficient verdicts settle');
-    assert.equal((await get('/api/status')).body.testLabTracking.v23Goal.summary.overall.wins,2);
     assert.equal(api.v23GoalLab.metadata().storage.archivedRecords,2);
-    const archivedPage=await get('/api/test-lab-comparison',{date:'2026-09-15',limit:'1'});
-    assert.equal(archivedPage.body.v23Goal.summary.overall.wins,2);
-    assert.equal(archivedPage.body.v23Goal.signals.length,1);
-    const archivedJson=await get('/api/v23-goal-history/export',{date:'2026-09-15',source:'v22:C'});
-    assert.equal(archivedJson.body.signals[0].settlement.result,'W');
-    assert(archivedJson.body.signals[0].audit.events,'Archived details must be restored, not just the compact index');
-    assert.equal(archivedJson.body.signals[0].audit.live.controls.find(c=>c.id==='tempo10').values.totals.shot,6);
-    assert(archivedJson.body.signals[0].audit.live.evidence.windows['10'].from);
-    assert.equal(archivedJson.body.signals[0].archiveRef,undefined);
-    assert.match((await get('/api/v23-goal-history/export.csv',{date:'2026-09-15'})).body,/Offline Home/);
-    const state=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}}}])[0];
-    assert.equal(state.fixture_kickoff,'2026-09-14T10:00:00Z');
-    assert.equal(state._v23Events,null);
-    const raw=api.enrichFixturesWithStats([{fixture:{id:1,date:'2026-09-14T10:00:00Z'},league:{},teams:{home:{id:1},away:{id:2}},events:[],_dino_fixture_received_at:'2026-09-14T10:01:00Z'}])[0];
-    assert.equal(raw._v23Events.length,0);assert.equal(raw._v23EventsAt,'2026-09-14T10:01:00Z');
-    const statTeam=(id,inside)=>({team:{id},statistics:[{type:'Total Shots',value:10},{type:'Shots on Goal',value:4},
-        {type:'Corner Kicks',value:3},{type:'Shots insidebox',value:inside},{type:'Shots outside box',value:2},{type:'Blocked Shots',value:1},{type:'expected_goals',value:1.2}]});
-    const rich=api.enrichFixturesWithStats([{fixture:{id:1},teams:{home:{id:10},away:{id:20}},statistics:[statTeam(20,5),statTeam(10,6)]}])[0];
-    assert.equal(rich._v23LiveStats.home.shotsInsidebox,6);assert.equal(rich._v23LiveStats.away.shotsInsidebox,5,'Reversed team order mapped by identity');
-    assert.equal(rich._v23LiveStats.home.shotsOutsidebox,2);assert.equal(rich._v23LiveStats.home.blockedShots,1);
-    api.tazeStatlariMacaUygula(rich,state);assert.equal(rich._v23LiveStats.home.shotsInsidebox,null,'Missing fresh optional stat must not borrow old value');
-    assert.equal(deliveries.length,4,'Three independent signal messages plus one confirmed-win reply; exports do not send');
+    assert.equal((await get('/api/status')).body.testLabTracking.v23Goal.summary.overall.wins,2);
+    const exported=await get('/api/v23-goal-history/export',{source:'v22:C'});
+    const settled=exported.body.signals.find(s=>s.fixtureId===2301);
+    assert.equal(settled.settlement.result,'W');
+    assert.equal(settled.filterAudit.controls.find(c=>c.id==='v22_quality').values.totalShots,18);
+    assert.equal(settled.archiveRef,undefined);
+    const paged=await get('/api/test-lab-comparison',{date:'2026-09-15',limit:'1'});
+    assert.equal(paged.body.v23Goal.signals.length,1);assert.equal(paged.body.v23Goal.summary.overall.total,7);
+    assert.match((await get('/api/v23-goal-history/export.csv')).body,/v22_quality/);
+    assert.equal(deliveries.length,6,'Five signals plus one win reply; exports send nothing');
     const onlyV22=vm.createContext({require:context.require,__dirname:path.join(root,'v22-only'),
-        process:{env:{...context.process.env,DINO_V21_SHADOW_ENABLED:'false',DINO_V22_SHADOW_ENABLED:'true'},platform:process.platform},
+        process:{env:{...context.process.env,DINO_V21_SHADOW_ENABLED:'false'},platform:process.platform},
         console:context.console,Date,Buffer,URL,URLSearchParams,setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
-    vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+';globalThis.sourceFlags=[DINO_V21_SHADOW_ENABLED,DINO_V22_SHADOW_ENABLED,v23GoalLab.enabled];',onlyV22);
-    assert.deepEqual(Array.from(onlyV22.sourceFlags),[false,true,true],'V23 stays enabled with only the V22 source enabled');
-    console.log('V23 real server flow: fresh V21/V22 pairing, V22-only A, no backfill/reselection/extra Telegram, independent V21/V22 delivery, isolated failures, TSI/source exports, embedded events and dual settlement passed.');
-})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(root,{recursive:true,force:true}));
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+';globalThis.labEnabled=v23GoalLab.enabled;',onlyV22);
+    assert.equal(onlyV22.labEnabled,true);
+    console.log('New LAB real server: source capture, LAB rejects still send, A+C protection, dedup, failures, TSI/source exports, archived measurements, result replies and V22-only runtime passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{
+    if(path.dirname(root)===os.tmpdir()&&path.basename(root).startsWith('dino-v23-flow-'))fs.rmSync(root,{recursive:true,force:true});
+});

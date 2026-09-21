@@ -1,10 +1,10 @@
 {
   "name": "dino-backend",
-  "version": "2.5.4",
+  "version": "2.5.6",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node market_tariff.test.js && node hybrid_tariff.test.js && node core_shadow_tariff.test.js && node dino_selector_v18.test.js && node test_lab_tracker.test.js && node test_lab_server_contract.test.js && node test_lab_panel_contract.test.js && node v20_selector.test.js && node v20_data_quality.test.js && node v20_panel_contract.test.js && node v21_tariff.test.js && node independent_lab.test.js && node v21_history.test.js && node v21_server_flow.test.js && node v22_tariff.test.js && node v22_lab.test.js && node v22_server_flow.test.js && node v22_panel.test.js && node v23_goal_profile.test.js && node v23_goal_policy.test.js && node v23_goal_lab.test.js && node v23_server_flow.test.js && node v23_panel.test.js && node v23_events.test.js && node v23_controls.test.js && node mac_yakala_telegram.test.js && node sharing.test.js && node v23_history_collector.test.js && node v23_ready_flow.test.js && node v23_archive.test.js && node v23_live_lab.test.js"
+    "test": "node market_tariff.test.js && node hybrid_tariff.test.js && node core_shadow_tariff.test.js && node dino_selector_v18.test.js && node test_lab_tracker.test.js && node test_lab_server_contract.test.js && node test_lab_panel_contract.test.js && node v20_selector.test.js && node v20_data_quality.test.js && node v20_panel_contract.test.js && node v21_tariff.test.js && node independent_lab.test.js && node v21_history.test.js && node v21_server_flow.test.js && node v22_tariff.test.js && node v22_lab.test.js && node v22_server_flow.test.js && node v22_panel.test.js && node v23_goal_profile.test.js && node v23_goal_policy.test.js && node v23_goal_lab.test.js && node v23_server_flow.test.js && node v23_panel.test.js && node v23_events.test.js && node v23_controls.test.js && node mac_yakala_telegram.test.js && node sharing.test.js && node v23_history_collector.test.js && node v23_ready_flow.test.js && node v23_archive.test.js && node v23_live_lab.test.js && node v23_filter_lab.test.js && node adaptive_scan.test.js && node adaptive_scan_server.test.js && node adaptive_scan_panel.test.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0",

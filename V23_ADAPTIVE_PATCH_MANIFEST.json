@@ -1,0 +1,56 @@
+{
+  "version": "2.5.6",
+  "build": "mac-yakala-v23-adaptive-scan-2026-09-21",
+  "supportedBaseVersions": [
+    "2.5.4",
+    "2.5.5"
+  ],
+  "previousPatchSha256": {
+    "2.5.4": "369cd174fd0757e6ea4f0805922d4718d25795a62dc5b3bf96100e23737b85b0",
+    "2.5.5": "c1b82339d41860b695d6c98ba589e6cc71ade12403b283c06c5e9f612a77d939"
+  },
+  "files": {
+    "server.js": "901d84683d08ad6c4c37d58bf3b74e8aee8ee4281b10650c930687706bc29f5f",
+    "v23_archive.js": "7aa2e7211afed19f244c62f31caea7989ed5a0dedd3ecee4a7ef5d718bf4a0c6",
+    "v23_filter_lab.js": "3c748eade9657cdf5a3a9d8a312c959f9c212f5b9fdf57986e94f5363a754f26",
+    "v23_filter_lab.test.js": "8cbcfe016e752cfdf24334ffcfcfd203dbbbb2c5b7f8df17c80a2913aa5207e9",
+    "index.html": "92a620105b780a27d9d7019cb88359ebdf12ca44d1c6079efc725719b89a48ea",
+    "public/index.html": "92a620105b780a27d9d7019cb88359ebdf12ca44d1c6079efc725719b89a48ea",
+    "public/v23_filter_panel.js": "c303b42e242d5ed7fb3fbf81a05f55e22d9fd5a5e5e5705cb94af865cca4d787",
+    "package.json": "e7a4508162bf0e3e244d2652fad5e0f066b91f6a19a662ad49e91f05c0bb1ae2",
+    "package-lock.json": "149d9af869e1aaf1a7c7f646a81b57cb5ba60a4343f3dce222e5893794a43812",
+    "v23_server_flow.test.js": "f4467744d93bb91e3e4b054918e3aacaadeeb9f4fa74efe39c9e143cbceb57ac",
+    "v23_panel.test.js": "9c11976e1100b020715cbf09ad51ac95671962220daec50a74f0e344cdf3ca32",
+    "v23_ready_flow.test.js": "7bdfac4466afca581911181b9e179332b9cdda546382c2093407727a359267c7",
+    "v23_history_collector.test.js": "eb7d895dba2f613cb943c729f9bdce1d1ca635ec0a7af318f72f8f1bc42d9150",
+    "v20_panel_contract.test.js": "ac191e73bd07519bb4886af98bf4f7637a6bd6f3aa04512c89414d701c8e3b5e",
+    "v22_panel.test.js": "3ca4c2bc90ab03bce5b9f83a8aac2a1ba657826f590558134a27a1cb812e0191",
+    "V23_YENI_FILTRE_LAB_2026-09-21.md": "cd64b7eeeea7a42f1d8ed9b1f2929ebd4fdd34a927125769bf6267eed299b027",
+    "adaptive_scan.js": "664df26966abd68b8771607dbfa54c0744f02e063e042bb09e7b1f45b3a1a76a",
+    "adaptive_scan.test.js": "1c00679bb732cdf14e2e1e0a3e7816b0d74f99df31ce5c17aa3d33f1bbf22864",
+    "adaptive_scan_server.test.js": "2775b9cf826b3789fb399fc674f7c090b9b5910a647eb03f9ee8f7abb0a5c587",
+    "adaptive_scan_panel.test.js": "ea5dbf01eb0946e24bf00548967d6436003606d8063ff8c92b00306eccf30917",
+    "V23_ADAPTIF_TARAMA_2026-09-21.md": "ab1282cf04d737bf886802d41e96af8eeb9a0842c6b772fd0665196e64931537"
+  },
+  "cumulativeLabUpdate": true,
+  "liveDecisionRulesChanged": false,
+  "scanTimingAndSignalOpportunitiesMayChange": true,
+  "adaptiveDefaultEnabled": false,
+  "normalMinutes": 10,
+  "adaptiveMinutes": 5,
+  "additionalLabApiCalls": 0,
+  "adaptiveScanningMayIncreaseApiUse": true,
+  "explicitFixedFiveMinuteSchedulePreserved": true,
+  "retiredCollectorsEnabled": false,
+  "oldArchivePreserved": true,
+  "newHistoryFile": "dino_v23_filter_history.json",
+  "installGuide": "V23_ADAPTIF_TARAMA_2026-09-21.md",
+  "excluded": [
+    ".env",
+    "histories",
+    "API caches",
+    "models",
+    "mac_yakala_telegram.js",
+    "node_modules"
+  ]
+}

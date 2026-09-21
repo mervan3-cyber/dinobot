@@ -39,6 +39,12 @@ function indexRecord(signal, ref) {
     if (signal.audit?.live) index.audit.live = {version:signal.audit.live.version,controls:signal.audit.live.controls.map(c=>({
         id:c.id,status:c.status,reasons:c.reasons,reasonLabels:c.reasonLabels,values:c.values?.tag?{tag:c.values.tag}:{}
     }))};
+    if (signal.filterAudit) {
+        index.baselineSignalId = signal.baselineSignalId;
+        index.filterAudit = {version:signal.filterAudit.version,controls:signal.filterAudit.controls.map(c=>({
+            id:c.id,status:c.status,reasons:c.reasons,reasonLabels:c.reasonLabels,values:{}
+        }))};
+    }
     index.archiveRef = ref;
     return JSON.parse(JSON.stringify(index));
 }

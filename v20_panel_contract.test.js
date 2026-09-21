@@ -67,6 +67,7 @@ const context = vm.createContext({
     clearTimeout() {},
     fetch() { throw new Error('Network is forbidden in panel contract tests.'); }
 });
+vm.runInContext(fs.readFileSync(path.join(__dirname,'public/v23_filter_panel.js'),'utf8'),context);
 for (const [, script] of publicPanel.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
     vm.runInContext(script, context);
 }
