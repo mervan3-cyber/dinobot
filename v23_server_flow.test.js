@@ -12,7 +12,7 @@ const external={dotenv:{config(){}},express,cors:()=>()=>{},axios:{create:()=>({
     './dino_selector_v18':{MODEL:{version:'test18'},scoreMarket:()=>({v18Probability:66,v18Edge:0})}};
 const context=vm.createContext({require:name=>Object.hasOwn(external,name)?external[name]:localRequire(name),__dirname:root,
     process:{env:{TELEGRAM_BOT_TOKEN:'offline',TELEGRAM_CHANNEL_ID:'offline',DINO_CORE_SHADOW_ENABLED:'false',DINO_LEGACY_V17_SHADOW_ENABLED:'false',
-        DINO_V20_SHADOW_ENABLED:'false',DINO_V19_SHADOW_ENABLED:'false'},platform:process.platform},
+        DINO_V20_SHADOW_ENABLED:'false',DINO_V19_SHADOW_ENABLED:'false',MAC_YAKALA_V21_TELEGRAM_ENABLED:'true'},platform:process.platform},
     console:{log(){},warn(){},error(){}},Date,Buffer,URL,URLSearchParams,setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+`
 for(const tracker of [coreShadowTracker,legacyV17ShadowTracker,v20ShadowTracker])tracker.data.startedAt='1970-01-01T00:00:00Z';

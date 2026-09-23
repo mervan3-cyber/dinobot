@@ -16,6 +16,7 @@ const external={dotenv:{config(){}},express,cors:()=>()=>{},
     './dino_selector_v18':{MODEL:{version:'test18'},scoreMarket:()=>({v18Probability:scores.v18,v18Edge:0})}};
 const context=vm.createContext({require:name=>Object.hasOwn(external,name)?external[name]:localRequire(name),__dirname:root,
     process:{env:{TELEGRAM_BOT_TOKEN:'offline',TELEGRAM_CHANNEL_ID:'offline',DINO_CORE_SHADOW_ENABLED:'false',
+        MAC_YAKALA_V21_TELEGRAM_ENABLED:'true',
         TELEGRAM_EXTRA_CHAT_ID:'-1002',X_API_KEY:'offline',X_API_SECRET:'offline',X_ACCESS_TOKEN:'offline',X_ACCESS_TOKEN_SECRET:'offline',
         DINO_LEGACY_V17_SHADOW_ENABLED:'false',DINO_V20_SHADOW_ENABLED:'false',DINO_V19_SHADOW_ENABLED:'false'},platform:process.platform},
     console:{log(){},warn(){},error(){}},Date,Buffer,URL,URLSearchParams,
