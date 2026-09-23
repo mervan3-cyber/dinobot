@@ -12,10 +12,11 @@ function renderEntryFilterLab(data, source) {
     const table=(parent,headers)=>{const wrap=node('div',undefined,'filterlab-scroll'),t=node('table',undefined,'filterlab-table'),head=node('thead'),tr=node('tr');
         headers.forEach(h=>tr.appendChild(node('th',h)));head.appendChild(tr);t.appendChild(head);const body=node('tbody');t.appendChild(body);wrap.appendChild(t);parent.appendChild(wrap);return body;};
     const tone=n=>n>0?'filterlab-positive':n<0?'filterlab-negative':'';
-    el('testlab-v23-mode').textContent=!data?'HAZIR DEĞİL':data.enabled?'YALNIZ LAB · SİNYAL ELENMEZ':'KAPALI';
+    el('testlab-v23-mode').textContent=!data?'HAZIR DEĞİL':!data.enabled?'KAPALI':
+        data.liveGate?.enabled?'V22 CANLI KAPI · V21 YALNIZ LAB':'YALNIZ LAB · SİNYAL ELENMEZ';
     el('testlab-v23-cohort').textContent=`Yeni dönem: ${data?.startedAt?formatDateTime(data.startedAt):'ilk yeni sinyal bekleniyor'}. Eski sonuçlar yeni testlere katılmaz.`;
     el('testlab-v23-impact').textContent=data?.disabledReason?`LAB durumu: ${data.disabledReason}. Canlı modeller etkilenmez.`:
-        `${data?.filters?.sourceRecords||0} kaynak kaydı · ${data?.filters?.uniqueFixtures||0} maç. V21/V22 ayrı değerlendirilir; sonuçları tekil Telegram kasası gibi toplanmaz.`;
+        `${data?.filters?.sourceRecords||0} kaynak kaydı · ${data?.filters?.uniqueFixtures||0} maç. ${data?.liveGate?.enabled?'Yalnız V22 açık retleri canlı gönderimi engeller; V21 etkilenmez.':'V21/V22 yalnız gözlenir.'} Sonuçlar tekil Telegram kasası gibi toplanmaz.`;
     el('testlab-v23-storage').textContent=`Eski deneyler ve geçmiş API toplama kapalı · Yeni testler için ek API: 0 · ${data?.storage?.archivedRecords||0} kayıt arşivde / ${data?.storage?.fullRecordsInMemory||0} tam kayıt RAM’de.${data?.storage?.error?' Arşiv yazılamadı; tam kayıtlar korunuyor.':''}`;
     const summary=el('testlab-v23-summary-rows');summary.replaceChildren();
     for(const name of ['v21','v22']) {
@@ -59,6 +60,7 @@ function renderEntryFilterLab(data, source) {
         for(const c of controls) {
             const def=allDefinitions.find(d=>d.id===c.id),v=c.values||{},parts=[];
             if(v.totalShots!=null)parts.push(`Toplam ${v.totalShots} şut / ${v.totalSot} isabet · oran ${v.sotRatio==null?'tanımsız':pct(v.sotRatio*100)}`);
+            if(v.box)parts.push(`Ceza içi/dışı: Ev ${v.box.home?.inside??'—'}/${v.box.home?.outside??'—'} · Dep ${v.box.away?.inside??'—'}/${v.box.away?.outside??'—'} (yalnız veri)`);
             if(v.trailingSide)parts.push(`Geride: ${v.trailingSide==='home'?'ev':'deplasman'} · şut ${v.trailing?.shot??'yok'} / isabet ${v.trailing?.sot??'yok'}`);
             if(v.goalCount!=null)parts.push(`Olay golü ${v.goalCount} / skor toplamı ${v.scoreTotal}`);
             details.appendChild(node('p',`${def?.label||c.id}: ${verdicts[c.status]}. ${c.reasonLabels.join('; ')}${parts.length?' · '+parts.join(' · '):''}`));
