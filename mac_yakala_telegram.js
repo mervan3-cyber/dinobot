@@ -9,10 +9,23 @@ const FOOTER='Öncelikli modelimiz V22';
 const html=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const clone=v=>JSON.parse(JSON.stringify(v));
 function shortAnalysis(value,market) {
-    const clean=String(value||'').replace(/<[^>]*>/g,'').replace(/[*_`#]/g,'').replace(/\s+/g,' ').trim();
-    const sentences=clean.match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g)||[];
-    const selected=sentences.map(x=>x.trim()).filter(x=>x.length<=180&&!/EDGE|value|Dino|karar motoru|kesin kazan|garanti|%/i.test(x)).slice(0,2).join(' ');
-    return selected||`Canlı veriler ve giriş skoru üzerinden ${String(market).replace('_UST',' ÜST')} seçimi değerlendirildi.`;
+    const clean=String(value||'')
+        .replace(/<[^>]*>/g,'')
+        .replace(/[*_`#]/g,'')
+        .replace(/\s+/g,' ')
+        .trim();
+    // Yalnız noktalama işaretinden sonra boşluk varsa yeni cümle say.
+    // Böylece 0.5, 1.5, 2.5 ve 3.5 gibi market çizgileri parçalanmaz.
+    const sentences=clean
+        .split(/(?<=[.!?])\s+/)
+        .map(sentence=>sentence.trim())
+        .filter(Boolean);
+    const selected=sentences
+        .filter(sentence=>sentence.length<=180&&!/EDGE|value|Dino|karar motoru|kesin kazan|garanti|%/i.test(sentence))
+        .slice(0,2)
+        .join(' ');
+    const marketLabel=String(market||'').replace('_UST',' ÜST');
+    return selected||`Canlı veriler ve giriş skoru üzerinden ${marketLabel} seçimi değerlendirildi.`;
 }
 function formatSignal(record) {
     const models=[...new Set(record.signalSources)].sort((a,b)=>a==='V22'?-1:b==='V22'?1:a.localeCompare(b));
