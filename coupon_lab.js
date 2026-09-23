@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const VERSION = 'coupon-lab-v2-market-profile-2026-09-23';
+const VERSION = 'coupon-lab-v3-htft-first-scoring-2026-09-24';
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO']);
 const MIN_PROFILE_MATCHES = 5;
 const MIN_PHASE_EVENTS = 3;
 const RESULT_CHECK_AFTER_MINUTES = 105;
+const HTFT_CODES = Object.freeze(['0/0','0/1','0/2','1/0','1/1','1/2','2/0','2/1','2/2']);
+const HTFT_REVERSALS = new Set(['1/2','2/1']);
 
 function finite(value) {
     const number = Number(value);
@@ -147,6 +149,25 @@ function normalizedWinnerProbabilities(winnerOdds) {
     };
 }
 
+function normalizedHtftProbabilities(htftOdds) {
+    const raw = {};
+    for (const code of HTFT_CODES) {
+        const odd = finite(htftOdds?.[code]);
+        if (odd && odd > 1) raw[code] = 1 / odd;
+    }
+    const entries = Object.entries(raw);
+    const overround = entries.reduce((sum, [,value]) => sum + value, 0);
+    if (!entries.length || !Number.isFinite(overround) || overround <= 0) {
+        return {probabilities:{}, coverage:0, complete:false, overround:null};
+    }
+    return {
+        probabilities:Object.fromEntries(entries.map(([code,value]) => [code, Number((value * 100 / overround).toFixed(1))])),
+        coverage:entries.length,
+        complete:entries.length === HTFT_CODES.length,
+        overround:Number((overround * 100).toFixed(1))
+    };
+}
+
 function predictionSummary(item) {
     const prediction = item?.predictions || {};
     return {
@@ -214,6 +235,31 @@ function boundedScore(value) {
     return Number(Math.max(0, Math.min(100, Number(value) || 0)).toFixed(1));
 }
 
+function metric(value) {
+    if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function average(values, fallback = 50) {
+    const usable = values.map(metric).filter(value => value !== null);
+    return usable.length ? usable.reduce((sum,value) => sum + value, 0) / usable.length : fallback;
+}
+
+function phaseShare(profile, direction, half) {
+    const split = profile?.[direction === 'score' ? 'scoringMinutes' : 'concedingMinutes'];
+    if (!phaseReady(split)) return null;
+    return metric(half === 'first' ? split.firstShare : split.secondShare);
+}
+
+function profileDataReliability(homeProfile, awayProfile) {
+    const homeReady = profileReady(homeProfile), awayReady = profileReady(awayProfile);
+    const profileScore = homeReady && awayReady ? 100 : homeReady || awayReady ? 62 : 28;
+    const phaseCount = [homeProfile?.scoringMinutes, homeProfile?.concedingMinutes,
+        awayProfile?.scoringMinutes, awayProfile?.concedingMinutes].filter(phaseReady).length;
+    return boundedScore(profileScore * .7 + phaseCount * 7.5);
+}
+
 function predictedSide(fixture, prediction) {
     if (prediction?.winnerId && prediction.winnerId === finite(fixture?.teams?.home?.id)) return 'home';
     if (prediction?.winnerId && prediction.winnerId === finite(fixture?.teams?.away?.id)) return 'away';
@@ -224,72 +270,106 @@ function predictedSide(fixture, prediction) {
 }
 
 function buildPicks(fixture, odds, prediction, homeProfile, awayProfile) {
-    const picks = [];
+    const doubleChancePicks = [];
+    const htftPicks = [];
     const side = predictedSide(fixture, prediction);
     const p = prediction?.percent || {};
     const marketProbability = normalizedWinnerProbabilities(odds?.winner);
+    const htftMarket = normalizedHtftProbabilities(odds?.htft);
     const profilesComplete = profileReady(homeProfile) && profileReady(awayProfile);
     const profileBonus = profilesComplete ? 8 : 0;
-    const add = (market, selection, odd, reasons, qualityScore, support = {}) => {
+    const add = (target, market, selection, odd, reasons, qualityScore, support = {}) => {
         if (!finite(odd)) return;
-        picks.push({market, selection, odd:Number(odd), reasons, qualityScore:boundedScore(qualityScore), support, labOnly:true});
+        target.push({market, selection, odd:Number(odd), reasons, qualityScore:boundedScore(qualityScore), support, labOnly:true});
     };
     const api1X = (finite(p.home) ?? 0) + (finite(p.draw) ?? 0);
     const apiX2 = (finite(p.away) ?? 0) + (finite(p.draw) ?? 0);
     const market1X = marketProbability ? marketProbability['1'] + marketProbability.X : null;
     const marketX2 = marketProbability ? marketProbability['2'] + marketProbability.X : null;
     if (prediction?.winOrDraw && side === 'home' && api1X >= 60 && market1X !== null && market1X >= 60) {
-        add('Çifte Şans', '1X', odds?.doubleChance?.['1X'],
+        add(doubleChancePicks, 'Çifte Şans', '1X', odds?.doubleChance?.['1X'],
             [`API 1X desteği %${api1X.toFixed(1)}`, `Marjsız piyasa 1X %${market1X.toFixed(1)}`],
             api1X * .55 + market1X * .37 + profileBonus,
             {apiProbability:Number(api1X.toFixed(1)),marketProbability:Number(market1X.toFixed(1)),profilesComplete});
     }
     if (prediction?.winOrDraw && side === 'away' && apiX2 >= 60 && marketX2 !== null && marketX2 >= 60) {
-        add('Çifte Şans', 'X2', odds?.doubleChance?.['X2'],
+        add(doubleChancePicks, 'Çifte Şans', 'X2', odds?.doubleChance?.['X2'],
             [`API X2 desteği %${apiX2.toFixed(1)}`, `Marjsız piyasa X2 %${marketX2.toFixed(1)}`],
             apiX2 * .55 + marketX2 * .37 + profileBonus,
             {apiProbability:Number(apiX2.toFixed(1)),marketProbability:Number(marketX2.toFixed(1)),profilesComplete});
     }
 
-    if (profilesComplete && marketProbability && side === 'home' && (p.home ?? 0) >= 50 && marketProbability['1'] >= 40 && phaseReady(homeProfile?.scoringMinutes) && phaseReady(awayProfile?.concedingMinutes)) {
-        const early = homeProfile?.scoringMinutes?.firstShare;
-        const late = homeProfile?.scoringMinutes?.secondShare;
-        const oppEarlyConcede = awayProfile?.concedingMinutes?.firstShare;
-        const oppLateConcede = awayProfile?.concedingMinutes?.secondShare;
-        if (early >= 45 && oppEarlyConcede >= 40) add('İY/MS', '1/1', odds?.htft?.['1/1'],
-            [`API MS1 %${p.home}`, `Marjsız piyasa MS1 %${marketProbability['1']}`, `Ev İY gol %${early} · rakip İY yeme %${oppEarlyConcede}`],
-            p.home * .35 + marketProbability['1'] * .30 + early * .18 + oppEarlyConcede * .17,
-            {apiProbability:p.home,marketProbability:marketProbability['1'],profilesComplete:true});
-        if (late >= 55 && oppLateConcede >= 50) add('İY/MS', '0/1', odds?.htft?.['0/1'],
-            [`API MS1 %${p.home}`, `Marjsız piyasa MS1 %${marketProbability['1']}`, `Ev 2Y gol %${late} · rakip 2Y yeme %${oppLateConcede}`],
-            p.home * .35 + marketProbability['1'] * .30 + late * .18 + oppLateConcede * .17,
-            {apiProbability:p.home,marketProbability:marketProbability['1'],profilesComplete:true});
+    const apiSide = {'1':metric(p.home), '0':metric(p.draw), '2':metric(p.away)};
+    const marketSide = {'1':metric(marketProbability?.['1']), '0':metric(marketProbability?.X), '2':metric(marketProbability?.['2'])};
+    const sideSupport = token => average([apiSide[token], marketSide[token]], 33.3);
+    const firstQuiet = boundedScore(100 - average([
+        phaseShare(homeProfile, 'score', 'first'), phaseShare(awayProfile, 'score', 'first'),
+        phaseShare(homeProfile, 'concede', 'first'), phaseShare(awayProfile, 'concede', 'first')
+    ], 50));
+    const halfSupport = token => token === '1'
+        ? average([sideSupport('1'), phaseShare(homeProfile, 'score', 'first'), phaseShare(awayProfile, 'concede', 'first')])
+        : token === '2'
+            ? average([sideSupport('2'), phaseShare(awayProfile, 'score', 'first'), phaseShare(homeProfile, 'concede', 'first')])
+            : average([sideSupport('0'), firstQuiet]);
+    const lateAttack = token => token === '1'
+        ? average([phaseShare(homeProfile, 'score', 'second'), phaseShare(awayProfile, 'concede', 'second')])
+        : average([phaseShare(awayProfile, 'score', 'second'), phaseShare(homeProfile, 'concede', 'second')]);
+    const homeScored = metric(homeProfile?.scoredPerGame), awayScored = metric(awayProfile?.scoredPerGame);
+    const homeConceded = metric(homeProfile?.concededPerGame), awayConceded = metric(awayProfile?.concededPerGame);
+    const scoringAverage = homeScored !== null && awayScored !== null ? Number((homeScored + awayScored).toFixed(2)) : null;
+    const concedingAverage = homeConceded !== null && awayConceded !== null ? Number((homeConceded + awayConceded).toFixed(2)) : null;
+    const lowGoalFit = scoringAverage === null ? 50 : boundedScore(100 - Math.max(0, scoringAverage - 1.4) * 28);
+    const scoringBalance = scoringAverage === null ? 50 : boundedScore(100 - Math.abs(homeScored - awayScored) * 28);
+    const reliability = profileDataReliability(homeProfile, awayProfile);
+    const htftValues = Object.values(htftMarket.probabilities);
+    const maximumHtftProbability = htftValues.length ? Math.max(...htftValues) : null;
+
+    for (const code of HTFT_CODES) {
+        const odd = finite(odds?.htft?.[code]);
+        if (!odd || odd <= 1) continue;
+        const [half, full] = code.split('/');
+        const fullSupport = sideSupport(full);
+        const openingSupport = halfSupport(half);
+        let transitionSupport;
+        if (half === full) transitionSupport = average([openingSupport, fullSupport]);
+        else if (half === '0' && full !== '0') transitionSupport = average([openingSupport, lateAttack(full), fullSupport]);
+        else if (full === '0') transitionSupport = average([openingSupport, lateAttack(half === '1' ? '2' : '1'), fullSupport]);
+        else transitionSupport = average([openingSupport, lateAttack(full), fullSupport]) - 10;
+        const profileFit = code === '0/0'
+            ? average([lowGoalFit, scoringBalance, firstQuiet])
+            : half === '0'
+                ? average([firstQuiet, lateAttack(full)])
+                : full === half
+                    ? average([openingSupport, fullSupport])
+                    : average([lateAttack(full), fullSupport]);
+        const htftProbability = metric(htftMarket.probabilities[code]);
+        const marketRelative = htftProbability !== null && maximumHtftProbability
+            ? boundedScore(htftProbability * 100 / maximumHtftProbability) : 35;
+        const marketAbsolute = htftProbability !== null ? boundedScore(htftProbability * 3) : boundedScore(300 / odd);
+        let qualityScore = fullSupport * .24 + openingSupport * .18 + transitionSupport * .22 +
+            profileFit * .14 + marketRelative * .10 + marketAbsolute * .04 + reliability * .08;
+        if (HTFT_REVERSALS.has(code)) qualityScore -= 8;
+        qualityScore = boundedScore(qualityScore);
+        const dataLevel = reliability >= 85 && htftMarket.complete ? 'tam' : reliability >= 55 ? 'kısmi' : 'zayıf';
+        const tier = HTFT_REVERSALS.has(code) ? 'sürpriz' : qualityScore >= 70 ? 'güçlü' : qualityScore >= 60 ? 'izlemelik' : 'deneysel';
+        add(htftPicks, 'İY/MS', code, odd, [
+            `API/MS desteği %${Number(fullSupport).toFixed(1)}`,
+            `İY/MS piyasa %${htftProbability === null ? '-' : htftProbability}`,
+            `zaman profili %${Number(profileFit).toFixed(1)}`,
+            `veri ${dataLevel}`
+        ], qualityScore, {
+            apiProbability:apiSide[full], marketProbability:marketSide[full],
+            htftMarketProbability:htftProbability, htftMarketCoverage:htftMarket.coverage,
+            htftMarketComplete:htftMarket.complete, profilesComplete, reliability, dataLevel, tier,
+            scoringAverage, concedingAverage
+        });
     }
-    if (profilesComplete && marketProbability && side === 'away' && (p.away ?? 0) >= 50 && marketProbability['2'] >= 35 && phaseReady(awayProfile?.scoringMinutes) && phaseReady(homeProfile?.concedingMinutes)) {
-        const early = awayProfile?.scoringMinutes?.firstShare;
-        const late = awayProfile?.scoringMinutes?.secondShare;
-        const oppEarlyConcede = homeProfile?.concedingMinutes?.firstShare;
-        const oppLateConcede = homeProfile?.concedingMinutes?.secondShare;
-        if (early >= 45 && oppEarlyConcede >= 40) add('İY/MS', '2/2', odds?.htft?.['2/2'],
-            [`API MS2 %${p.away}`, `Marjsız piyasa MS2 %${marketProbability['2']}`, `Dep. İY gol %${early} · rakip İY yeme %${oppEarlyConcede}`],
-            p.away * .35 + marketProbability['2'] * .30 + early * .18 + oppEarlyConcede * .17,
-            {apiProbability:p.away,marketProbability:marketProbability['2'],profilesComplete:true});
-        if (late >= 55 && oppLateConcede >= 50) add('İY/MS', '0/2', odds?.htft?.['0/2'],
-            [`API MS2 %${p.away}`, `Marjsız piyasa MS2 %${marketProbability['2']}`, `Dep. 2Y gol %${late} · rakip 2Y yeme %${oppLateConcede}`],
-            p.away * .35 + marketProbability['2'] * .30 + late * .18 + oppLateConcede * .17,
-            {apiProbability:p.away,marketProbability:marketProbability['2'],profilesComplete:true});
-    }
-    const underHint = normalize(prediction?.underOver).includes('under') || String(prediction?.underOver || '').trim().startsWith('-');
-    const scoringAverage = profilesComplete ? Number(homeProfile.scoredPerGame) + Number(awayProfile.scoredPerGame) : null;
-    const concedingAverage = profilesComplete ? Number(homeProfile.concededPerGame) + Number(awayProfile.concededPerGame) : null;
-    if (profilesComplete && marketProbability && (p.draw ?? 0) >= 30 && marketProbability.X >= 25 && scoringAverage <= 2.4 && concedingAverage <= 2.8 && (underHint || scoringAverage <= 2.0)) {
-        const lowGoalScore = Math.max(0, 100 - scoringAverage * 25);
-        add('İY/MS', '0/0', odds?.htft?.['0/0'],
-            [`API beraberlik %${p.draw}`, `Marjsız piyasa X %${marketProbability.X}`, `Gol ort. ${scoringAverage.toFixed(2)} · yenen ${concedingAverage.toFixed(2)}`],
-            p.draw * .35 + marketProbability.X * .30 + lowGoalScore * .25 + 10,
-            {apiProbability:p.draw,marketProbability:marketProbability.X,profilesComplete:true,scoringAverage:Number(scoringAverage.toFixed(2)),concedingAverage:Number(concedingAverage.toFixed(2))});
-    }
-    return picks.sort((a,b)=>b.qualityScore-a.qualityScore).slice(0,3);
+
+    htftPicks.sort((a,b)=>b.qualityScore-a.qualityScore || a.odd-b.odd || a.selection.localeCompare(b.selection));
+    doubleChancePicks.sort((a,b)=>b.qualityScore-a.qualityScore || a.odd-b.odd);
+    // İY/MS bu modun ana ürünüdür. Aynı maçta en güçlü üç İY/MS adayı
+    // korunur; çifte şans yalnızca ikincil referans olarak en fazla bir adet eklenir.
+    return [...htftPicks.slice(0,3), ...doubleChancePicks.slice(0,1)];
 }
 
 function settlePick(pick, fixture) {
@@ -310,6 +390,23 @@ function settlePick(pick, fixture) {
     return null;
 }
 
+function rankCouponRows(rows, maximumSelected, maximumDoubleChance = 2) {
+    const score = row => Number(row?.candidateScore) || 0;
+    const kickoff = row => Date.parse(row?.kickoff) || 0;
+    const ordered = list => [...list].sort((a,b) => score(b) - score(a) || kickoff(a) - kickoff(b));
+    const htftRows = ordered(rows.filter(row => row.picks?.some(pick => pick.market === 'İY/MS')));
+    const selected = htftRows.slice(0, maximumSelected);
+    const selectedIds = new Set(selected.map(row => row.id));
+    const remaining = Math.max(0, maximumSelected - selected.length);
+    if (remaining > 0 && maximumDoubleChance > 0) {
+        const fallback = ordered(rows.filter(row => !selectedIds.has(row.id) &&
+            row.picks?.some(pick => pick.market === 'Çifte Şans')))
+            .slice(0, Math.min(remaining, maximumDoubleChance));
+        selected.push(...fallback);
+    }
+    return selected;
+}
+
 class CouponLab {
     constructor(options = {}) {
         this.filePath = options.filePath;
@@ -322,6 +419,7 @@ class CouponLab {
         this.reserve = Math.max(0, Number(options.reserve) || 1000);
         this.maxCandidates = Math.max(1, Number(options.maxCandidates) || 30);
         this.maxSelected = Math.max(1, Number(options.maxSelected) || 10);
+        this.maxDoubleChance = Math.max(0, Math.min(this.maxSelected, Number.isFinite(Number(options.maxDoubleChance)) ? Number(options.maxDoubleChance) : 2));
         this.scanHour = Math.min(23, Math.max(0, Number(options.scanHour) || 9));
         this.scanMinute = Math.min(59, Math.max(0, Number(options.scanMinute) || 0));
         this.finalCheckMinutes = Math.max(15, Number(options.finalCheckMinutes) || 75);
@@ -342,7 +440,8 @@ class CouponLab {
             finalCheckMinutes:this.finalCheckMinutes,
             dailyLimit:this.dailyLimit,
             maxCandidates:this.maxCandidates,
-            maxSelected:this.maxSelected
+            maxSelected:this.maxSelected,
+            maxDoubleChance:this.maxDoubleChance
         };
     }
 
@@ -371,7 +470,9 @@ class CouponLab {
         integer('dailyLimit',20,2000,'Günlük API bütçesi');
         integer('maxCandidates',1,100,'Maksimum aday');
         integer('maxSelected',1,30,'Maksimum kupon maçı');
+        integer('maxDoubleChance',0,30,'Maksimum çifte şans');
         if (next.maxSelected > next.maxCandidates) throw new Error('Maksimum kupon maçı, maksimum aday sayısından büyük olamaz.');
+        if (next.maxDoubleChance > next.maxSelected) throw new Error('Maksimum çifte şans, maksimum kupon maçı sayısından büyük olamaz.');
         this.enabled = next.enabled;
         this.includeTomorrow = next.includeTomorrow;
         [this.scanHour,this.scanMinute] = next.scanTime.split(':').map(Number);
@@ -379,6 +480,7 @@ class CouponLab {
         this.dailyLimit = next.dailyLimit;
         this.maxCandidates = next.maxCandidates;
         this.maxSelected = next.maxSelected;
+        this.maxDoubleChance = next.maxDoubleChance;
         this.data.settings = this.settingsSnapshot();
         if (persist) this.save();
         return this.status();
@@ -524,20 +626,22 @@ class CouponLab {
                 ]);
                 const odds = oddsMap.get(fixtureId);
                 const picks = buildPicks(fixture, odds, prediction, homeProfile, awayProfile);
-                const candidateScore = picks.length ? Math.max(...picks.map(pick => Number(pick.qualityScore) || 0)) : 0;
+                const primaryPicks = picks.filter(pick => pick.market === 'İY/MS');
+                const scoringPicks = primaryPicks.length ? primaryPicks : picks;
+                const candidateScore = scoringPicks.length ? Math.max(...scoringPicks.map(pick => Number(pick.qualityScore) || 0)) : 0;
                 newRows.push({
                     id:`${scan.id}:${fixtureId}`, scanId:scan.id, capturedAt:new Date().toISOString(), day, fixtureDay:dateKey(new Date(fixture.fixture.date)),
                     fixtureId, kickoff:fixture.fixture.date, leagueId:finite(fixture?.league?.id), league:fixture?.league?.name || '-', country:fixture?.league?.country || null,
                     home:{id:finite(fixture?.teams?.home?.id), name:fixture?.teams?.home?.name || '-'},
                     away:{id:finite(fixture?.teams?.away?.id), name:fixture?.teams?.away?.name || '-'},
                     bookmaker:odds.bookmaker, bookmakerId:odds.bookmakerId, odds,
-                    prediction, profiles:{home:homeProfile,away:awayProfile}, picks, candidateScore, selected:false, active:true,
+                    prediction, profiles:{home:homeProfile,away:awayProfile}, picks, candidateScore,
+                    candidateMarket:primaryPicks.length ? 'İY/MS' : picks.length ? 'Çifte Şans' : null,
+                    selected:false, active:true,
                     finalCheck:{status:'waiting',checkedAt:null,reasons:[]}, result:{status:'pending',score:null,picks:[]}
                 });
             }
-            const ranked = newRows.filter(row => row.picks.length).sort((a,b) => {
-                return (b.candidateScore || 0) - (a.candidateScore || 0) || Date.parse(a.kickoff) - Date.parse(b.kickoff);
-            }).slice(0, this.maxSelected);
+            const ranked = rankCouponRows(newRows.filter(row => row.picks.length), this.maxSelected, this.maxDoubleChance);
             const selected = new Set(ranked.map(row => row.id));
             for (const row of newRows) row.selected = selected.has(row.id);
             const refreshedFixtures = new Set(newRows.map(row => Number(row.fixtureId)));
@@ -658,13 +762,17 @@ class CouponLab {
             success:true, version:VERSION, enabled:this.enabled, autoEnabled:this.autoEnabled, running:this.running, settling:this.settling,
             day, scanHour:this.scanHour, scanMinute:this.scanMinute, scanTime:this.settingsSnapshot().scanTime, includeTomorrow:this.includeTomorrow, finalCheckMinutes:this.finalCheckMinutes,
             bookmaker:this.data.bookmaker, api:{used:this.usageToday(now),limit:this.dailyLimit,reserve:this.reserve,remaining:finite(this.getQuotaRemaining())},
-            limits:{maxCandidates:this.maxCandidates,maxSelected:this.maxSelected}, latestScan,
+            limits:{maxCandidates:this.maxCandidates,maxSelected:this.maxSelected,maxDoubleChance:this.maxDoubleChance}, latestScan,
             settings:this.settingsSnapshot(),
-            summary:{candidates:todayRows.length,selected:todayRows.filter(row=>row.selected).length,passed:todayRows.filter(row=>row.finalCheck?.status==='passed').length,rejected:todayRows.filter(row=>row.finalCheck?.status==='rejected').length},
+            summary:{candidates:todayRows.length,selected:todayRows.filter(row=>row.selected).length,
+                selectedHtft:todayRows.filter(row=>row.selected && row.picks?.some(pick=>pick.market==='İY/MS')).length,
+                selectedDoubleChance:todayRows.filter(row=>row.selected && !row.picks?.some(pick=>pick.market==='İY/MS') && row.picks?.some(pick=>pick.market==='Çifte Şans')).length,
+                passed:todayRows.filter(row=>row.finalCheck?.status==='passed').length,rejected:todayRows.filter(row=>row.finalCheck?.status==='rejected').length},
             candidates:todayRows.sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)),
             disclaimer:'Yalnız LAB verisidir; Telegram ve canlı V21/V22 sinyallerini etkilemez.'
         };
     }
 }
 
-module.exports = {CouponLab, VERSION, dateKey, parseOddsRows, normalizedWinnerProbabilities, predictionSummary, teamSummary, buildPicks, settlePick};
+module.exports = {CouponLab, VERSION, dateKey, parseOddsRows, normalizedWinnerProbabilities,
+    normalizedHtftProbabilities, predictionSummary, teamSummary, buildPicks, settlePick, rankCouponRows};
