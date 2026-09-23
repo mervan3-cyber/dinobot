@@ -34,6 +34,7 @@ const api=context.api;
 const match=id=>({fixture_id:id,fixture_kickoff:'2026-09-14T20:30:00Z',league_id:39,season:2026,home_team_id:1,away_team_id:2,
     mac_isim:'Offline Home - Away',lig:'Offline',dakika:60,skor:'0-0',status_short:'2H',home_red:0,away_red:0,
     stats_identity_verified:true,stats_received_at:'2026-09-14T21:30:00.000Z',home_shot:10,away_shot:8,home_sot:4,away_sot:3,
+    _v23LiveStats:{home:{shotsInsidebox:6,shotsOutsidebox:4,blockedShots:1},away:{shotsInsidebox:3,shotsOutsidebox:5,blockedShots:2}},
     _v23EventsAt:'2026-09-14T21:30:00.000Z',_v23Events:[],canli_oranlar:{'0.5_UST':{oran:1.6,bookmaker:'Offline'}},prematch_totals:{'0.5':{over:.85,under:.15}}});
 class Response extends EventEmitter { constructor(){super();this.parts=[];this.headers={};this.destroyed=false;this.statusCode=200;}
     json(body){this.body=body;}send(body){this.body=body;}write(part){this.parts.push(part);return true;}end(){this.body=JSON.parse(this.parts.join(''));}
@@ -53,7 +54,8 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     api.setup({...match(2302),dakika:75});await api.botuCalistir();
     const late=api.v23GoalLab.data.signals.find(s=>s.fixtureId===2302&&s.sourceModel==='v22');
     assert.equal(late.filterAudit.controls.find(c=>c.id==='v22_minute').status,'reject');
-    assert.equal(deliveries.length,2,'LAB rejection never blocks Telegram');
+    assert.equal(deliveries.length,2,'Independent V21 still sends when V22 is rejected');
+    assert.deepEqual(api.signalTracker.data.signals.find(s=>s.fixtureId===2302).signalSources,['V21'],'Only V22 source is removed');
     const zero={...match(2303),canli_oranlar:{'1.5_UST':{oran:1.6}},prematch_totals:{'1.5':{over:.85,under:.15}}};
     api.setup(zero);await api.botuCalistir();
     assert.equal(api.v23GoalLab.data.signals.at(-1).filterAudit.controls.find(c=>c.id==='v21_score').status,'reject');
@@ -78,7 +80,8 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal((await get('/api/test-lab-comparison',{date:'2026-09-14'})).body.v23Goal.summary.overall.total,0);
     for(const [source,count]of [['all',7],['v21',4],['v22:C',3],['v22:A',1]]) {
         const json=await get('/api/v23-goal-history/export',{date:'2026-09-15',source});
-        assert.equal(json.body.signals.length,count);assert.equal(json.body.decisionImpact,false);
+        assert.equal(json.body.signals.length,count);assert.equal(json.body.decisionImpact,true);
+        assert.equal(json.body.liveGate.source,'v22');assert.equal(json.body.liveGate.v21DecisionImpact,false);
         assert.equal(json.body.additionalApiCalls,0);assert.equal(Object.keys(json.body.profiles).length,0);
     }
     assert.equal((await get('/api/v23-goal-history',{date:'nonsense'})).statusCode,400);
@@ -88,7 +91,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(retired.body.retired,true);assert.equal(retired.body.enabled,false);
     assert(!fs.existsSync(path.join(root,'dino_v23_goal_cache.json')),'No retired collector file created');
     assert(!fs.existsSync(path.join(root,'dino_v23_goal_history.json')),'No retired history written');
-    assert(fs.existsSync(path.join(root,'dino_v23_filter_history.json')));
+    assert(fs.existsSync(path.join(root,'dino_v23_filter_history_v2.json')));
     await api.settle({fixture:{id:2301,status:{short:'FT'}},score:{fulltime:{home:1,away:0}}});
     assert.equal(api.v23GoalLab.metadata().storage.archivedRecords,2);
     assert.equal((await get('/api/status')).body.testLabTracking.v23Goal.summary.overall.wins,2);
@@ -96,6 +99,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     const settled=exported.body.signals.find(s=>s.fixtureId===2301);
     assert.equal(settled.settlement.result,'W');
     assert.equal(settled.filterAudit.controls.find(c=>c.id==='v22_quality').values.totalShots,18);
+    assert.equal(settled.liveStats.home.shotsInsideBox,6,'Box shots are persisted without a new request');
     assert.equal(settled.archiveRef,undefined);
     const paged=await get('/api/test-lab-comparison',{date:'2026-09-15',limit:'1'});
     assert.equal(paged.body.v23Goal.signals.length,1);assert.equal(paged.body.v23Goal.summary.overall.total,7);
@@ -106,7 +110,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
         console:context.console,Date,Buffer,URL,URLSearchParams,setInterval(){},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
     vm.runInContext(fs.readFileSync(path.join(__dirname,'server.js'),'utf8')+';globalThis.labEnabled=v23GoalLab.enabled;',onlyV22);
     assert.equal(onlyV22.labEnabled,true);
-    console.log('New LAB real server: source capture, LAB rejects still send, A+C protection, dedup, failures, TSI/source exports, archived measurements, result replies and V22-only runtime passed.');
+    console.log('V23 V22 live gate: V21 isolation, V22 explicit veto, A+C protection, observations, exports, archive and result flow passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{
     if(path.dirname(root)===os.tmpdir()&&path.basename(root).startsWith('dino-v23-flow-'))fs.rmSync(root,{recursive:true,force:true});
 });

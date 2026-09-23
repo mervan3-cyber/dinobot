@@ -6,13 +6,14 @@ const { GoalLab } = require('./v23_goal_lab');
 const { VERSION: LEGACY_STORAGE } = require('./v23_goal_policy');
 const { normalize, MAX_AGE_MS } = require('./v23_events');
 const v21 = require('./v21_tariff'), v22 = require('./v22_tariff');
-const VERSION = 'v23-entry-filters-v1-2026-09-21';
+const VERSION = 'v23-entry-filters-v2-2026-09-23';
+const V22_GATE_CONTROL_IDS = Object.freeze(['v22_minute','v22_quality','v22_reaction']);
 const DEFINITIONS = Object.freeze([
     {id:'event_score',source:'both',label:'Olay listesi / skor tutarlılığı',rule:'Geçerli olay golleri giriş skoruyla eşleşir. Veri kontrolüdür; gol tahmini değildir.'},
     {id:'v21_score',source:'v21',label:'1.5 ÜST · skor filtresi',rule:'Yalnız 1.5 ÜST: skor 1-0 veya 0-1. 0-0 elenirdi; diğer marketler korunur.'},
     {id:'v21_reaction',source:'v21',label:'1.5 ÜST · skor + reaksiyon',rule:'Skor filtresi + gerideki takım ≥4 şut ve ≥1 isabet. Diğer marketler korunur.'},
     {id:'v22_minute',source:'v22',label:'Yalnız C · dakika ≤73',rule:'Yalnız C: 73 dahil geçer, 74+ elenirdi. A/B’den de geçenler korunur.'},
-    {id:'v22_quality',source:'v22',label:'Yalnız C · dakika + şut kalitesi',rule:'Dakika ≤73 + iki takım toplamında ≥2 isabet ve ≥%20 isabet oranı. A/B korunur.'},
+    {id:'v22_quality',source:'v22',label:'Yalnız C · dakika + isabetli şut',rule:'Dakika ≤73 + iki takım toplamında ≥2 isabetli şut. İsabet oranı yalnız ölçülür; kararı etkilemez. A/B korunur.'},
     {id:'v22_reaction',source:'v22',label:'Yalnız C · dakika + reaksiyon',rule:'Dakika ≤73; ayrıca yalnız 1.5 ÜST’te gerideki takım ≥4 şut ve ≥1 isabet. A/B korunur.'}
 ]);
 const definitions = source => DEFINITIONS.filter(d=>d.source==='both'||d.source===source);
@@ -27,8 +28,8 @@ const REASONS = Object.freeze({
     SCORE_ZERO:'1.5 ÜST için giriş skoru 0-0', SCORE_ONE:'Giriş skoru 1-0 / 0-1', SCORE_INVALID:'1.5 ÜST için geçersiz veya sonuçlanmış giriş skoru',
     MINUTE_OK:'Dakika 73 veya daha erken', MINUTE_LATE:'Dakika 74 veya daha geç',
     REACTION_OK:'Gerideki takımda en az 4 şut ve 1 isabet', REACTION_LOW:'Gerideki takım 4 şut / 1 isabet şartını karşılamıyor',
-    SHOTS_MISSING:'Gerekli şut/isabet verisi eksik veya tutarsız', QUALITY_OK:'Toplam en az 2 isabet ve en az %20 isabet oranı',
-    QUALITY_LOW:'Toplam 2 isabet / %20 isabet şartı karşılanmıyor', NOT_15:'1.5 ÜST değil: yalnız dakika şartı uygulandı',
+    SHOTS_MISSING:'Gerekli şut/isabet verisi eksik veya tutarsız', QUALITY_OK:'Toplam en az 2 isabetli şut; isabet oranı yalnız gözlem',
+    QUALITY_LOW:'Toplam 2 isabetli şut şartı karşılanmıyor', NOT_15:'1.5 ÜST değil: yalnız dakika şartı uygulandı',
     EVENT_MATCH:'Olay golleri ve skor tutarlı', EVENT_MISMATCH:'Olay golleri skorla uyuşmuyor',
     EVENTS_MISSING:'Taze ve geçerli olay listesi yok', EVALUATION_ERROR:'LAB kontrolü hesaplanamadı; sinyal korunur'
 });
@@ -44,7 +45,12 @@ function evaluate({signal,mac,sourceModel,matchedFilters=[]}) {
         mac?.stats_identity_verified===true&&Number(signal.fixtureId)===Number(mac.fixture_id)&&
         Number(mac.dakika)===minute&&String(mac.skor)===String(signal.score)&&score&&minute!==null&&minute<=90;
     const values={minute,score:signal.score,market:signal.market,matchedFilters:[...matchedFilters],
-        home:shotPair(mac,'home'),away:shotPair(mac,'away'),statsAt:mac?.stats_received_at||null};
+        home:shotPair(mac,'home'),away:shotPair(mac,'away'),statsAt:mac?.stats_received_at||null,
+        box:Object.fromEntries(['home','away'].map(side=>[side,{
+            inside:integer(mac?._v23LiveStats?.[side]?.shotsInsidebox),
+            outside:integer(mac?._v23LiveStats?.[side]?.shotsOutsidebox),
+            blocked:integer(mac?._v23LiveStats?.[side]?.blockedShots)
+        }]))};
     if(score&&Number(score[1])!==Number(score[2])) {
         values.trailingSide=Number(score[1])<Number(score[2])?'home':'away';
         values.trailing=values[values.trailingSide];
@@ -82,7 +88,9 @@ function evaluate({signal,mac,sourceModel,matchedFilters=[]}) {
         if(def.id==='v22_minute')return verdict(def,'approve','MINUTE_OK',values);
         if(def.id==='v22_quality') {
             if(!values.home||!values.away)return verdict(def,'insufficient','SHOTS_MISSING',values);
-            const pass=values.totalSot>=2&&values.totalSot*5>=values.totalShots;
+            // The percentage is retained in values.sotRatio for analysis only.
+            // It must never approve/reject a V22 signal.
+            const pass=values.totalSot>=2;
             return verdict(def,pass?'approve':'reject',pass?'QUALITY_OK':'QUALITY_LOW',values);
         }
         if(signal.market!=='1.5_UST')return verdict(def,'approve','NOT_15',values);
@@ -90,6 +98,15 @@ function evaluate({signal,mac,sourceModel,matchedFilters=[]}) {
         return reaction(def);
     });
     return {version:VERSION,capturedAt:signal.sentAt,decisionImpact:false,controls};
+}
+function v22Gate(audit) {
+    if(!validAudit(audit,'v22'))return {eligible:false,reason:'AUDIT_INVALID',rejected:[],insufficient:[]};
+    const selected=audit.controls.filter(control=>V22_GATE_CONTROL_IDS.includes(control.id));
+    const rejected=selected.filter(control=>control.status==='reject').map(control=>control.id);
+    const insufficient=selected.filter(control=>control.status==='insufficient').map(control=>control.id);
+    // The LAB's prospective accounting always retained insufficient rows. Keep
+    // that frozen behavior; only an explicit rejection is a live veto.
+    return {eligible:rejected.length===0,reason:rejected.length?'EXPLICIT_REJECT':'PASS',rejected,insufficient};
 }
 function validAudit(audit,source) {
     return audit?.version===VERSION&&Array.isArray(audit.controls)&&audit.controls.length===definitions(source).length&&
@@ -118,6 +135,7 @@ const inert = Object.freeze({prune(){},releaseFixture(){},metadata(){return {ena
 class FilterLab extends GoalLab {
     constructor(options) {
         super({...options,cache:inert,events:inert,live:inert});
+        this.v22GateEnabled=options?.v22GateEnabled===true;
         this.data.filterVersion=VERSION;
     }
     load() {
@@ -152,7 +170,7 @@ class FilterLab extends GoalLab {
         if(this.data.signals.length>=this.maxRecords){this.disabledReason='history_capacity_reached';return null;}
         const matchedFilters=sourceModel==='v22'?[...(signal.matchedFilters||[])]:[];
         let filterAudit;
-        try {filterAudit=evaluate({signal,mac,sourceModel,matchedFilters});}
+        try {filterAudit=evaluate({signal,mac,sourceModel,matchedFilters});filterAudit.decisionImpact=sourceModel==='v22'&&this.v22GateEnabled;}
         catch {filterAudit={version:VERSION,capturedAt:signal.sentAt,decisionImpact:false,
             controls:definitions(sourceModel).map(d=>verdict(d,'insufficient','EVALUATION_ERROR'))};}
         const copied={};
@@ -171,7 +189,9 @@ class FilterLab extends GoalLab {
         const current=signals.filter(s=>s.filterAudit?.version===VERSION);
         const sources=Object.fromEntries(['v21','v22'].map(source=>[source,report(current.filter(s=>s.sourceModel===source),source,r=>this.summary(r))]));
         return {label:'V21 / V22 · Yeni filtre deneyleri',enabled:this.enabled&&!this.disabledReason,disabledReason:this.disabledReason,
-            telegram:false,decisionImpact:false,filterVersion:VERSION,startedAt:this.data.startedAt,summary:this.summary(current),
+            telegram:false,decisionImpact:this.v22GateEnabled,filterVersion:VERSION,startedAt:this.data.startedAt,summary:this.summary(current),
+            liveGate:{enabled:this.v22GateEnabled,source:'v22',controls:[...V22_GATE_CONTROL_IDS],rejectOnly:true,
+                v21DecisionImpact:false,shotAccuracyDecisionImpact:false},
             filters:{version:VERSION,sources,sourceRecords:current.length,uniqueFixtures:new Set(current.map(s=>s.fixtureId)).size,
                 v22Filters:Object.fromEntries(['A','B','C'].map(f=>[f,report(current.filter(s=>s.sourceModel==='v22'&&s.matchedFilters.includes(f)),'v22',r=>this.summary(r))]))},
             retiredExperiments:{enabled:false,historyRequests:false,timelineCapture:false},additionalApiCalls:0,
@@ -195,4 +215,4 @@ function readRetired(filePath) {
     if(lab.disabledReason)throw Error('retired_history_unreadable');
     return lab;
 }
-module.exports={FilterLab,VERSION,DEFINITIONS,REASONS,evaluate,validAudit,report,selectSource,readRetired};
+module.exports={FilterLab,VERSION,DEFINITIONS,REASONS,V22_GATE_CONTROL_IDS,evaluate,validAudit,v22Gate,report,selectSource,readRetired};
