@@ -42,7 +42,7 @@ const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
 const v22Tariff = require('./v22_tariff');
 const { createV22Lab } = require('./v22_lab');
-const { FilterLab, selectSource: selectV23Source, readRetired: readRetiredV23 } = require('./v23_filter_lab');
+const { FilterLab, v22Gate: evaluateV23V22Gate, selectSource: selectV23Source, readRetired: readRetiredV23 } = require('./v23_filter_lab');
 const { streamJson: streamV23Json } = require('./v23_export');
 const { AdaptiveScan, providerTrouble } = require('./adaptive_scan');
 const { createIndependentLab, importV19History } = require('./independent_lab');
@@ -60,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v23-adaptive-scan-2026-09-21';
+const BUILD_VERSION = 'mac-yakala-v23-v22-live-gate-2026-09-23';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -243,7 +243,10 @@ const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
     : path.join(__dirname, 'dino_v22_union_shadow_history.json');
 const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V23_SHADOW_ENABLED = String(process.env.DINO_V23_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
-const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_filter_history.json');
+const DINO_V23_V22_GATE_ENABLED = String(process.env.DINO_V23_V22_GATE_ENABLED || 'true').toLowerCase() !== 'false';
+// V2 starts a clean prospective period because the V22 quality rule changed.
+// The V1 file is deliberately left untouched beside it.
+const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_filter_history_v2.json');
 const V23_RETIRED_HISTORY_FILE = path.join(__dirname, 'dino_v23_goal_history.json');
 if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE,
     V21_SHADOW_HISTORY_FILE, V22_SHADOW_HISTORY_FILE, CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE]
@@ -514,7 +517,8 @@ app.post('/api/sharing-settings', (req,res)=>{
 
 // Retired profile collectors are not instantiated, loaded, queued or scheduled.
 const v23GoalLab = new FilterLab({ filePath: V23_GOAL_HISTORY_FILE,
-    enabled: DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED), logger: message => addSystemLog(message) });
+    enabled: DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED),
+    v22GateEnabled: DINO_V23_V22_GATE_ENABLED, logger: message => addSystemLog(message) });
 
 function v23YerelArsivBakimi() {
     try {
@@ -4349,7 +4353,12 @@ function paylasilanCanliStatsAnlikGoruntusu(mac) {
             fouls: mac?.home_fouls ?? null,
             offsides: mac?.home_offsides ?? null,
             saves: mac?.home_saves ?? null,
-            xg: mac?.home_xg ?? null
+            xg: mac?.home_xg ?? null,
+            // Observation only. These fields never participate in V21/V22,
+            // V23 gate or model decisions and add no API request.
+            shotsInsideBox: mac?._v23LiveStats?.home?.shotsInsidebox ?? null,
+            shotsOutsideBox: mac?._v23LiveStats?.home?.shotsOutsidebox ?? null,
+            blockedShots: mac?._v23LiveStats?.home?.blockedShots ?? null
         },
         away: {
             shots: mac?.away_shot ?? null,
@@ -4361,7 +4370,10 @@ function paylasilanCanliStatsAnlikGoruntusu(mac) {
             fouls: mac?.away_fouls ?? null,
             offsides: mac?.away_offsides ?? null,
             saves: mac?.away_saves ?? null,
-            xg: mac?.away_xg ?? null
+            xg: mac?.away_xg ?? null,
+            shotsInsideBox: mac?._v23LiveStats?.away?.shotsInsidebox ?? null,
+            shotsOutsideBox: mac?._v23LiveStats?.away?.shotsOutsidebox ?? null,
+            blockedShots: mac?._v23LiveStats?.away?.blockedShots ?? null
         }
     };
 }
@@ -5040,7 +5052,7 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
 
 
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
-    const results = { core: null, legacyV17: null, v19: null, v21: null, v22: null };
+    const results = { core: null, legacyV17: null, v19: null, v21: null, v22: null, v23: {v21:null,v22:null} };
     for (const kind of ['v21']) {
         try {
             results[kind] = independentLab.record(kind, { mac, dino, liveOnlyDino, capturedAt });
@@ -5058,7 +5070,10 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
     for (const source of ['v21','v22']) {
         try {
             const observed = v23GoalLab.observe(results[source],mac);
-            if (observed) addSystemLog(`> 🧪 YENİ LAB [${source.toUpperCase()}]: ${mac.mac_isim} | ${observed.market} | giriş filtreleri ayrı simülasyon; gerçek sinyal elenmedi.`);
+            results.v23[source]=observed;
+            if (observed) addSystemLog(source==='v22'&&DINO_V23_V22_GATE_ENABLED
+                ? `> 🛡️ V23 V22 KAPISI: ${mac.mac_isim} | ${observed.market} | V22 filtresi canlı gönderimden önce değerlendirildi; LAB kaydı da korundu.`
+                : `> 🧪 YENİ LAB [${source.toUpperCase()}]: ${mac.mac_isim} | ${observed.market} | giriş filtreleri ayrı simülasyon; gerçek sinyal elenmedi.`);
         } catch {
             addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
         }
@@ -5580,17 +5595,37 @@ async function botuCalistir() {
             // Telegram'dan bağımsız iki Test Lab kolu aynı taze fixture,
             // altı temel istatistik, canlı oran ve ikinci Python sonucunu kullanır.
             // Son Telegram canlılık beklemesi bu gölge kayıtlarını etkilemez.
-            tazeLabGolgeKayitlariniOlustur({
+            const freshLabResults = tazeLabGolgeKayitlariniOlustur({
                 mac,
                 dino: freshDino,
                 liveOnlyDino: freshLiveOnlyDino,
                 capturedAt: freshValidation.verifiedAt || new Date().toISOString()
             });
+            const liveV22Gate = DINO_V23_V22_GATE_ENABLED
+                ? evaluateV23V22Gate(freshLabResults?.v23?.v22?.filterAudit)
+                : {eligible:true,reason:'DISABLED',rejected:[],insufficient:[]};
 
             // Independent source locks, unrelated to lab locks or old fixture-wide locks.
             const groups = telegramRouter.select({mac,dino:freshDino,liveOnlyDino:freshLiveOnlyDino});
             for (const group of groups) {
                 group.choices = group.choices.filter(s=>initialTelegramSources.has(s.source));
+                if(DINO_V23_V22_GATE_ENABLED&&group.choices.some(choice=>choice.source==='V22')) {
+                    const sameFrozenEntry=freshLabResults?.v22?.market===group.market&&
+                        Number(freshLabResults?.v22?.fixtureId)===Number(mac.fixture_id)&&
+                        Date.parse(freshLabResults?.v22?.sentAt)===Date.parse(freshValidation.verifiedAt);
+                    if(!sameFrozenEntry||!liveV22Gate.eligible) {
+                        group.choices=group.choices.filter(choice=>choice.source!=='V22');
+                        const rejected=sameFrozenEntry&&liveV22Gate.rejected.length?liveV22Gate.rejected.join('+'):
+                            sameFrozenEntry?liveV22Gate.reason:'ENTRY_MISMATCH';
+                        for(const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
+                            record.decision='v23_v22_gate_rejected';
+                            record.decisionDetail=`V23 V22 canlı kapısı reddetti: ${rejected}. V21 kararı bağımsızdır.`;
+                        }
+                        addSystemLog(`> ⛔ V23 V22 KAPISI: ${mac.mac_isim} | ${group.market} | ${rejected}; yalnız V22 kaynağı çıkarıldı.`);
+                    } else {
+                        addSystemLog(`> ✅ V23 V22 KAPISI: ${mac.mac_isim} | ${group.market} | geçti${liveV22Gate.insufficient.length?` (yetersiz gözlemler veto değildir: ${liveV22Gate.insufficient.join('+')})`:''}.`);
+                    }
+                }
                 if (!group.choices.length) continue;
                 const choice = group.choices[0];
                 const analysisInput = {...group, sinyal_kaynaklari:group.choices.map(s=>s.source),
@@ -7331,6 +7366,15 @@ app.get(
                 maximumSignalsPerSourcePerFixture: 1,
                 underMarketsDisabled: true
             },
+            v23V22Gate: {
+                enabled: DINO_V23_V22_GATE_ENABLED,
+                source: 'V22',
+                v21DecisionImpact: false,
+                shotAccuracyDecisionImpact: false,
+                boxShotDecisionImpact: false,
+                historyFile: path.basename(V23_GOAL_HISTORY_FILE),
+                policy: v23GoalLab.metadata().liveGate
+            },
 
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
@@ -7478,7 +7522,8 @@ v20ShadowTracker.load();
 v21ShadowTracker.load();
 v22ShadowTracker.load();
 v23GoalLab.load();
-addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21: 2 / V22: 3 deney + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0 | Telegram değişmez.`);
+addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
+addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 etkilenmez.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
 sharingSettings.load();
@@ -7547,7 +7592,7 @@ app.listen(
             "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
-        addSystemLog("> 🧠 Telegram: V22 A/B/C ve V21 mevcut kuralları bağımsızdır; V23 kontrolü veto uygulamaz.");
+        addSystemLog(`> 🧠 Telegram: V21 mevcut kurallarıyla bağımsızdır; V23 canlı kapısı ${DINO_V23_V22_GATE_ENABLED ? 'yalnız V22 üzerinde etkindir' : 'kapalıdır'}.`);
 
         addSystemLog("> 🗃️ Telegram kilidi model başına ayrıdır: V21 35' ve V22 60' aynı marketi ayrı paylaşabilir. Aynı girişte modeller tek mesajda listelenir.");
 
