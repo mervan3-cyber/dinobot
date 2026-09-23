@@ -1012,11 +1012,12 @@
         #section-decision { order: 1; }
         #section-signals { order: 2; }
         #section-v18-shadow { order: 3; }
-        #section-coverage { order: 4; }
-        #section-audit { order: 5; }
-        #section-tariff { order: 6; }
-        #section-schedule { order: 7; }
-        #section-radar { order: 8; }
+        #section-coupon-lab { order: 4; }
+        #section-coverage { order: 5; }
+        #section-audit { order: 6; }
+        #section-tariff { order: 7; }
+        #section-schedule { order: 8; }
+        #section-radar { order: 9; }
 
         .card {
             margin-bottom: 12px;
@@ -1354,6 +1355,7 @@
             <button type="button" data-target="section-decision" onclick="jumpToSection('section-decision', this)">Son Karar</button>
             <button type="button" data-target="section-signals" onclick="jumpToSection('section-signals', this)">Sinyaller</button>
             <button type="button" data-target="section-v18-shadow" onclick="jumpToSection('section-v18-shadow', this)">Test Lab</button>
+            <button type="button" data-target="section-coupon-lab" onclick="jumpToSection('section-coupon-lab', this)">Kupon LAB</button>
             <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
             <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
             <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
@@ -1892,6 +1894,31 @@
             </div>
         </div>
 
+        <div class="card" id="section-coupon-lab">
+            <div class="section-title">
+                <div>
+                    <h3>🎟️ Kupon LAB · Maç Önü</h3>
+                    <p class="muted" id="coupon-lab-status" style="margin-top:4px;">Durum yükleniyor…</p>
+                </div>
+                <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
+            </div>
+            <p class="muted">Yalnız bugünün başlamamış maçları taranır. Tercih edilen bookmaker’da marketi bulunmayan maç ve lig otomatik elenir. Sonuçlar LAB’dır; Telegram’a ve canlı V21/V22 kararlarına katkı yapmaz.</p>
+            <div class="metrics">
+                <div class="metric info"><span class="metric-label">Marketteki maç</span><span class="metric-value" id="coupon-market-count">0</span></div>
+                <div class="metric warning"><span class="metric-label">İncelenen</span><span class="metric-value" id="coupon-candidate-count">0</span></div>
+                <div class="metric success"><span class="metric-label">LAB seçimi</span><span class="metric-value" id="coupon-selected-count">0</span></div>
+                <div class="metric info"><span class="metric-label">Maç önü geçti</span><span class="metric-value" id="coupon-passed-count">0</span></div>
+                <div class="metric warning"><span class="metric-label">Kupon API</span><span class="metric-value" id="coupon-api-usage">0 / 200</span></div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Saat</th><th>Lig / Maç</th><th>API tahmini</th><th>Takım gol profili</th><th>Bulunan marketler</th><th>LAB seçimleri</th><th>Maç önü kontrol</th><th>Sonuç</th></tr></thead>
+                    <tbody id="coupon-lab-rows"><tr><td colspan="8" class="empty-row">Henüz Kupon LAB taraması yapılmadı.</td></tr></tbody>
+                </table>
+            </div>
+            <p class="muted">Ana tarama her gün bir kez çalışır. Yalnız seçilen en fazla 10 maç, başlangıçtan 75 dakika önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden yalnız bugünü tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
+        </div>
+
         <div class="card" id="section-coverage">
             <div class="section-title">
                 <div>
@@ -2041,6 +2068,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="/v23_filter_panel.js?v=20260921"></script>
+    <script src="/coupon_lab_panel.js?v=20260923"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
@@ -2183,6 +2211,7 @@
                 "section-decision",
                 "section-signals",
                 "section-v18-shadow",
+                "section-coupon-lab",
                 "section-coverage",
                 "section-audit",
                 "section-tariff",
@@ -2421,6 +2450,7 @@
                 setInterval(fetchTestLabHistory, 10000);
                 setInterval(fetchCandidateHistory, 15000);
                 setInterval(fetchSharing, 15000);
+                setInterval(fetchCouponLab, 10000);
             }
         }
 
@@ -2433,6 +2463,7 @@
                 fetchSignalHistory(),
                 fetchTestLabHistory(),
                 fetchCandidateHistory(),
+                fetchCouponLab(),
                 fetchLogs()
             ]);
         }
