@@ -45,6 +45,11 @@ function oddsFixture(id=101) {
         league:{id:39,name:'Premier League',country:'England',season:2026},
         teams:{home:{id:1,name:'Ev'},away:{id:2,name:'Dep.'}}
     };
+    const tomorrowFixture={
+        fixture:{id:202,date:'2026-09-24T15:00:00Z',status:{short:'NS'}},
+        league:{id:39,name:'Premier League',country:'England',season:2026},
+        teams:{home:{id:3,name:'Yarın Ev'},away:{id:4,name:'Yarın Dep.'}}
+    };
     const minute={
         '0-15':{total:1},'16-30':{total:1},'31-45':{total:1},
         '46-60':{total:2},'61-75':{total:2},'76-90':{total:3}
@@ -52,8 +57,8 @@ function oddsFixture(id=101) {
     const apiGet=async url=>{
         calls.push(url);
         if(url.startsWith('/odds/bookmakers'))return {data:{response:[{id:8,name:'Bet365'}]}};
-        if(url.startsWith('/fixtures?date='))return {data:{response:[fixture]}};
-        if(url.startsWith('/odds?date='))return {data:{response:[oddsFixture()],paging:{total:1}}};
+        if(url.startsWith('/fixtures?date='))return {data:{response:[url.includes('2026-09-24')?tomorrowFixture:fixture]}};
+        if(url.startsWith('/odds?date='))return {data:{response:[oddsFixture(url.includes('2026-09-24')?202:101)],paging:{total:1}}};
         if(url.startsWith('/predictions?fixture='))return {data:{response:[{predictions:{winner:{id:1,name:'Ev'},win_or_draw:true,under_over:'Over 2.5',goals:{home:'2',away:'1'},advice:'Double chance : Ev or draw',percent:{home:'61%',draw:'24%',away:'15%'}}}]}};
         if(url.startsWith('/teams/statistics?'))return {data:{response:{fixtures:{played:{home:10,away:10}},goals:{for:{total:{home:15,away:12},average:{home:'1.5',away:'1.2'},minute},against:{total:{home:8,away:14},average:{home:'0.8',away:'1.4'},minute}},clean_sheet:{home:4,away:2},failed_to_score:{home:1,away:3}}}};
         throw new Error(`unexpected ${url}`);
@@ -71,6 +76,19 @@ function oddsFixture(id=101) {
     assert.ok(calls.every(url=>!url.includes('/odds/live')&&!url.includes('/fixtures/statistics')));
     assert.ok(calls.some(url=>url==='/fixtures?date=2026-09-23&timezone=Europe%2FIstanbul'));
     assert.strictEqual(lab.shouldAutoScan(now),false);
+    const changed=lab.applySettings({enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
+    assert.deepStrictEqual(changed.settings,{enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
+    const twoDayStatus=await lab.scanToday({mode:'manual',now:new Date('2026-09-23T06:01:00Z')});
+    assert.deepStrictEqual(twoDayStatus.latestScan.days,['2026-09-23','2026-09-24']);
+    assert.strictEqual(twoDayStatus.summary.candidates,2);
+    assert.ok(twoDayStatus.candidates.some(item=>item.fixtureDay==='2026-09-24'));
+    assert.strictEqual(lab.data.candidates.filter(item=>item.fixtureId===101 && item.active!==false).length,1);
+    assert.ok(calls.some(url=>url==='/fixtures?date=2026-09-24&timezone=Europe%2FIstanbul'));
+    assert.throws(()=>lab.applySettings({scanTime:'25:00'}),/SS:DD/);
+    assert.throws(()=>lab.applySettings({maxCandidates:4,maxSelected:5}),/büyük olamaz/);
+    const restored=new CouponLab({filePath:temp,apiGet,getQuotaRemaining:()=>7000,canRun:()=>true});
+    restored.load();
+    assert.deepStrictEqual(restored.settingsSnapshot(),changed.settings);
     fs.rmSync(temp,{force:true});
-    console.log('Coupon LAB: today-only market intersection, cached team profiles, LAB picks, budget and isolation passed.');
+    console.log('Coupon LAB: market intersection, cached team profiles, LAB picks, persistent panel settings, budget and isolation passed.');
 })().catch(error=>{console.error(error);process.exit(1);});

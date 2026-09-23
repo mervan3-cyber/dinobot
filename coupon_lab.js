@@ -35,6 +35,14 @@ function istanbulHour(date = new Date()) {
     }).format(date));
 }
 
+function istanbulClockMinutes(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone:'Europe/Istanbul', hour:'2-digit', minute:'2-digit', hourCycle:'h23'
+    }).formatToParts(date);
+    const item = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return Number(item.hour) * 60 + Number(item.minute);
+}
+
 function atomicWrite(filePath, value) {
     fs.mkdirSync(path.dirname(filePath), {recursive:true});
     const temporary = `${filePath}.tmp`;
@@ -247,12 +255,64 @@ class CouponLab {
         this.maxCandidates = Math.max(1, Number(options.maxCandidates) || 30);
         this.maxSelected = Math.max(1, Number(options.maxSelected) || 10);
         this.scanHour = Math.min(23, Math.max(0, Number(options.scanHour) || 9));
+        this.scanMinute = Math.min(59, Math.max(0, Number(options.scanMinute) || 0));
         this.finalCheckMinutes = Math.max(15, Number(options.finalCheckMinutes) || 75);
+        this.includeTomorrow = options.includeTomorrow === true;
         this.priorityLeagues = new Set((options.priorityLeagues || []).map(normalize));
         this.enabled = options.enabled !== false;
         this.autoEnabled = options.autoEnabled !== false;
         this.running = false;
-        this.data = {version:VERSION, bookmaker:{id:null,name:this.bookmakerName}, usage:{}, scans:[], candidates:[], teamCache:{}};
+        this.data = {version:VERSION, bookmaker:{id:null,name:this.bookmakerName}, settings:null, usage:{}, scans:[], candidates:[], teamCache:{}};
+    }
+
+    settingsSnapshot() {
+        return {
+            enabled:this.enabled,
+            includeTomorrow:this.includeTomorrow,
+            scanTime:`${String(this.scanHour).padStart(2,'0')}:${String(this.scanMinute).padStart(2,'0')}`,
+            finalCheckMinutes:this.finalCheckMinutes,
+            dailyLimit:this.dailyLimit,
+            maxCandidates:this.maxCandidates,
+            maxSelected:this.maxSelected
+        };
+    }
+
+    applySettings(input = {}, persist = true) {
+        const next = {...this.settingsSnapshot()};
+        if (input.enabled !== undefined) {
+            if (typeof input.enabled !== 'boolean') throw new Error('Kupon modu ayarı true/false olmalıdır.');
+            next.enabled = input.enabled;
+        }
+        if (input.includeTomorrow !== undefined) {
+            if (typeof input.includeTomorrow !== 'boolean') throw new Error('Yarın ayarı true/false olmalıdır.');
+            next.includeTomorrow = input.includeTomorrow;
+        }
+        if (input.scanTime !== undefined) {
+            const match = String(input.scanTime).match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+            if (!match) throw new Error('Ana tarama saati SS:DD biçiminde olmalıdır.');
+            next.scanTime = `${match[1]}:${match[2]}`;
+        }
+        const integer = (key, minimum, maximum, label) => {
+            if (input[key] === undefined) return;
+            const value = Number(input[key]);
+            if (!Number.isInteger(value) || value < minimum || value > maximum) throw new Error(`${label} ${minimum}-${maximum} arasında tam sayı olmalıdır.`);
+            next[key] = value;
+        };
+        integer('finalCheckMinutes',15,240,'Maç önü kontrol');
+        integer('dailyLimit',20,2000,'Günlük API bütçesi');
+        integer('maxCandidates',1,100,'Maksimum aday');
+        integer('maxSelected',1,30,'Maksimum kupon maçı');
+        if (next.maxSelected > next.maxCandidates) throw new Error('Maksimum kupon maçı, maksimum aday sayısından büyük olamaz.');
+        this.enabled = next.enabled;
+        this.includeTomorrow = next.includeTomorrow;
+        [this.scanHour,this.scanMinute] = next.scanTime.split(':').map(Number);
+        this.finalCheckMinutes = next.finalCheckMinutes;
+        this.dailyLimit = next.dailyLimit;
+        this.maxCandidates = next.maxCandidates;
+        this.maxSelected = next.maxSelected;
+        this.data.settings = this.settingsSnapshot();
+        if (persist) this.save();
+        return this.status();
     }
 
     load() {
@@ -261,6 +321,8 @@ class CouponLab {
                 const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
                 if (parsed && typeof parsed === 'object') this.data = {...this.data, ...parsed, version:VERSION};
             }
+            if (this.data.settings && typeof this.data.settings === 'object') this.applySettings(this.data.settings, false);
+            else this.data.settings = this.settingsSnapshot();
         } catch (error) {
             this.logger(`> ⚠️ Kupon LAB geçmişi okunamadı: ${error.message}`);
         }
@@ -270,6 +332,7 @@ class CouponLab {
 
     save() {
         this.trim();
+        this.data.settings = this.settingsSnapshot();
         if (this.filePath) atomicWrite(this.filePath, this.data);
     }
 
@@ -288,6 +351,7 @@ class CouponLab {
     }
 
     consume(now = new Date()) {
+        if (!this.enabled) throw new Error('Kupon LAB panelden kapatıldı.');
         const key = dateKey(now);
         const used = this.usageToday(now);
         if (used >= this.dailyLimit) throw new Error(`Kupon LAB günlük API bütçesi doldu (${used}/${this.dailyLimit}).`);
@@ -348,18 +412,25 @@ class CouponLab {
         this.running = true;
         const startedAt = now.toISOString();
         const day = dateKey(now);
-        const scan = {id:`coupon-${Date.now()}`, day, mode, startedAt, completedAt:null, status:'running', apiStart:this.usageToday(now), fixtures:0, marketFixtures:0, candidates:0, selected:0, error:null};
+        const scanDays = [day];
+        if (this.includeTomorrow) scanDays.push(dateKey(new Date(now.getTime() + 24 * 60 * 60 * 1000)));
+        const scan = {id:`coupon-${Date.now()}`, day, days:scanDays, mode, startedAt, completedAt:null, status:'running', apiStart:this.usageToday(now), fixtures:0, marketFixtures:0, candidates:0, selected:0, error:null};
         this.data.scans.push(scan);
         this.save();
         try {
-            this.logger(`> 🎟️ Kupon LAB ${mode === 'manual' ? 'manuel' : 'günlük'} taraması başladı: ${day}.`);
+            this.logger(`> 🎟️ Kupon LAB ${mode === 'manual' ? 'manuel' : 'günlük'} taraması başladı: ${scanDays.join(' + ')}.`);
             await this.settlePending(now);
             const bookmakerId = await this.bookmakerId(now);
-            const [fixturesResponse, oddsRows] = await Promise.all([
-                this.call(`/fixtures?date=${day}&timezone=Europe%2FIstanbul`, now),
-                this.oddsForDate(day, bookmakerId, now)
-            ]);
-            const fixtures = Array.isArray(fixturesResponse?.data?.response) ? fixturesResponse.data.response : [];
+            const fixtures = [];
+            const oddsRows = [];
+            for (const targetDay of scanDays) {
+                const [fixturesResponse, targetOdds] = await Promise.all([
+                    this.call(`/fixtures?date=${targetDay}&timezone=Europe%2FIstanbul`, now),
+                    this.oddsForDate(targetDay, bookmakerId, now)
+                ]);
+                fixtures.push(...(Array.isArray(fixturesResponse?.data?.response) ? fixturesResponse.data.response : []));
+                oddsRows.push(...targetOdds);
+            }
             const oddsMap = parseOddsRows(oddsRows, bookmakerId);
             scan.fixtures = fixtures.length;
             scan.marketFixtures = oddsMap.size;
@@ -385,7 +456,7 @@ class CouponLab {
                 const odds = oddsMap.get(fixtureId);
                 const picks = buildPicks(fixture, odds, prediction, homeProfile, awayProfile);
                 newRows.push({
-                    id:`${scan.id}:${fixtureId}`, scanId:scan.id, capturedAt:new Date().toISOString(), day,
+                    id:`${scan.id}:${fixtureId}`, scanId:scan.id, capturedAt:new Date().toISOString(), day, fixtureDay:dateKey(new Date(fixture.fixture.date)),
                     fixtureId, kickoff:fixture.fixture.date, leagueId:finite(fixture?.league?.id), league:fixture?.league?.name || '-', country:fixture?.league?.country || null,
                     home:{id:finite(fixture?.teams?.home?.id), name:fixture?.teams?.home?.name || '-'},
                     away:{id:finite(fixture?.teams?.away?.id), name:fixture?.teams?.away?.name || '-'},
@@ -401,10 +472,11 @@ class CouponLab {
             }).slice(0, this.maxSelected);
             const selected = new Set(ranked.map(row => row.id));
             for (const row of newRows) row.selected = selected.has(row.id);
-            for (const previous of this.data.candidates.filter(row => row.day === day && row.active !== false)) {
+            const refreshedFixtures = new Set(newRows.map(row => Number(row.fixtureId)));
+            for (const previous of this.data.candidates.filter(row => row.active !== false && (row.day === day || refreshedFixtures.has(Number(row.fixtureId))))) {
                 previous.active = false;
                 previous.selected = false;
-                if (previous.finalCheck?.status === 'waiting') previous.finalCheck = {status:'superseded',checkedAt:new Date().toISOString(),reasons:['Aynı günün daha yeni ana taramasıyla değiştirildi']};
+                if (previous.finalCheck?.status === 'waiting') previous.finalCheck = {status:'superseded',checkedAt:new Date().toISOString(),reasons:['Daha yeni ana taramayla değiştirildi']};
             }
             this.data.candidates.push(...newRows);
             scan.candidates = newRows.length;
@@ -413,7 +485,7 @@ class CouponLab {
             scan.completedAt = new Date().toISOString();
             scan.apiUsed = this.usageToday(now) - scan.apiStart;
             this.save();
-            this.logger(`> ✅ Kupon LAB: ${fixtures.length} bugünkü maç · ${oddsMap.size} markette · ${newRows.length} incelendi · ${ranked.length} LAB seçimi · ${scan.apiUsed} API.`);
+            this.logger(`> ✅ Kupon LAB: ${fixtures.length} fikstür · ${oddsMap.size} markette · ${newRows.length} incelendi · ${ranked.length} LAB seçimi · ${scan.apiUsed} API.`);
             return this.status(now);
         } catch (error) {
             scan.status = 'error'; scan.error = error.message; scan.completedAt = new Date().toISOString(); scan.apiUsed = this.usageToday(now) - scan.apiStart;
@@ -482,7 +554,7 @@ class CouponLab {
     }
 
     shouldAutoScan(now = new Date()) {
-        if (!this.enabled || !this.autoEnabled || this.running || istanbulHour(now) < this.scanHour) return false;
+        if (!this.enabled || !this.autoEnabled || this.running || istanbulClockMinutes(now) < this.scanHour * 60 + this.scanMinute) return false;
         return !this.data.scans.some(scan => scan.day === dateKey(now) && scan.status === 'complete');
     }
 
@@ -497,9 +569,10 @@ class CouponLab {
         const latestScan = [...this.data.scans].reverse().find(scan => scan.day === day) || this.data.scans.at(-1) || null;
         return {
             success:true, version:VERSION, enabled:this.enabled, autoEnabled:this.autoEnabled, running:this.running,
-            day, scanHour:this.scanHour, finalCheckMinutes:this.finalCheckMinutes,
+            day, scanHour:this.scanHour, scanMinute:this.scanMinute, scanTime:this.settingsSnapshot().scanTime, includeTomorrow:this.includeTomorrow, finalCheckMinutes:this.finalCheckMinutes,
             bookmaker:this.data.bookmaker, api:{used:this.usageToday(now),limit:this.dailyLimit,reserve:this.reserve,remaining:finite(this.getQuotaRemaining())},
             limits:{maxCandidates:this.maxCandidates,maxSelected:this.maxSelected}, latestScan,
+            settings:this.settingsSnapshot(),
             summary:{candidates:todayRows.length,selected:todayRows.filter(row=>row.selected).length,passed:todayRows.filter(row=>row.finalCheck?.status==='passed').length,rejected:todayRows.filter(row=>row.finalCheck?.status==='rejected').length},
             candidates:todayRows.sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)),
             disclaimer:'Yalnız LAB verisidir; Telegram ve canlı V21/V22 sinyallerini etkilemez.'
