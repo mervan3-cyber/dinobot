@@ -61,7 +61,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v22-only-coupon-lab-v2-2026-09-23';
+const BUILD_VERSION = 'mac-yakala-v22-only-coupon-lab-htft-v3-2026-09-24';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -382,6 +382,8 @@ const COUPON_DAILY_LIMIT = Math.max(20, Number(process.env.DINO_COUPON_DAILY_LIM
 const COUPON_API_RESERVE = Math.max(0, Number(process.env.DINO_COUPON_API_RESERVE) || 1000);
 const COUPON_MAX_CANDIDATES = Math.max(1, Number(process.env.DINO_COUPON_MAX_CANDIDATES) || 30);
 const COUPON_MAX_SELECTED = Math.max(1, Number(process.env.DINO_COUPON_MAX_SELECTED) || 10);
+const COUPON_MAX_DOUBLE_CHANCE = Math.max(0, Math.min(COUPON_MAX_SELECTED,
+    Number.isFinite(Number(process.env.DINO_COUPON_MAX_DOUBLE_CHANCE)) ? Number(process.env.DINO_COUPON_MAX_DOUBLE_CHANCE) : 2));
 const COUPON_SCAN_HOUR = Math.min(23, Math.max(0, Number(process.env.DINO_COUPON_SCAN_HOUR) || 9));
 const COUPON_SCAN_MINUTE = Math.min(59, Math.max(0, Number(process.env.DINO_COUPON_SCAN_MINUTE) || 0));
 const COUPON_INCLUDE_TOMORROW = String(process.env.DINO_COUPON_INCLUDE_TOMORROW || 'false').toLowerCase() === 'true';
@@ -709,6 +711,7 @@ const couponLab = new CouponLab({
     reserve: COUPON_API_RESERVE,
     maxCandidates: COUPON_MAX_CANDIDATES,
     maxSelected: COUPON_MAX_SELECTED,
+    maxDoubleChance: COUPON_MAX_DOUBLE_CHANCE,
     scanHour: COUPON_SCAN_HOUR,
     scanMinute: COUPON_SCAN_MINUTE,
     includeTomorrow: COUPON_INCLUDE_TOMORROW,
@@ -7640,7 +7643,7 @@ couponLab.load();
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
 addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
-addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
+addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
 sharingSettings.load();
