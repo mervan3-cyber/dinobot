@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
 const {SignalTracker}=require('./signal_tracker');
-const {createRouter,TelegramDelivery,formatSignal,WIN_TEXT,FOOTER}=require('./mac_yakala_telegram');
+const {createRouter,TelegramDelivery,formatSignal,shortAnalysis,WIN_TEXT,FOOTER}=require('./mac_yakala_telegram');
+assert.equal(shortAnalysis('2.5 üstü ihtimalini destekliyor.','2.5_UST'),'2.5 üstü ihtimalini destekliyor.');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'mac-yakala-telegram-'));
 const deliveries=[];let sequence=100,behavior='ok',now=Date.parse('2026-09-16T12:00:00Z');
 const tracker=new SignalTracker({filePath:path.join(root,'history.json'),strict:true});tracker.load();

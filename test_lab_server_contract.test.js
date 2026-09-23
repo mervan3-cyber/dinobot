@@ -149,7 +149,7 @@ try {
     assert.equal(status.testLabTracking.v19Shadow.enabled, false);
     assert.equal(fs.readFileSync(process.env.DINO_CORE_SHADOW_HISTORY_FILE,'utf8'),'retired-core-preserve');
     assert.equal(fs.readFileSync(process.env.DINO_V19_SHADOW_HISTORY_FILE,'utf8'),'retired-v19-preserve');
-    assert.deepEqual(status.marketTariff.telegramSources,['V22','V21']);
+    assert.deepEqual(status.marketTariff.telegramSources,['V22']);
     assert.equal(status.marketTariff.maximumSignalsPerSourcePerFixture,1);
 
     console.log('Test Lab server contract tests passed.');

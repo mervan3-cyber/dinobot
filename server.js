@@ -61,7 +61,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-coupon-lab-v1-panel-controls-2026-09-23';
+const BUILD_VERSION = 'mac-yakala-v22-only-coupon-lab-v2-2026-09-23';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -236,7 +236,9 @@ const V21_SHADOW_HISTORY_FILE = process.env.DINO_V21_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V21_SHADOW_HISTORY_FILE)
     : path.join(__dirname, 'dino_v21_consensus_shadow_history.json');
 const DINO_V19_SHADOW_ENABLED = false; // Retired: not even an environment flag can start this lab again.
-const MY_V21_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V21_TELEGRAM_ENABLED || 'true').toLowerCase() !== 'false';
+// V21 continues to be measured in LAB, but live Telegram is V22-only by default.
+// An explicit true remains as a rollback escape hatch; the production .env omits it.
+const MY_V21_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V21_TELEGRAM_ENABLED || 'false').toLowerCase() === 'true';
 const MY_V22_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V22_TELEGRAM_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V21_SHADOW_ENABLED = String(process.env.DINO_V21_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
@@ -717,7 +719,7 @@ const couponLab = new CouponLab({
 });
 
 async function couponLabClock() {
-    if (!couponLab.enabled || couponLab.running || isScanning || isSignalResultRefreshing) return;
+    if (!couponLab.enabled || couponLab.running || couponLab.settling || isScanning || isSignalResultRefreshing) return;
     try {
         if (couponLab.shouldAutoScan()) await couponLab.scanToday({mode:'automatic'});
         await couponLab.runDueFinalChecks();
@@ -7164,14 +7166,32 @@ app.post('/api/coupon-lab/scan', (req, res) => {
     if (!apiFootballKey || !apiFootballKey.trim()) {
         return res.status(503).json({success:false,message:'API_FOOTBALL_KEY bulunamadı.',error:'API_FOOTBALL_KEY bulunamadı.'});
     }
-    if (couponLab.running) {
-        return res.status(409).json({success:false,message:'Kupon LAB taraması zaten çalışıyor.',error:'Kupon LAB taraması zaten çalışıyor.'});
+    if (couponLab.running || couponLab.settling) {
+        return res.status(409).json({success:false,message:'Kupon LAB işlemi zaten çalışıyor.',error:'Kupon LAB işlemi zaten çalışıyor.'});
     }
     if (isScanning || isSignalResultRefreshing) {
         return res.status(409).json({success:false,message:'Canlı sistem meşgul; kupon LAB canlı taramaya öncelik verdi.',error:'Canlı sistem meşgul; kupon LAB canlı taramaya öncelik verdi.'});
     }
     setImmediate(() => couponLab.scanToday({mode:'manual'}).catch(() => undefined));
     return res.status(202).json({success:true,message:couponLab.includeTomorrow ? 'Bugün ve yarının Kupon LAB taraması başladı.' : 'Bugünün Kupon LAB taraması başladı.',status:couponLab.status()});
+});
+
+app.post('/api/coupon-lab/settle', async (req, res) => {
+    if (!apiFootballKey || !apiFootballKey.trim()) {
+        return res.status(503).json({success:false,message:'API_FOOTBALL_KEY bulunamadı.',error:'API_FOOTBALL_KEY bulunamadı.'});
+    }
+    if (couponLab.running || couponLab.settling) {
+        return res.status(409).json({success:false,message:'Kupon LAB işlemi zaten çalışıyor.',error:'Kupon LAB işlemi zaten çalışıyor.'});
+    }
+    if (isScanning || isSignalResultRefreshing) {
+        return res.status(409).json({success:false,message:'Canlı sistem meşgul; sonuç güncelleme canlı taramaya öncelik verdi.',error:'Canlı sistem meşgul; sonuç güncelleme canlı taramaya öncelik verdi.'});
+    }
+    try {
+        const result = await couponLab.refreshResults();
+        return res.json({success:true,message:result.settled ? `${result.settled} Kupon LAB maçı sonuçlandırıldı.` : 'Yeni sonuçlanmış Kupon LAB maçı bulunamadı.',settled:result.settled,apiUsed:result.apiUsed,...result.status});
+    } catch (error) {
+        return res.status(409).json({success:false,message:error.message,error:error.message});
+    }
 });
 
 
@@ -7460,6 +7480,7 @@ app.get(
                 enabled: couponLab.enabled,
                 autoEnabled: couponLab.autoEnabled,
                 running: couponLab.running,
+                settling: couponLab.settling,
                 scanHour: couponLab.scanHour,
                 scanMinute: couponLab.scanMinute,
                 scanTime: couponLab.status().scanTime,
@@ -7618,7 +7639,7 @@ v23GoalLab.load();
 couponLab.load();
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
-addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 etkilenmez.`);
+addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
 addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
@@ -7660,7 +7681,7 @@ app.listen(
 
 
         addSystemLog(
-            `> 🧭 TELEGRAM: V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} + V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} bağımsız ÜST | V20/V17 yalnız lab | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
+            `> 🧭 TELEGRAM: yalnız V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} | V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK (açık override)' : 'yalnız LAB'} | V20/V17 yalnız LAB | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
         );
 
         addSystemLog(
@@ -7688,9 +7709,9 @@ app.listen(
             "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
-        addSystemLog(`> 🧠 Telegram: V21 mevcut kurallarıyla bağımsızdır; V23 canlı kapısı ${DINO_V23_V22_GATE_ENABLED ? 'yalnız V22 üzerinde etkindir' : 'kapalıdır'}.`);
+        addSystemLog(`> 🧠 Telegram: üretim kaynağı yalnız V22'dir; V21 ölçümü LAB'da sürer. V23 canlı kapısı ${DINO_V23_V22_GATE_ENABLED ? 'V22 üzerinde etkindir' : 'kapalıdır'}.`);
 
-        addSystemLog("> 🗃️ Telegram kilidi model başına ayrıdır: V21 35' ve V22 60' aynı marketi ayrı paylaşabilir. Aynı girişte modeller tek mesajda listelenir.");
+        addSystemLog("> 🗃️ Telegram kilidi V22 kaynak/fixture bazındadır; V21 yalnız LAB kaydı üretir ve Telegram kilidine girmez.");
 
         addSystemLog(
             "> 🧪 Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir."

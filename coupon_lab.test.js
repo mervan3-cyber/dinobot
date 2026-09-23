@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const {CouponLab, parseOddsRows, buildPicks, settlePick} = require('./coupon_lab');
+const {CouponLab, parseOddsRows, normalizedWinnerProbabilities, buildPicks, settlePick} = require('./coupon_lab');
 
 function oddsFixture(id=101) {
     return {fixture:{id},update:'2026-09-23T06:00:00Z',bookmakers:[{id:8,name:'Bet365',bets:[
@@ -18,17 +18,23 @@ function oddsFixture(id=101) {
     assert.deepStrictEqual(parsed.doubleChance,{'1X':1.25,'X2':2.1});
     assert.strictEqual(parsed.htft['0/1'],4.5);
     assert.strictEqual(parsed.htft['1/1'],2.4);
+    const fair=normalizedWinnerProbabilities(parsed.winner);
+    assert.ok(Math.abs(fair['1']+fair.X+fair['2']-100)<0.2);
+    assert.strictEqual(fair['1'],57.4);
 }
 
 {
     const fixture={teams:{home:{id:1,name:'Ev'},away:{id:2,name:'Dep.'}}};
     const odds=parseOddsRows([oddsFixture()],8).get(101);
     const prediction={winnerId:1,winnerName:'Ev',winOrDraw:true,underOver:'Over 2.5',goals:{home:2,away:1},percent:{home:61,draw:24,away:15}};
-    const home={scoringMinutes:{firstShare:40,secondShare:60}};
-    const away={scoringMinutes:{firstShare:50,secondShare:50}};
+    const home={played:10,scoredPerGame:1.5,concededPerGame:.8,scoringMinutes:{total:10,firstShare:40,secondShare:60},concedingMinutes:{total:8,firstShare:50,secondShare:50}};
+    const away={played:10,scoredPerGame:1.2,concededPerGame:1.4,scoringMinutes:{total:12,firstShare:50,secondShare:50},concedingMinutes:{total:10,firstShare:40,secondShare:60}};
     const picks=buildPicks(fixture,odds,prediction,home,away);
     assert.deepStrictEqual(picks.map(item=>item.selection),['1X','0/1']);
     assert.ok(picks.every(item=>item.labOnly===true));
+    assert.ok(picks.every(item=>item.qualityScore>0&&item.support.marketProbability>0));
+    const incomplete=buildPicks(fixture,odds,prediction,{...home,played:2},away);
+    assert.deepStrictEqual(incomplete.map(item=>item.selection),['1X'],'Incomplete profiles may keep double chance but never exact HT/FT.');
 }
 
 {
@@ -58,6 +64,7 @@ function oddsFixture(id=101) {
         calls.push(url);
         if(url.startsWith('/odds/bookmakers'))return {data:{response:[{id:8,name:'Bet365'}]}};
         if(url.startsWith('/fixtures?date='))return {data:{response:[url.includes('2026-09-24')?tomorrowFixture:fixture]}};
+        if(url.startsWith('/fixtures?ids='))return {data:{response:[{...fixture,fixture:{...fixture.fixture,status:{short:'FT'}},goals:{home:2,away:1},score:{halftime:{home:0,away:0}}}]}};
         if(url.startsWith('/odds?date='))return {data:{response:[oddsFixture(url.includes('2026-09-24')?202:101)],paging:{total:1}}};
         if(url.startsWith('/predictions?fixture='))return {data:{response:[{predictions:{winner:{id:1,name:'Ev'},win_or_draw:true,under_over:'Over 2.5',goals:{home:'2',away:'1'},advice:'Double chance : Ev or draw',percent:{home:'61%',draw:'24%',away:'15%'}}}]}};
         if(url.startsWith('/teams/statistics?'))return {data:{response:{fixtures:{played:{home:10,away:10}},goals:{for:{total:{home:15,away:12},average:{home:'1.5',away:'1.2'},minute},against:{total:{home:8,away:14},average:{home:'0.8',away:'1.4'},minute}},clean_sheet:{home:4,away:2},failed_to_score:{home:1,away:3}}}};
@@ -76,6 +83,10 @@ function oddsFixture(id=101) {
     assert.ok(calls.every(url=>!url.includes('/odds/live')&&!url.includes('/fixtures/statistics')));
     assert.ok(calls.some(url=>url==='/fixtures?date=2026-09-23&timezone=Europe%2FIstanbul'));
     assert.strictEqual(lab.shouldAutoScan(now),false);
+    const refreshed=await lab.refreshResults(new Date('2026-09-23T18:00:00Z'));
+    assert.strictEqual(refreshed.settled,1);
+    assert.strictEqual(refreshed.apiUsed,1);
+    assert.strictEqual(refreshed.status.candidates[0].result.status,'settled');
     const changed=lab.applySettings({enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
     assert.deepStrictEqual(changed.settings,{enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
     const twoDayStatus=await lab.scanToday({mode:'manual',now:new Date('2026-09-23T06:01:00Z')});

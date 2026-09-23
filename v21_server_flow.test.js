@@ -25,7 +25,7 @@ const external = {
 const context = vm.createContext({
     require: name => Object.hasOwn(external, name) ? external[name] : localRequire(name),
     __dirname: root, process: { env: { TELEGRAM_BOT_TOKEN: 'offline', TELEGRAM_CHANNEL_ID: 'offline',
-        DINO_CORE_SHADOW_ENABLED: 'false', DINO_LEGACY_V17_SHADOW_ENABLED: 'false', DINO_V20_SHADOW_ENABLED: 'false' }, platform: process.platform },
+        MAC_YAKALA_V21_TELEGRAM_ENABLED: 'true', DINO_CORE_SHADOW_ENABLED: 'false', DINO_LEGACY_V17_SHADOW_ENABLED: 'false', DINO_V20_SHADOW_ENABLED: 'false' }, platform: process.platform },
     console: { log() {}, warn() {}, error() {} }, Date, Buffer, URL, URLSearchParams,
     setInterval() {}, setTimeout() {}, setImmediate() {}, clearInterval() {}, clearTimeout() {}
 });
