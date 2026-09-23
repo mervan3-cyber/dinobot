@@ -1919,6 +1919,7 @@
                     <label>Günlük API bütçesi<input type="number" id="coupon-setting-budget" min="20" max="2000" step="1" value="200" onchange="markCouponSettingsDirty()"></label>
                     <label>Maksimum aday<input type="number" id="coupon-setting-max-candidates" min="1" max="100" step="1" value="30" onchange="markCouponSettingsDirty()"></label>
                     <label>Maksimum kupon maçı<input type="number" id="coupon-setting-max-selected" min="1" max="30" step="1" value="10" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum çifte şans<input type="number" id="coupon-setting-max-double-chance" min="0" max="30" step="1" value="2" onchange="markCouponSettingsDirty()"></label>
                     <button class="quick-scan-button" id="coupon-settings-save" type="button" onclick="saveCouponLabSettings()" style="margin:8px 0;">AYARLARI KAYDET</button>
                 </div>
             </div>
@@ -2087,7 +2088,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="/v23_filter_panel.js?v=20260921"></script>
-    <script src="/coupon_lab_panel.js?v=20260923c"></script>
+<script src="/coupon_lab_panel.js?v=20260924a"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;

@@ -40,7 +40,14 @@
     }
     function picksText(item) {
         if(!item?.picks?.length)return 'LAB seçimi oluşmadı';
-        return item.picks.map(pick=>`${pick.selection} @ ${Number(pick.odd).toFixed(2)}${pick.finalOdd?` → ${Number(pick.finalOdd).toFixed(2)}`:''} · puan ${Number(pick.qualityScore || 0).toFixed(1)}`).join(' | ');
+        return item.picks.map(pick=>{
+            const rawMarketProbability=pick.support?.htftMarketProbability;
+            const marketProbability=rawMarketProbability===null || rawMarketProbability===undefined ? null : Number(rawMarketProbability);
+            const probabilityText=pick.market==='İY/MS' && marketProbability!==null && Number.isFinite(marketProbability)
+                ? ` · piyasa %${marketProbability.toFixed(1)}` : '';
+            const tier=pick.support?.tier ? ` · ${pick.support.tier}` : '';
+            return `${pick.market} ${pick.selection} @ ${Number(pick.odd).toFixed(2)}${pick.finalOdd?` → ${Number(pick.finalOdd).toFixed(2)}`:''} · puan ${Number(pick.qualityScore || 0).toFixed(1)}${probabilityText}${tier}`;
+        }).join(' | ');
     }
     function finalText(item) {
         const status=item?.finalCheck?.status;
@@ -89,6 +96,7 @@
             setValue('coupon-setting-budget',settings.dailyLimit ?? data?.api?.limit ?? 200);
             setValue('coupon-setting-max-candidates',settings.maxCandidates ?? data?.limits?.maxCandidates ?? 30);
             setValue('coupon-setting-max-selected',settings.maxSelected ?? data?.limits?.maxSelected ?? 10);
+            setValue('coupon-setting-max-double-chance',settings.maxDoubleChance ?? data?.limits?.maxDoubleChance ?? 2);
         }
         const enabled=byId('coupon-setting-enabled')?.checked === true;
         const tomorrow=byId('coupon-setting-tomorrow')?.checked === true;
@@ -123,7 +131,7 @@
             settle.disabled=data?.running===true || data?.settling===true;
             settle.textContent=data?.settling?'GÜNCELLENİYOR…':'SONUÇLARI GÜNCELLE';
         }
-        setText('coupon-lab-footnote',`Ana tarama her gün ${data?.scanTime || '09:00'}'da bir kez çalışır. Seçilen en fazla ${data?.limits?.maxSelected ?? 10} maç, başlangıçtan ${data?.finalCheckMinutes ?? 75} dakika önce bir kez doğrulanır. Günlük Kupon API bütçesi ${data?.api?.limit ?? 200}; genel API rezervi korunur.`);
+        setText('coupon-lab-footnote',`Ana tarama her gün ${data?.scanTime || '09:00'}'da bir kez çalışır. İY/MS ana üründür; yalnız İY/MS bulunmayanlardan en fazla ${data?.limits?.maxDoubleChance ?? 2} çifte şans seçilir. Seçilen en fazla ${data?.limits?.maxSelected ?? 10} maç, başlangıçtan ${data?.finalCheckMinutes ?? 75} dakika önce bir kez doğrulanır. Günlük Kupon API bütçesi ${data?.api?.limit ?? 200}; genel API rezervi korunur.`);
         renderRows(data?.candidates || [],data?.day);
     }
     async function fetchCouponLab() {
@@ -169,7 +177,8 @@
             finalCheckMinutes:Number(byId('coupon-setting-final-minutes')?.value),
             dailyLimit:Number(byId('coupon-setting-budget')?.value),
             maxCandidates:Number(byId('coupon-setting-max-candidates')?.value),
-            maxSelected:Number(byId('coupon-setting-max-selected')?.value)
+            maxSelected:Number(byId('coupon-setting-max-selected')?.value),
+            maxDoubleChance:Number(byId('coupon-setting-max-double-chance')?.value)
         };
         settingsSaving=true;
         renderSettings(latestData || {settings:payload});
