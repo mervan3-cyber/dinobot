@@ -1902,7 +1902,23 @@
                 </div>
                 <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
             </div>
-            <p class="muted">Yalnız bugünün başlamamış maçları taranır. Tercih edilen bookmaker’da marketi bulunmayan maç ve lig otomatik elenir. Sonuçlar LAB’dır; Telegram’a ve canlı V21/V22 kararlarına katkı yapmaz.</p>
+            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Tercih edilen bookmaker’da marketi bulunmayan maç ve lig otomatik elenir. Sonuçlar LAB’dır; Telegram’a ve canlı V21/V22 kararlarına katkı yapmaz.</p>
+            <div class="control-card" style="min-height:auto;margin:14px 0 16px;">
+                <div class="control-card__top">
+                    <div><h3>Kupon tarama ayarları</h3><p>Değişiklikler sunucuda kalıcı tutulur ve yalnız Kupon LAB’ı etkiler.</p></div>
+                    <span class="mini-badge bg-muted" id="coupon-settings-state">YÜKLENİYOR</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;align-items:end;">
+                    <div style="display:flex;flex-direction:column;gap:8px;"><span>Kupon modu</span><span style="display:flex;align-items:center;gap:10px;min-height:45px;"><label class="switch" title="Kupon LAB'ı aç/kapat"><input type="checkbox" id="coupon-setting-enabled" onchange="markCouponSettingsDirty()"><span class="switch-slider"></span></label><strong id="coupon-setting-enabled-label">Kapalı</strong></span></div>
+                    <label>Ana tarama<input type="time" id="coupon-setting-scan-time" value="09:00" onchange="markCouponSettingsDirty()"></label>
+                    <div style="display:flex;flex-direction:column;gap:8px;"><span>Yarının maçlarını dahil et</span><span style="display:flex;align-items:center;gap:10px;min-height:45px;"><label class="switch" title="Yarının maçlarını da tara"><input type="checkbox" id="coupon-setting-tomorrow" onchange="markCouponSettingsDirty()"><span class="switch-slider"></span></label><strong id="coupon-setting-tomorrow-label">Kapalı</strong></span></div>
+                    <label>Maç önü kontrol (dk)<input type="number" id="coupon-setting-final-minutes" min="15" max="240" step="1" value="75" onchange="markCouponSettingsDirty()"></label>
+                    <label>Günlük API bütçesi<input type="number" id="coupon-setting-budget" min="20" max="2000" step="1" value="200" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum aday<input type="number" id="coupon-setting-max-candidates" min="1" max="100" step="1" value="30" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum kupon maçı<input type="number" id="coupon-setting-max-selected" min="1" max="30" step="1" value="10" onchange="markCouponSettingsDirty()"></label>
+                    <button class="quick-scan-button" id="coupon-settings-save" type="button" onclick="saveCouponLabSettings()" style="margin:8px 0;">AYARLARI KAYDET</button>
+                </div>
+            </div>
             <div class="metrics">
                 <div class="metric info"><span class="metric-label">Marketteki maç</span><span class="metric-value" id="coupon-market-count">0</span></div>
                 <div class="metric warning"><span class="metric-label">İncelenen</span><span class="metric-value" id="coupon-candidate-count">0</span></div>
@@ -1916,7 +1932,7 @@
                     <tbody id="coupon-lab-rows"><tr><td colspan="8" class="empty-row">Henüz Kupon LAB taraması yapılmadı.</td></tr></tbody>
                 </table>
             </div>
-            <p class="muted">Ana tarama her gün bir kez çalışır. Yalnız seçilen en fazla 10 maç, başlangıçtan 75 dakika önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden yalnız bugünü tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
+            <p class="muted" id="coupon-lab-footnote">Ana tarama her gün bir kez çalışır. Seçilen maçlar başlangıçtan önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden seçili gün kapsamını tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
         </div>
 
         <div class="card" id="section-coverage">
@@ -2068,7 +2084,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="/v23_filter_panel.js?v=20260921"></script>
-    <script src="/coupon_lab_panel.js?v=20260923"></script>
+    <script src="/coupon_lab_panel.js?v=20260923b"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
