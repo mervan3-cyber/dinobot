@@ -1900,9 +1900,12 @@
                     <h3>🎟️ Kupon LAB · Maç Önü</h3>
                     <p class="muted" id="coupon-lab-status" style="margin-top:4px;">Durum yükleniyor…</p>
                 </div>
-                <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                    <button class="quick-scan-button" id="coupon-lab-settle" type="button" onclick="settleCouponLab()" style="width:auto;padding:10px 18px;background:linear-gradient(135deg,#2196f3,#71bcf4);">SONUÇLARI GÜNCELLE</button>
+                    <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
+                </div>
             </div>
-            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Tercih edilen bookmaker’da marketi bulunmayan maç ve lig otomatik elenir. Sonuçlar LAB’dır; Telegram’a ve canlı V21/V22 kararlarına katkı yapmaz.</p>
+            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Çifte şans API ile marjsız MS1/X/MS2 piyasa desteğini; İY/MS ayrıca en az 5 maçlık gol profili ve İY/2Y üretim-yeme dağılımını kullanır. Sonuçlar LAB’dır; Telegram’a ve canlı V22 kararına katkı yapmaz.</p>
             <div class="control-card" style="min-height:auto;margin:14px 0 16px;">
                 <div class="control-card__top">
                     <div><h3>Kupon tarama ayarları</h3><p>Değişiklikler sunucuda kalıcı tutulur ve yalnız Kupon LAB’ı etkiler.</p></div>
@@ -2084,7 +2087,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="/v23_filter_panel.js?v=20260921"></script>
-    <script src="/coupon_lab_panel.js?v=20260923b"></script>
+    <script src="/coupon_lab_panel.js?v=20260923c"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;

@@ -29,7 +29,10 @@
     }
     function profileText(profile,label) {
         if(!profile)return `${label}: veri yok`;
-        return `${label}: ${profile.scoredPerGame ?? '-'} gol/maç · İY %${profile.scoringMinutes?.firstShare ?? '-'} · 2Y %${profile.scoringMinutes?.secondShare ?? '-'}`;
+        const played=profile.played ?? '-';
+        const failed=profile.failedToScore ?? '-';
+        const clean=profile.cleanSheets ?? '-';
+        return `${label}: ${played} maç · ${profile.scoredPerGame ?? '-'} atılan / ${profile.concededPerGame ?? '-'} yenen · İY %${profile.scoringMinutes?.firstShare ?? '-'} · 2Y %${profile.scoringMinutes?.secondShare ?? '-'} · gol atamadı ${failed} · gol yemedi ${clean}`;
     }
     function predictionText(prediction) {
         const p=prediction?.percent || {};
@@ -37,7 +40,7 @@
     }
     function picksText(item) {
         if(!item?.picks?.length)return 'LAB seçimi oluşmadı';
-        return item.picks.map(pick=>`${pick.selection} @ ${Number(pick.odd).toFixed(2)}${pick.finalOdd?` → ${Number(pick.finalOdd).toFixed(2)}`:''}`).join(' · ');
+        return item.picks.map(pick=>`${pick.selection} @ ${Number(pick.odd).toFixed(2)}${pick.finalOdd?` → ${Number(pick.finalOdd).toFixed(2)}`:''} · puan ${Number(pick.qualityScore || 0).toFixed(1)}`).join(' | ');
     }
     function finalText(item) {
         const status=item?.finalCheck?.status;
@@ -100,7 +103,7 @@
     function render(data) {
         latestData=data;
         const scan=data?.latestScan;
-        const status=data?.running?'Taranıyor…':scan
+        const status=data?.settling?'Sonuçlar güncelleniyor…':data?.running?'Taranıyor…':scan
             ? `${(scan.days || [scan.day]).join(' + ')} · ${scan.status==='complete'?'tamamlandı':scan.status==='error'?'hata':'çalışıyor'} · ${data.bookmaker?.name || 'bookmaker'} · ${scan.apiUsed ?? 0} API`
             : `Her gün ${data?.scanTime || '09:00'} otomatik · henüz taranmadı`;
         setText('coupon-lab-status',`${status} · ${data?.disclaimer || ''}`);
@@ -112,8 +115,13 @@
         renderSettings(data);
         const button=byId('coupon-lab-scan');
         if(button){
-            button.disabled=data?.running===true || data?.enabled===false;
+            button.disabled=data?.running===true || data?.settling===true || data?.enabled===false;
             button.textContent=data?.running?'TARANIYOR…':data?.includeTomorrow?'BUGÜN + YARINI ŞİMDİ TARA':'BUGÜNÜ ŞİMDİ TARA';
+        }
+        const settle=byId('coupon-lab-settle');
+        if(settle){
+            settle.disabled=data?.running===true || data?.settling===true;
+            settle.textContent=data?.settling?'GÜNCELLENİYOR…':'SONUÇLARI GÜNCELLE';
         }
         setText('coupon-lab-footnote',`Ana tarama her gün ${data?.scanTime || '09:00'}'da bir kez çalışır. Seçilen en fazla ${data?.limits?.maxSelected ?? 10} maç, başlangıçtan ${data?.finalCheckMinutes ?? 75} dakika önce bir kez doğrulanır. Günlük Kupon API bütçesi ${data?.api?.limit ?? 200}; genel API rezervi korunur.`);
         renderRows(data?.candidates || [],data?.day);
@@ -130,6 +138,19 @@
             const result=await apiFetch('/api/coupon-lab/scan',{method:'POST'});
             if(typeof showToast==='function')showToast(result.message || 'Kupon LAB taraması başladı.');
             setTimeout(fetchCouponLab,800);
+        } catch(error) {
+            if(typeof showToast==='function')showToast(error.message,true);
+            if(latestData)render(latestData);
+        }
+    }
+    async function settleCouponLab() {
+        const button=byId('coupon-lab-settle');
+        if(button){button.disabled=true;button.textContent='GÜNCELLENİYOR…';}
+        try {
+            const result=await apiFetch('/api/coupon-lab/settle',{method:'POST'});
+            latestData=result;
+            render(result);
+            if(typeof showToast==='function')showToast(result.message || 'Kupon LAB sonuçları güncellendi.');
         } catch(error) {
             if(typeof showToast==='function')showToast(error.message,true);
             if(latestData)render(latestData);
@@ -167,6 +188,7 @@
     }
     window.fetchCouponLab=fetchCouponLab;
     window.scanCouponLab=scanCouponLab;
+    window.settleCouponLab=settleCouponLab;
     window.markCouponSettingsDirty=markCouponSettingsDirty;
     window.saveCouponLabSettings=saveCouponLabSettings;
 })();
