@@ -6875,6 +6875,7 @@ app.get(
     '/api/candidate-history',
     (req, res) => {
         const limit = Math.max(1, Math.min(Number(req.query.limit) || 200, 5000));
+        const requestedPage = Math.max(1, Math.floor(Number(req.query.page) || 1));
         const allRecords = candidateTracker.list(100000);
         const selection = gecmisSeciminiHazirla(
             req,
@@ -6884,10 +6885,23 @@ app.get(
         );
         if (!selection) return;
 
+        const totalRecords = selection.items.length;
+        const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
+        const page = Math.min(requestedPage, totalPages);
+        const offset = (page - 1) * limit;
+
         res.json({
             filter: selection.filter,
             summary: candidateTracker.summary(selection.items),
-            records: candidateTracker.list(limit, selection.items)
+            pagination: {
+                page,
+                pageSize: limit,
+                totalRecords,
+                totalPages,
+                hasPrevious: page > 1,
+                hasNext: page < totalPages
+            },
+            records: candidateTracker.list(limit, selection.items, offset)
         });
     }
 );

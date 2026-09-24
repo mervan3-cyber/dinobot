@@ -32,6 +32,21 @@ assert.doesNotMatch(publicPanel, /id="testlab-(core|v19)-(rows|total|mode-badge)
 assert.match(publicPanel, /Maç Yakala/);
 assert.doesNotMatch(publicPanel, /HAM GÖZLEM|hybrid-observation|Hibrit Gözlem/);
 assert.doesNotMatch(publicPanel, /V21 · ÜST \/ ALT|en az 2 model|negatiflerde alt sınır yok/);
+for (const paginationContract of [
+    'CANDIDATE_HISTORY_PAGE_SIZE = 200',
+    'id="candidate-page-summary"',
+    'id="candidate-page-select"',
+    'goCandidateHistoryPage',
+    'V16 / V18',
+    'Pre Destek',
+    'EDGE (kayıt)'
+]) {
+    assert.ok(
+        publicPanel.includes(paginationContract),
+        `Tam-stat sayfalama/model görünümü eksik: ${paginationContract}`
+    );
+}
+assert.doesNotMatch(publicPanel, /Tam-Stat Ham Akış|candidate-visible|candidateStatValue/);
 assert.ok(scripts.length > 0, 'Panel JavaScript bloğu bulunamadı.');
 for (const [, source] of scripts) {
     new vm.Script(source);
