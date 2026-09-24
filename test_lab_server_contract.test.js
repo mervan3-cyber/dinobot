@@ -12,6 +12,7 @@ process.env.DINO_LEGACY_V17_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 
 process.env.DINO_V19_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v19.json');
 process.env.DINO_V21_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v21.json');
 process.env.DINO_V20_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v20.json');
+process.env.DINO_V24_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v24.json');
 process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
 process.env.DINO_V19_SHADOW_ENABLED = 'true';
 process.env.DINO_CORE_SHADOW_ENABLED = 'true';
@@ -99,7 +100,10 @@ try {
         '/api/v19-independent-shadow-history/export.csv',
         '/api/v21-consensus-shadow-history',
         '/api/v21-consensus-shadow-history/export',
-        '/api/v21-consensus-shadow-history/export.csv'
+        '/api/v21-consensus-shadow-history/export.csv',
+        '/api/v24-shadow-history',
+        '/api/v24-shadow-history/export',
+        '/api/v24-shadow-history/export.csv'
     ];
     for (const route of requiredGetRoutes) {
         assert.ok(routes.get.has(route), `GET route eksik: ${route}`);
@@ -133,6 +137,14 @@ try {
     assert.equal(comparison?.v21Shadow?.policy.edgeLow, -5);
     assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 3);
     assert.deepEqual(comparison?.v21Shadow?.policy.markets, ['UST']);
+    assert.equal(comparison?.v24Shadow?.telegram, false);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.prematchMinimum, 32);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.edgeField, 'dino');
+    assert.equal(comparison?.v24Shadow?.policy?.over?.edgeHigh, 0);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.edgeLow, null);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.A?.v16Minimum, 50);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.B?.v16Minimum, 60);
+    assert.equal(comparison?.v24Shadow?.policy?.leadingWinner?.v16EdgeHigh, 5);
     assert.deepEqual(
         comparison?.coreShadow?.rules?.map(rule => rule.market),
         ['MS2', '2.5_UST']
@@ -144,6 +156,7 @@ try {
     assert.ok(status?.testLabTracking?.legacyV17);
     assert.ok(status?.testLabTracking?.v19Shadow);
     assert.ok(status?.testLabTracking?.v21Shadow);
+    assert.ok(status?.testLabTracking?.v24Shadow);
     assert.equal(status?.v18ShadowTracking, undefined);
     assert.equal(status.testLabTracking.coreShadow.enabled, false);
     assert.equal(status.testLabTracking.v19Shadow.enabled, false);

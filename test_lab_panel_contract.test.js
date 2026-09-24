@@ -22,6 +22,13 @@ for (const requiredText of [
     '−5 ≤ Kayıt EDGE ≤ 0',
     'Eski V21 JSON',
     'testlab-v21-cohort-note',
+    '/api/v24-shadow-history',
+    'V24 · A/B ÜST + Öndeki Taraf MS',
+    'id="testlab-v24-rows"',
+    'Pre ≥ %32',
+    'Dino EDGE ≤ %0 · negatifte alt sınır yok',
+    'V16 EDGE %0…+5',
+    'renderV24Rows',
     'scope: "test-lab"'
 ]) {
     assert.match(publicPanel, new RegExp(requiredText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
