@@ -300,6 +300,10 @@
         .v18-arm-card.legacy { border-color: rgba(177,137,255,.52); }
         .v18-arm-card.v21 { border-color: rgba(255,211,79,.55); }
         .v18-arm-card.v22 { border-color: rgba(45,212,191,.65); }
+        .v18-arm-card.v24 {
+            border-color: rgba(129,140,248,.72);
+            background: linear-gradient(135deg, rgba(40,43,85,.56), rgba(17,25,31,.96));
+        }
 
         .v18-arm-title {
             display: flex;
@@ -349,6 +353,7 @@
         .v18-table-panel.legacy { border-color: rgba(177,137,255,.34); }
         .v18-table-panel.v21 { grid-column: 1 / -1; border-color: rgba(255,211,79,.38); }
         .v18-table-panel.v22 { grid-column: 1 / -1; border-color: rgba(45,212,191,.5); }
+        .v18-table-panel.v24 { grid-column: 1 / -1; border-color: rgba(129,140,248,.58); }
 
         .test-lab-table-title {
             display: flex;
@@ -1731,7 +1736,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
-                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V22, V21, deneysel V20, Legacy V17 ve V23 kontrolleri aynı Türkiye tarihinde izlenir.</p>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24, V22, V21, deneysel V20, Legacy V17 ve V23 kontrolleri aynı Türkiye tarihinde izlenir.</p>
                 </div>
                 <div class="tracker-actions">
                     <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
@@ -1808,6 +1813,30 @@
                 <span class="test-lab-rule">A VEYA B VEYA C · Temel/V16/V18: üçü de &gt; %50</span>
                 <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · EDGE uçları dahil · İlk uygun an · Model başına maçta 1 · Telegram ayrı izlenir</span>
             </div>
+            <div class="v18-arm-card v24" style="margin:14px 0;">
+                <div class="v18-arm-title"><span>🔵 V24 · A/B ÜST + Öndeki Taraf MS</span><span class="mini-badge bg-info" id="testlab-v24-mode-badge">TAZE DOĞRULAMA · YALNIZ LAB</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Toplam kayıt</span><strong id="testlab-v24-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-average-odds">-</strong></div>
+                </div>
+                <p class="muted" id="testlab-v24-start-note">İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.</p>
+                <div class="test-lab-rules" aria-label="V24 kol sonuçları">
+                    <span class="test-lab-rule" id="testlab-v24-filter-A">A · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-filter-B">B · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-filter-MS">MS · 0 sinyal</span>
+                </div>
+                <p class="muted">ÜST tarafı maç başına ortak tek kayıt; MS1/MS2 bunun dışında bağımsız ilk uygun kayıt hakkıdır. Bu nedenle bir maçtan en fazla 1 ÜST + 1 MS kaydı çıkabilir. Telegram’a gönderilmez. Olay filtresi ayrı endpoint çağırmaz; yalnız V24 adayı ortak taze doğrulamayı tetikleyebilir.</p>
+            </div>
+            <div class="test-lab-rules" id="test-lab-v24-rules" aria-label="V24 kuralları">
+                <span class="test-lab-rule">0-0 yasak · ÜST: 25–80. dk · oran 1.50–4.00 · Dino EDGE ≤ %0 · negatifte alt sınır yok</span>
+                <span class="test-lab-rule">A · Açık ÜST çizgileri · Pre ≥ %32 · Dino ≥ %45 · V16 ≥ %50 · V18 ≥ %50</span>
+                <span class="test-lab-rule">B · Yalnız 1 gol gerekiyor · Pre ≥ %32 · Dino ≥ %45 · V16 ≥ %60 · V18 ≥ %50</span>
+                <span class="test-lab-rule">ÜST için tek ek filtre: taze olay listesi ile giriş skoru tutarlı olmalı</span>
+                <span class="test-lab-rule">MS · 25–44. dk · skorda öndeki taraf · oran 1.50–2.50 · V16 ≥ %50 · V16 EDGE %0…+5</span>
+            </div>
             <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 yalnız ÜST 3/3 kuralları">
                 <span class="test-lab-rule">V21 · Yalnız ÜST · Pre &gt; %50</span>
                 <span class="test-lab-rule">Temel / V16 / V18: üçü de &gt; %50 · eksik model varsa sinyal yok</span>
@@ -1824,7 +1853,7 @@
 
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V20 yalnızca deneysel gölgede kayıt toplar ve taze skor–istatistik doğrulaması ister. V21 aynen korunur. V22 ayrı geçmişle A/B/C filtrelerini ileri test eder; hiçbir lab kolu Telegram kararını genişletmez.</p>
+                <p class="muted">V24 yalnız ileri test kaydı toplar; ÜST ve MS hakları ayrıdır. V20 deneysel gölgede, V21/V22 ve V23 mevcut düzeninde devam eder. Hiçbir V24 kaydı Telegram kararını etkilemez.</p>
                 <span class="mini-badge bg-info">BAĞIMSIZ LAB + EŞLEŞTİRİLMİŞ V23</span>
             </div>
 
@@ -1876,6 +1905,13 @@
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v22','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v22','csv')">CSV</button></div>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Filtre</th><th>Gereken gol</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v22-rows"><tr><td colspan="13" class="empty-row">Henüz V22 sinyali yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🔵 V24 · A/B ÜST + Öndeki Taraf MS · taze doğrulama</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-rows"><tr><td colspan="15" class="empty-row">Henüz V24 kaydı yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel v21">
                     <div class="test-lab-table-title">
@@ -2097,7 +2133,8 @@
                 v17: "/api/v17-legacy-shadow-history",
                 v21: "/api/v21-consensus-shadow-history",
                 v22: "/api/v22-union-shadow-history",
-                v23: "/api/v23-goal-history"
+                v23: "/api/v23-goal-history",
+                v24: "/api/v24-shadow-history"
             })
         });
 
@@ -3217,6 +3254,80 @@
             }
         }
 
+        function renderV24Rows(signals, selectedDate) {
+            const body = document.getElementById("testlab-v24-rows");
+            if (!body) return;
+            body.replaceChildren();
+            if (!Array.isArray(signals) || signals.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 15;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde V24 kaydı yok.`
+                    : "Henüz V24 kaydı yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const signal of signals) {
+                const row = document.createElement("tr");
+                const isOver = signal.signalType === "strong";
+                const resultInfo = signalResultInfo(signal?.settlement?.result);
+                const eventScore = signal?.analysis?.eventScore || {};
+                const eventText = isOver
+                    ? eventScore.status === "approve"
+                        ? `✅ Tutarlı · ${eventScore.goalCount ?? "-"}/${eventScore.scoreTotal ?? "-"} gol`
+                        : eventScore.status === "reject"
+                            ? "❌ Uyumsuz"
+                            : "⚪ Veri yok"
+                    : "MS filtresine dahil değil";
+                const probabilityText = isOver
+                    ? `Dino ${formatPercent(testLabNumber(signal.dinoProbability))} · V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))} · V18 ${formatPercent(testLabNumber(signal.v18Probability))}`
+                    : `V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))}`;
+                const edgeText = isOver
+                    ? `Dino ${testLabEdge({ edge: signal.edge })} · karar filtresi · V16 ${testLabEdge({ v16Edge: signal.v16Edge })} yalnız veri`
+                    : `V16 ${testLabEdge({ v16Edge: signal.v16Edge })}`;
+                const values = [
+                    isOver ? "ÜST" : "MS",
+                    formatDateTime(signal.sentAt),
+                    signal.match || "-",
+                    signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
+                    signal.score || "-",
+                    isOver ? signal.matchedFilters?.[0] || "-" : "MS",
+                    isOver ? signal.goalsNeeded ?? "-" : "-",
+                    marketDisplayName(signal.market),
+                    probabilityText,
+                    edgeText,
+                    isOver
+                        ? formatPercent(testLabNumber(signal.prematchMarketSupport))
+                        : `${formatPercent(testLabNumber(signal.prematchMarketSupport))} · yalnız veri`,
+                    eventText,
+                    Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                ];
+                for (const value of values) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    if (value === probabilityText || value === edgeText) {
+                        cell.style.whiteSpace = "normal";
+                        cell.style.minWidth = "170px";
+                    }
+                    row.appendChild(cell);
+                }
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+                const finalCell = document.createElement("td");
+                finalCell.textContent = signal?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+                body.appendChild(row);
+            }
+        }
+
         function setTestLabModeBadge(id, arm, mode = "shadow") {
             const badge = document.getElementById(id);
             if (!badge) return;
@@ -3326,6 +3437,7 @@
             setTestLabSummary("testlab-v17", data?.legacyV17?.summary);
             setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
             setTestLabSummary("testlab-v22", data?.v22Shadow?.summary);
+            setTestLabSummary("testlab-v24", data?.v24Shadow?.summary);
             setTestLabModeBadge("testlab-v22-mode-badge", data?.v22Shadow, "fresh");
             const v22Start = document.getElementById("testlab-v22-start-note");
             if (v22Start) v22Start.textContent = data?.v22Shadow?.startedAt
@@ -3336,6 +3448,19 @@
                 const summary = data?.v22Shadow?.filterSummaries?.[id];
                 if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
             }
+            setTestLabModeBadge("testlab-v24-mode-badge", data?.v24Shadow, "fresh");
+            const v24Start = document.getElementById("testlab-v24-start-note");
+            if (v24Start) v24Start.textContent = data?.v24Shadow?.startedAt
+                ? `V24 ileri test başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Eski kayıt aktarılmaz · Telegram kapalı.`
+                : "İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.";
+            for (const id of ["A", "B"]) {
+                const element = document.getElementById(`testlab-v24-filter-${id}`);
+                const summary = data?.v24Shadow?.filterSummaries?.[id];
+                if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
+            }
+            const v24Ms = data?.v24Shadow?.winnerSummary?.overall || {};
+            const v24MsElement = document.getElementById("testlab-v24-filter-MS");
+            if (v24MsElement) v24MsElement.textContent = `MS · ${v24Ms.total || 0} sinyal · ${v24Ms.wins || 0} K / ${v24Ms.losses || 0} Y · ${formatPercent(v24Ms.hitRate)}`;
 
             setTestLabModeBadge("testlab-v20-mode-badge", data?.v20Shadow, "experimental");
             setTestLabModeBadge("testlab-v17-mode-badge", data?.legacyV17, "fresh");
@@ -3355,6 +3480,7 @@
                 data?.v21Shadow?.summary?.updatedAt,
                 data?.v22Shadow?.summary?.updatedAt,
                 data?.v23Goal?.summary?.updatedAt,
+                data?.v24Shadow?.summary?.updatedAt,
             ]
                 .filter(Boolean)
                 .sort();
@@ -3374,6 +3500,7 @@
             renderTestLabRows("testlab-v17-rows", data?.legacyV17?.signals, { label: "Legacy V17", modelName: "V16", showSignalType: true }, selectedDate);
             renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
             renderTestLabRows("testlab-v22-rows", data?.v22Shadow?.signals, { label: "V22", modelName: "V22", consensus: true, v22: true }, selectedDate);
+            renderV24Rows(data?.v24Shadow?.signals, selectedDate);
         }
 
         function filterTestLabTables(value) {
@@ -3382,6 +3509,7 @@
             filterTableRows(value, "testlab-v21-rows");
             filterTableRows(value, "testlab-v22-rows");
             filterTableRows(value, "testlab-v23-rows");
+            filterTableRows(value, "testlab-v24-rows");
         }
 
         async function fetchTestLabHistory() {
