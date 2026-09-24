@@ -569,14 +569,15 @@ class CandidateTracker {
     }
 
 
-    list(limit = 200, records = this.data.records) {
+    list(limit = 200, records = this.data.records, offset = 0) {
         const safeLimit = Math.max(1, Math.min(Number(limit) || 200, 100000));
+        const safeOffset = Math.max(0, Math.floor(Number(offset) || 0));
         const selectedRecords = Array.isArray(records)
             ? records
             : this.data.records;
         return [...selectedRecords]
             .sort((left, right) => new Date(right.capturedAt) - new Date(left.capturedAt))
-            .slice(0, safeLimit)
+            .slice(safeOffset, safeOffset + safeLimit)
             .map(record => {
                 const context = this.shadowContextFor(record);
                 return context
