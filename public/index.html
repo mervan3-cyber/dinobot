@@ -1569,34 +1569,13 @@
                     <span class="mini-badge bg-info">MODEL GİRDİSİ · VETO YOK</span>
                 </div>
                 <div class="metrics signal-metrics">
-                    <div class="metric info">
-                        <span class="metric-label">Bağlam anı</span>
-                        <span class="metric-value" id="candidate-shadow-context">0</span>
-                    </div>
-                    <div class="metric success">
-                        <span class="metric-label">Takım gücü tam</span>
-                        <span class="metric-value" id="candidate-shadow-team">0</span>
-                    </div>
-                    <div class="metric success">
-                        <span class="metric-label">Puan durumu tam</span>
-                        <span class="metric-value" id="candidate-shadow-standings">0</span>
-                    </div>
-                    <div class="metric info">
-                        <span class="metric-label">API tahmini var</span>
-                        <span class="metric-value" id="candidate-shadow-predictions">0</span>
-                    </div>
-                    <div class="metric info">
-                        <span class="metric-label">Kimlik doğrulandı</span>
-                        <span class="metric-value" id="candidate-shadow-identity">0</span>
-                    </div>
-                    <div class="metric info">
-                        <span class="metric-label">Örneklem yeterli</span>
-                        <span class="metric-value" id="candidate-shadow-sample">0</span>
-                    </div>
-                    <div class="metric success">
-                        <span class="metric-label">Tam doğrulandı</span>
-                        <span class="metric-value" id="candidate-shadow-verified">0</span>
-                    </div>
+                    <div class="metric info"><span class="metric-label">Bağlam anı</span><span class="metric-value" id="candidate-shadow-context">0</span></div>
+                    <div class="metric success"><span class="metric-label">Takım gücü tam</span><span class="metric-value" id="candidate-shadow-team">0</span></div>
+                    <div class="metric success"><span class="metric-label">Puan durumu tam</span><span class="metric-value" id="candidate-shadow-standings">0</span></div>
+                    <div class="metric info"><span class="metric-label">API tahmini var</span><span class="metric-value" id="candidate-shadow-predictions">0</span></div>
+                    <div class="metric info"><span class="metric-label">Kimlik doğrulandı</span><span class="metric-value" id="candidate-shadow-identity">0</span></div>
+                    <div class="metric info"><span class="metric-label">Örneklem yeterli</span><span class="metric-value" id="candidate-shadow-sample">0</span></div>
+                    <div class="metric success"><span class="metric-label">Tam doğrulandı</span><span class="metric-value" id="candidate-shadow-verified">0</span></div>
                 </div>
             </div>
 
@@ -1625,6 +1604,21 @@
                         <tr><td colspan="13" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="history-filter" style="margin-top:12px;">
+                <div class="history-filter-copy">
+                    <strong id="candidate-page-summary">Sayfa 1 / 1</strong>
+                    <span class="muted">Her sayfada en fazla 200 kayıt gösterilir.</span>
+                </div>
+                <div class="tracker-actions">
+                    <button id="candidate-page-first" type="button" onclick="goCandidateHistoryPage(1)">İLK</button>
+                    <button id="candidate-page-prev" type="button" onclick="goCandidateHistoryPage(candidateHistoryPage - 1)">ÖNCEKİ</button>
+                    <select id="candidate-page-select" class="history-date-select" aria-label="Tam-stat aday sayfası" onchange="goCandidateHistoryPage(this.value)">
+                        <option value="1">Sayfa 1 / 1</option>
+                    </select>
+                    <button id="candidate-page-next" type="button" onclick="goCandidateHistoryPage(candidateHistoryPage + 1)">SONRAKİ</button>
+                    <button id="candidate-page-last" type="button" onclick="goCandidateHistoryPage(candidateHistoryTotalPages)">SON</button>
+                </div>
             </div>
         </div>
 
@@ -2121,7 +2115,10 @@
         let testLabDate = "";
         let v23Source = "all";
         let latestV23Data = null;
+        const CANDIDATE_HISTORY_PAGE_SIZE = 200;
         let candidateHistoryDate = "";
+        let candidateHistoryPage = 1;
+        let candidateHistoryTotalPages = 1;
         let pollingStarted = false;
         let nextRunTarget = 0;
         let latestSystemLogs = [];
@@ -2552,9 +2549,10 @@
             select.value = selectedDate || "";
         }
 
-        function historyApiPath(basePath, limit, selectedDate) {
+        function historyApiPath(basePath, limit, selectedDate, page = null) {
             const params = new URLSearchParams({ limit: String(limit) });
             if (selectedDate) params.set("date", selectedDate);
+            if (page !== null && page !== undefined) params.set("page", String(page));
             return `${basePath}?${params.toString()}`;
         }
 
@@ -3530,17 +3528,12 @@
             document.getElementById("candidate-shadow-sample").textContent = shadowPower.sampleAdequate ?? 0;
             document.getElementById("candidate-shadow-verified").textContent = shadowPower.fullyVerified ?? 0;
             const selectedDate = data?.filter?.date || "";
-            const viewLabel = selectedDate
-                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
-                : "Tüm Veriler";
+            const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Veriler";
             document.getElementById("candidate-history-updated").textContent = summary.updatedAt
                 ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(summary.updatedAt)}`
                 : `Görünüm: ${viewLabel} · Telegram'a gitmeyenler dahil`;
-            syncHistoryDateOptions(
-                "candidate-history-date",
-                data?.filter,
-                selectedDate
-            );
+            syncHistoryDateOptions("candidate-history-date", data?.filter, selectedDate);
+            renderCandidatePagination(data?.pagination || {});
 
             const body = document.getElementById("candidate-history-rows");
             body.replaceChildren();
@@ -3568,24 +3561,18 @@
                         ? "🟡 Sürpriz"
                         : record.signalClass === "shadow"
                             ? "👁️ Gölge"
-                        : "⚪ Dışı";
+                            : "⚪ Dışı";
                 const plainValues = [
                     formatDateTime(record.capturedAt),
                     record.match || "-",
                     record.minute ?? "-",
                     record.market || "-",
                     signalClass,
-                    record.dinoProbability !== null && record.dinoProbability !== undefined
-                        ? `%${record.dinoProbability}`
-                        : "-",
+                    record.dinoProbability !== null && record.dinoProbability !== undefined ? `%${record.dinoProbability}` : "-",
                     `${record.selectorV2Probability !== null && record.selectorV2Probability !== undefined ? `%${record.selectorV2Probability}` : "-"} / ${record.v18Probability !== null && record.v18Probability !== undefined ? `%${record.v18Probability}` : "-"}`,
-                    record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined
-                        ? `%${record.prematchMarketSupport}`
-                        : "-",
+                    record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined ? `%${record.prematchMarketSupport}` : "-",
                     candidateShadowInfo(record),
-                    record.edge !== null && record.edge !== undefined
-                        ? `%${record.edge}`
-                        : "-",
+                    record.edge !== null && record.edge !== undefined ? `%${record.edge}` : "-",
                     record.odds ?? "-"
                 ];
 
@@ -3601,7 +3588,9 @@
                 decisionBadge.textContent = decisionInfo.text;
                 decisionBadge.title = [
                     record.tariffRuleId || null,
-                    record.decisionModel ? `${String(record.decisionModel).toUpperCase()} %${record.decisionProbability ?? "-"} · EDGE ${record.decisionEdge ?? "-"}` : null,
+                    record.decisionModel
+                        ? `${String(record.decisionModel).toUpperCase()} %${record.decisionProbability ?? "-"} · EDGE ${record.decisionEdge ?? "-"}`
+                        : null,
                     record.decisionDetail || null
                 ].filter(Boolean).join(" · ");
                 decisionCell.appendChild(decisionBadge);
@@ -3619,10 +3608,53 @@
             }
         }
 
+        function renderCandidatePagination(pagination = {}) {
+            const page = Math.max(1, Number(pagination.page) || 1);
+            const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
+            const totalRecords = Math.max(0, Number(pagination.totalRecords) || 0);
+            const pageSize = Math.max(1, Number(pagination.pageSize) || CANDIDATE_HISTORY_PAGE_SIZE);
+            candidateHistoryPage = page;
+            candidateHistoryTotalPages = totalPages;
+
+            const start = totalRecords === 0 ? 0 : ((page - 1) * pageSize) + 1;
+            const end = Math.min(totalRecords, page * pageSize);
+            document.getElementById("candidate-page-summary").textContent = totalRecords
+                ? `Sayfa ${page} / ${totalPages} · ${start}-${end} / ${totalRecords}`
+                : "Sayfa 1 / 1 · Kayıt yok";
+
+            const select = document.getElementById("candidate-page-select");
+            select.replaceChildren();
+            for (let index = 1; index <= totalPages; index += 1) {
+                const option = document.createElement("option");
+                option.value = String(index);
+                option.textContent = `Sayfa ${index} / ${totalPages}`;
+                select.appendChild(option);
+            }
+            select.value = String(page);
+            document.getElementById("candidate-page-first").disabled = page <= 1;
+            document.getElementById("candidate-page-prev").disabled = page <= 1;
+            document.getElementById("candidate-page-next").disabled = page >= totalPages;
+            document.getElementById("candidate-page-last").disabled = page >= totalPages;
+        }
+
+        async function goCandidateHistoryPage(value) {
+            const requested = Math.floor(Number(value) || 1);
+            const nextPage = Math.max(1, Math.min(requested, candidateHistoryTotalPages));
+            if (nextPage === candidateHistoryPage) return;
+            candidateHistoryPage = nextPage;
+            await fetchCandidateHistory();
+            document.getElementById("section-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
         async function fetchCandidateHistory() {
             try {
                 const data = await apiFetch(
-                    historyApiPath("/api/candidate-history", 200, candidateHistoryDate)
+                    historyApiPath(
+                        "/api/candidate-history",
+                        CANDIDATE_HISTORY_PAGE_SIZE,
+                        candidateHistoryDate,
+                        candidateHistoryPage
+                    )
                 );
                 renderCandidateHistory(data || {});
                 applyTableSearch("candidate-search", "candidate-history-rows");
@@ -3633,6 +3665,7 @@
 
         async function changeCandidateHistoryDate(value) {
             candidateHistoryDate = value || "";
+            candidateHistoryPage = 1;
             await fetchCandidateHistory();
         }
 
