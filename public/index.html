@@ -1736,7 +1736,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
-                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24, V22, V21, deneysel V20, Legacy V17 ve V23 kontrolleri aynı Türkiye tarihinde izlenir.</p>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24 Ana, üç hafta sonu V24 deneyi, V22, V21 ve V23 aynı Türkiye tarihinde izlenir.</p>
                 </div>
                 <div class="tracker-actions">
                     <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
@@ -1747,7 +1747,7 @@
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
-                    <span class="muted">V22 ve V21 labda devam eder, Telegram’a bağımsız gönderilir. V20 şimdilik yalnız labda.</span>
+                    <span class="muted">V24 Ana hafta sonunda da çalışır; Guard, Quiet ve Gemini Weekend yalnız cumartesi/pazar karşılaştırmasıdır.</span>
                 </div>
                 <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
                     <option value="">🗂️ Tüm Ortak Test Dönemi</option>
@@ -1756,27 +1756,6 @@
 
             <div class="v18-comparison-grid">
                 
-                <div class="v18-arm-card v20">
-                    <div class="v18-arm-title"><span>🧠 V20 · Yeni Model</span><span class="mini-badge bg-info" id="testlab-v20-mode-badge">DENEYSEL GÖLGE</span></div>
-                    <div class="v18-arm-metrics">
-                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v20-total">0</strong></div>
-                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v20-win-loss">0 / 0</strong></div>
-                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v20-hit-rate">-</strong></div>
-                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v20-roi">-</strong></div>
-                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v20-average-odds">-</strong></div>
-                    </div>
-                </div>
-                
-                <div class="v18-arm-card legacy">
-                    <div class="v18-arm-title"><span>🟣 Legacy V17</span><span class="mini-badge bg-info" id="testlab-v17-mode-badge">TAZE DOĞRULAMA</span></div>
-                    <div class="v18-arm-metrics">
-                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v17-total">0</strong></div>
-                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v17-win-loss">0 / 0</strong></div>
-                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v17-hit-rate">-</strong></div>
-                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v17-roi">-</strong></div>
-                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v17-average-odds">-</strong></div>
-                    </div>
-                </div>
                 <div class="v18-arm-card v21">
                     <div class="v18-arm-title"><span>🟡 V21 · ÜST · 3/3</span><span class="mini-badge bg-warning" id="testlab-v21-mode-badge">TAZE DOĞRULAMA</span></div>
                     <div class="v18-arm-metrics">
@@ -1814,7 +1793,7 @@
                 <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · EDGE uçları dahil · İlk uygun an · Model başına maçta 1 · Telegram ayrı izlenir</span>
             </div>
             <div class="v18-arm-card v24" style="margin:14px 0;">
-                <div class="v18-arm-title"><span>🔵 V24 · A/B ÜST + Öndeki Taraf MS</span><span class="mini-badge bg-info" id="testlab-v24-mode-badge">TAZE DOĞRULAMA · YALNIZ LAB</span></div>
+                <div class="v18-arm-title"><span>🔵 V24 Ana · Sniper/B/A/MS</span><span class="mini-badge bg-info" id="testlab-v24-mode-badge">TAZE DOĞRULAMA · YALNIZ LAB</span></div>
                 <div class="v18-arm-metrics">
                     <div class="v18-arm-metric"><span>Toplam kayıt</span><strong id="testlab-v24-total">0</strong></div>
                     <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-win-loss">0 / 0</strong></div>
@@ -1824,18 +1803,55 @@
                 </div>
                 <p class="muted" id="testlab-v24-start-note">İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.</p>
                 <div class="test-lab-rules" aria-label="V24 kol sonuçları">
+                    <span class="test-lab-rule" id="testlab-v24-filter-SNIPER">Sniper · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-filter-A">A · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-filter-B">B · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-filter-MS">MS · 0 sinyal</span>
                 </div>
-                <p class="muted">ÜST tarafı maç başına ortak tek kayıt; MS1/MS2 bunun dışında bağımsız ilk uygun kayıt hakkıdır. Bu nedenle bir maçtan en fazla 1 ÜST + 1 MS kaydı çıkabilir. Telegram’a gönderilmez. Olay filtresi ayrı endpoint çağırmaz; yalnız V24 adayı ortak taze doğrulamayı tetikleyebilir.</p>
+                <p class="muted">Sniper → B → A → MS önceliğiyle maçın yalnız ilk uygun kaydı alınır. Dört kol aynı tek maç kilidini paylaşır. Telegram’a gönderilmez.</p>
             </div>
             <div class="test-lab-rules" id="test-lab-v24-rules" aria-label="V24 kuralları">
-                <span class="test-lab-rule">0-0 yasak · ÜST: 25–80. dk · oran 1.50–4.00 · Dino EDGE ≤ %0 · negatifte alt sınır yok</span>
-                <span class="test-lab-rule">A · Açık ÜST çizgileri · Pre ≥ %32 · Dino ≥ %45 · V16 ≥ %50 · V18 ≥ %50</span>
-                <span class="test-lab-rule">B · Yalnız 1 gol gerekiyor · Pre ≥ %32 · Dino ≥ %45 · V16 ≥ %60 · V18 ≥ %50</span>
-                <span class="test-lab-rule">ÜST için tek ek filtre: taze olay listesi ile giriş skoru tutarlı olmalı</span>
-                <span class="test-lab-rule">MS · 25–44. dk · skorda öndeki taraf · oran 1.50–2.50 · V16 ≥ %50 · V16 EDGE %0…+5</span>
+                <span class="test-lab-rule">Ortak · kadın maçları hariç · olay/skor tutarlı · maç başına 1 · Dino EDGE ≤ %0</span>
+                <span class="test-lab-rule">Sniper · 0-0 · 1.5 ÜST · Pre/V16 ≥ %72 · Dino/V18 ≥ %50</span>
+                <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %60 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
+                <span class="test-lab-rule">A · tam 2 gol · V16 ≥ %65 · Pre: 2.5 %52 · 3.5/4.5 %25</span>
+                <span class="test-lab-rule">ÜST · 25–70 · oran 1.50–4.00 · Dino ≥ %45 · V18 ≥ %50 · gereken gol en fazla 2</span>
+                <span class="test-lab-rule">MS · 25–44 · öndeki taraf · oran 1.50–2.50 · V16 ≥ %60 · V16 EDGE %0…+5</span>
+            </div>
+            <div class="v18-comparison-grid" style="margin:14px 0;">
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🛡️ Weekend Guard</span><span class="mini-badge bg-info" id="testlab-v24-guard-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-guard-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-guard-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-guard-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-guard-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-guard-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">Ana kurallar + B kolu V18 ≥ %55 + MS V16 ≥ %65.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🤫 Weekend Quiet</span><span class="mini-badge bg-info" id="testlab-v24-quiet-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-quiet-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-quiet-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-quiet-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-quiet-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-quiet-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">25–68 + B V18 ≥ %65 + MS V16 ≥ %65 + lig ID başına günde ilk 1 sinyal.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>💎 Gemini Weekend</span><span class="mini-badge bg-info" id="testlab-v24-gemini-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-gemini-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-gemini-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-gemini-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-gemini-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-gemini-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">25–68 + İngiltere League One/Two hariç + ÜST Dino EDGE −12…0.</p>
+                </div>
             </div>
             <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 yalnız ÜST 3/3 kuralları">
                 <span class="test-lab-rule">V21 · Yalnız ÜST · Pre &gt; %50</span>
@@ -1845,15 +1861,8 @@
                 <span class="test-lab-rule">Aynı anda birden çok aday: onay sayısı ↓, oran ↑, market adı</span>
             </div>
 
-            <div class="test-lab-rules" id="test-lab-v20-rules" aria-label="V20 deneysel politika bilgisi">
-                <span class="test-lab-rule">V20 · deneysel gölge</span>
-                <span class="test-lab-rule">Taze doğrulama zorunlu · Telegram'a etkisi yok</span>
-                <span class="test-lab-rule">Maç başına en fazla 1 sinyal</span>
-            </div>
-
-
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V24 yalnız ileri test kaydı toplar; ÜST ve MS hakları ayrıdır. V20 deneysel gölgede, V21/V22 ve V23 mevcut düzeninde devam eder. Hiçbir V24 kaydı Telegram kararını etkilemez.</p>
+                <p class="muted">V24 Ana her gün, üç ek kol yalnız hafta sonu ileri test kaydı toplar. Dördü de aynı taze doğrulamayı paylaşır ve Telegram kararını etkilemez. V17/V20 emekli edilmiştir.</p>
                 <span class="mini-badge bg-info">BAĞIMSIZ LAB + EŞLEŞTİRİLMİŞ V23</span>
             </div>
 
@@ -1884,21 +1893,6 @@
 
             <div class="v18-table-grid">
                 
-                <div class="v18-table-panel v20">
-                    <div class="test-lab-table-title">
-                        <h4>🧠 V20 · deneysel taze-doğrulamalı gölge</h4>
-                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v20','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v20','csv')">CSV</button></div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Olasılık</th><th>Ham EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v20-rows"><tr><td colspan="10" class="empty-row">Henüz V20 gölge sinyali yok.</td></tr></tbody></table></div>
-                </div>
-                
-                <div class="v18-table-panel legacy">
-                    <div class="test-lab-table-title">
-                        <h4>🟣 Legacy V17 · taze doğrulama</h4>
-                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v17','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v17','csv')">CSV</button></div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>V16</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v17-rows"><tr><td colspan="11" class="empty-row">Henüz Legacy V17 sinyali yok.</td></tr></tbody></table></div>
-                </div>
                 <div class="v18-table-panel v22">
                     <div class="test-lab-table-title">
                         <h4>🟢 V22 · ÜST · A/B/C · taze doğrulama</h4>
@@ -1908,10 +1902,31 @@
                 </div>
                 <div class="v18-table-panel v24">
                     <div class="test-lab-table-title">
-                        <h4>🔵 V24 · A/B ÜST + Öndeki Taraf MS · taze doğrulama</h4>
+                        <h4>🔵 V24 Ana · Sniper/B/A/MS · taze doğrulama</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24','csv')">CSV</button></div>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-rows"><tr><td colspan="15" class="empty-row">Henüz V24 kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🛡️ V24 Weekend Guard · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Guard','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Guard','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-guard-rows"><tr><td colspan="15" class="empty-row">Henüz Weekend Guard kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🤫 V24 Weekend Quiet · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Quiet','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Quiet','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-quiet-rows"><tr><td colspan="15" class="empty-row">Henüz Weekend Quiet kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>💎 V24 Gemini Weekend · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Gemini','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Gemini','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-gemini-rows"><tr><td colspan="15" class="empty-row">Henüz Gemini Weekend kaydı yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel v21">
                     <div class="test-lab-table-title">
@@ -2129,12 +2144,13 @@
             comparison: "/api/test-lab-comparison",
             refresh: "/api/test-lab-results/refresh",
             exports: Object.freeze({
-                v20: "/api/v20-shadow-history",
-                v17: "/api/v17-legacy-shadow-history",
                 v21: "/api/v21-consensus-shadow-history",
                 v22: "/api/v22-union-shadow-history",
                 v23: "/api/v23-goal-history",
-                v24: "/api/v24-shadow-history"
+                v24: "/api/v24-shadow-history",
+                v24Guard: "/api/v24-weekend-guard-history",
+                v24Quiet: "/api/v24-weekend-quiet-history",
+                v24Gemini: "/api/v24-gemini-weekend-history"
             })
         });
 
@@ -2343,7 +2359,7 @@
             document.getElementById("tariff-primary-count").textContent = String(enabledModels.length);
             document.getElementById("tariff-follow-count").textContent = "Model başına ayrı";
             document.getElementById("tariff-primary-rules").textContent = "V22: A/B/C kuralları korunur. V21: 3/3 model >%50, pre >%50, EDGE −5…0. Modeller birbirinin onayını beklemez.";
-            document.getElementById("tariff-follow-rules").textContent = "V21 35′te 1.5 ÜST verdiyse V22 60′ta aynı marketi ayrıca gönderebilir. Her modelin kendi maç başına bir sinyal sınırı korunur. V20 ve Legacy V17 yalnız labda.";
+            document.getElementById("tariff-follow-rules").textContent = "V21 35′te 1.5 ÜST verdiyse V22 60′ta aynı marketi ayrıca gönderebilir. Her modelin kendi maç başına bir sinyal sınırı korunur. V17 ve V20 emeklidir.";
         }
 
         function renderDecisionBreakdown(byDecision) {
@@ -3254,8 +3270,8 @@
             }
         }
 
-        function renderV24Rows(signals, selectedDate) {
-            const body = document.getElementById("testlab-v24-rows");
+        function renderV24Rows(targetId, signals, selectedDate, label = "V24") {
+            const body = document.getElementById(targetId);
             if (!body) return;
             body.replaceChildren();
             if (!Array.isArray(signals) || signals.length === 0) {
@@ -3264,8 +3280,8 @@
                 cell.colSpan = 15;
                 cell.className = "empty-row";
                 cell.textContent = selectedDate
-                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde V24 kaydı yok.`
-                    : "Henüz V24 kaydı yok.";
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${label} kaydı yok.`
+                    : `Henüz ${label} kaydı yok.`;
                 row.appendChild(cell);
                 body.appendChild(row);
                 return;
@@ -3276,13 +3292,11 @@
                 const isOver = signal.signalType === "strong";
                 const resultInfo = signalResultInfo(signal?.settlement?.result);
                 const eventScore = signal?.analysis?.eventScore || {};
-                const eventText = isOver
-                    ? eventScore.status === "approve"
-                        ? `✅ Tutarlı · ${eventScore.goalCount ?? "-"}/${eventScore.scoreTotal ?? "-"} gol`
-                        : eventScore.status === "reject"
-                            ? "❌ Uyumsuz"
-                            : "⚪ Veri yok"
-                    : "MS filtresine dahil değil";
+                const eventText = eventScore.status === "approve"
+                    ? `✅ Tutarlı · ${eventScore.goalCount ?? "-"}/${eventScore.scoreTotal ?? "-"} gol`
+                    : eventScore.status === "reject"
+                        ? "❌ Uyumsuz"
+                        : "⚪ Veri yok";
                 const probabilityText = isOver
                     ? `Dino ${formatPercent(testLabNumber(signal.dinoProbability))} · V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))} · V18 ${formatPercent(testLabNumber(signal.v18Probability))}`
                     : `V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))}`;
@@ -3433,11 +3447,12 @@
 
         function renderTestLabHistory(data) {
             renderV23GoalLab(data?.v23Goal);
-            setTestLabSummary("testlab-v20", data?.v20Shadow?.summary);
-            setTestLabSummary("testlab-v17", data?.legacyV17?.summary);
             setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
             setTestLabSummary("testlab-v22", data?.v22Shadow?.summary);
             setTestLabSummary("testlab-v24", data?.v24Shadow?.summary);
+            setTestLabSummary("testlab-v24-guard", data?.v24WeekendGuard?.summary);
+            setTestLabSummary("testlab-v24-quiet", data?.v24WeekendQuiet?.summary);
+            setTestLabSummary("testlab-v24-gemini", data?.v24GeminiWeekend?.summary);
             setTestLabModeBadge("testlab-v22-mode-badge", data?.v22Shadow, "fresh");
             const v22Start = document.getElementById("testlab-v22-start-note");
             if (v22Start) v22Start.textContent = data?.v22Shadow?.startedAt
@@ -3453,7 +3468,7 @@
             if (v24Start) v24Start.textContent = data?.v24Shadow?.startedAt
                 ? `V24 ileri test başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Eski kayıt aktarılmaz · Telegram kapalı.`
                 : "İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.";
-            for (const id of ["A", "B"]) {
+            for (const id of ["SNIPER", "A", "B"]) {
                 const element = document.getElementById(`testlab-v24-filter-${id}`);
                 const summary = data?.v24Shadow?.filterSummaries?.[id];
                 if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
@@ -3462,8 +3477,9 @@
             const v24MsElement = document.getElementById("testlab-v24-filter-MS");
             if (v24MsElement) v24MsElement.textContent = `MS · ${v24Ms.total || 0} sinyal · ${v24Ms.wins || 0} K / ${v24Ms.losses || 0} Y · ${formatPercent(v24Ms.hitRate)}`;
 
-            setTestLabModeBadge("testlab-v20-mode-badge", data?.v20Shadow, "experimental");
-            setTestLabModeBadge("testlab-v17-mode-badge", data?.legacyV17, "fresh");
+            setTestLabModeBadge("testlab-v24-guard-mode-badge", data?.v24WeekendGuard, "fresh");
+            setTestLabModeBadge("testlab-v24-quiet-mode-badge", data?.v24WeekendQuiet, "fresh");
+            setTestLabModeBadge("testlab-v24-gemini-mode-badge", data?.v24GeminiWeekend, "fresh");
             setTestLabModeBadge("testlab-v21-mode-badge", data?.v21Shadow, "fresh");
             const v21CohortNote = document.getElementById("testlab-v21-cohort-note");
             if (v21CohortNote) {
@@ -3475,12 +3491,13 @@
             const selectedDate = data?.date || data?.filter?.date || "";
             const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
             const updatedCandidates = [
-                data?.v20Shadow?.summary?.updatedAt,
-                data?.legacyV17?.summary?.updatedAt,
                 data?.v21Shadow?.summary?.updatedAt,
                 data?.v22Shadow?.summary?.updatedAt,
                 data?.v23Goal?.summary?.updatedAt,
                 data?.v24Shadow?.summary?.updatedAt,
+                data?.v24WeekendGuard?.summary?.updatedAt,
+                data?.v24WeekendQuiet?.summary?.updatedAt,
+                data?.v24GeminiWeekend?.summary?.updatedAt,
             ]
                 .filter(Boolean)
                 .sort();
@@ -3495,21 +3512,22 @@
             const dateSelect = document.getElementById("test-lab-date");
             if (dateSelect?.options?.[0]) dateSelect.options[0].textContent = "🗂️ Tüm Ortak Test Dönemi";
 
-            renderV20Rules(data?.v20Shadow);
-            renderTestLabRows("testlab-v20-rows", data?.v20Shadow?.signals, { label: "V20 gölge", modelName: "V20", probabilityOnly: true }, selectedDate);
-            renderTestLabRows("testlab-v17-rows", data?.legacyV17?.signals, { label: "Legacy V17", modelName: "V16", showSignalType: true }, selectedDate);
             renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
             renderTestLabRows("testlab-v22-rows", data?.v22Shadow?.signals, { label: "V22", modelName: "V22", consensus: true, v22: true }, selectedDate);
-            renderV24Rows(data?.v24Shadow?.signals, selectedDate);
+            renderV24Rows("testlab-v24-rows", data?.v24Shadow?.signals, selectedDate, "V24 Ana");
+            renderV24Rows("testlab-v24-guard-rows", data?.v24WeekendGuard?.signals, selectedDate, "Weekend Guard");
+            renderV24Rows("testlab-v24-quiet-rows", data?.v24WeekendQuiet?.signals, selectedDate, "Weekend Quiet");
+            renderV24Rows("testlab-v24-gemini-rows", data?.v24GeminiWeekend?.signals, selectedDate, "Gemini Weekend");
         }
 
         function filterTestLabTables(value) {
-            filterTableRows(value, "testlab-v20-rows");
-            filterTableRows(value, "testlab-v17-rows");
             filterTableRows(value, "testlab-v21-rows");
             filterTableRows(value, "testlab-v22-rows");
             filterTableRows(value, "testlab-v23-rows");
             filterTableRows(value, "testlab-v24-rows");
+            filterTableRows(value, "testlab-v24-guard-rows");
+            filterTableRows(value, "testlab-v24-quiet-rows");
+            filterTableRows(value, "testlab-v24-gemini-rows");
         }
 
         async function fetchTestLabHistory() {
@@ -3521,10 +3539,12 @@
                 filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
             } catch (_) {
                 document.getElementById("test-lab-updated").textContent = "Test Lab verisi alınamadı; görünen kayıtlar son başarılı yanıttan kalmıştır. Tarih filtresi henüz uygulanmamış olabilir.";
-                const badge = document.getElementById("testlab-v20-mode-badge");
-                if (badge) {
-                    badge.textContent = "BAĞLANTI YOK";
-                    badge.className = "mini-badge bg-danger";
+                for (const id of ["testlab-v24-mode-badge", "testlab-v24-guard-mode-badge", "testlab-v24-quiet-mode-badge", "testlab-v24-gemini-mode-badge"]) {
+                    const badge = document.getElementById(id);
+                    if (badge) {
+                        badge.textContent = "BAĞLANTI YOK";
+                        badge.className = "mini-badge bg-danger";
+                    }
                 }
             }
         }
