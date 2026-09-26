@@ -73,10 +73,12 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     api.setup(match(2307));await api.botuCalistir();assert.equal(deliveries.length,5);
     assert(api.v21ShadowTracker.hasSignal(2307,'strong'));assert(api.v22ShadowTracker.hasSignal(2307,'strong'));
     const comparison=(await get('/api/test-lab-comparison',{date:'2026-09-15'})).body;
-    assert.equal(comparison.v23Goal.summary.overall.total,7);
-    assert.equal(comparison.v23Goal.filters.sources.v21.baseline.total,4);
-    assert.equal(comparison.v23Goal.filters.sources.v22.baseline.total,3);
-    assert.equal(comparison.v23Goal.filters.sources.v22.controls.find(c=>c.id==='v22_minute').reject.pending,1);
+    assert.equal(comparison.v23Goal.summary.overall.total,0,'Yeni ortak V24 dönemi öncesi V23 kayıtları karşılaştırmaya girmez.');
+    const fullV23=(await get('/api/v23-goal-history',{date:'2026-09-15',source:'all'})).body;
+    assert.equal(fullV23.summary.overall.total,7);
+    assert.equal(fullV23.filters.sources.v21.baseline.total,4);
+    assert.equal(fullV23.filters.sources.v22.baseline.total,3);
+    assert.equal(fullV23.filters.sources.v22.controls.find(c=>c.id==='v22_minute').reject.pending,1);
     assert.equal((await get('/api/test-lab-comparison',{date:'2026-09-14'})).body.v23Goal.summary.overall.total,0);
     for(const [source,count]of [['all',7],['v21',4],['v22:C',3],['v22:A',1]]) {
         const json=await get('/api/v23-goal-history/export',{date:'2026-09-15',source});
@@ -102,7 +104,7 @@ async function get(route,query={}){const res=new Response();await routes.get(rou
     assert.equal(settled.liveStats.home.shotsInsideBox,6,'Box shots are persisted without a new request');
     assert.equal(settled.archiveRef,undefined);
     const paged=await get('/api/test-lab-comparison',{date:'2026-09-15',limit:'1'});
-    assert.equal(paged.body.v23Goal.signals.length,1);assert.equal(paged.body.v23Goal.summary.overall.total,7);
+    assert.equal(paged.body.v23Goal.signals.length,0);assert.equal(paged.body.v23Goal.summary.overall.total,0);
     assert.match((await get('/api/v23-goal-history/export.csv')).body,/v22_quality/);
     assert.equal(deliveries.length,6,'Five signals plus one win reply; exports send nothing');
     const onlyV22=vm.createContext({require:context.require,__dirname:path.join(root,'v22-only'),

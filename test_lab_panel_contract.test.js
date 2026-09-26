@@ -14,7 +14,6 @@ assert.doesNotMatch(publicPanel, /V18-A|V18-B|v18-shadow-comparison|v18-a-shadow
 for (const requiredText of [
     '/api/test-lab-comparison',
     '/api/test-lab-results/refresh',
-    '/api/v17-legacy-shadow-history',
     'TAZE DOĞRULAMA',
     '/api/v21-consensus-shadow-history',
     'Pre destek',
@@ -23,11 +22,18 @@ for (const requiredText of [
     'Eski V21 JSON',
     'testlab-v21-cohort-note',
     '/api/v24-shadow-history',
-    'V24 · A/B ÜST + Öndeki Taraf MS',
+    'V24 Ana · Sniper/B/A/MS',
     'id="testlab-v24-rows"',
-    'Pre ≥ %32',
-    'Dino EDGE ≤ %0 · negatifte alt sınır yok',
+    'Sniper · 0-0 · 1.5 ÜST',
+    'B · tam 1 gol',
+    'A · tam 2 gol',
     'V16 EDGE %0…+5',
+    'Weekend Guard',
+    'Weekend Quiet',
+    'Gemini Weekend',
+    '/api/v24-weekend-guard-history',
+    '/api/v24-weekend-quiet-history',
+    '/api/v24-gemini-weekend-history',
     'renderV24Rows',
     'scope: "test-lab"'
 ]) {
@@ -36,6 +42,7 @@ for (const requiredText of [
 
 const scripts = [...publicPanel.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
 assert.doesNotMatch(publicPanel, /id="testlab-(core|v19)-(rows|total|mode-badge)"|Dino Operations|Yeni [Çç]ekirdek/);
+assert.doesNotMatch(publicPanel, /id="testlab-(v17|v20)-(rows|total|mode-badge)"|\/api\/v17-legacy-shadow-history|\/api\/v20-shadow-history/);
 assert.match(publicPanel, /Maç Yakala/);
 assert.doesNotMatch(publicPanel, /HAM GÖZLEM|hybrid-observation|Hibrit Gözlem/);
 assert.doesNotMatch(publicPanel, /V21 · ÜST \/ ALT|en az 2 model|negatiflerde alt sınır yok/);

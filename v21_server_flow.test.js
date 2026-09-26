@@ -168,7 +168,8 @@ const mac = (fixture_id, market, minute) => ({ fixture_id, mac_isim: 'Offline A 
     const comparison=get('/api/test-lab-comparison').body.v21Shadow;
     assert(comparison.signals.every(s=>s.tariffVersion===policy.VERSION));
     assert.equal(comparison.archivedRecords,1);
-    assert.equal(comparison.summary.overall.total,current.signals.length);
+    assert.equal(comparison.summary.overall.total,comparison.signals.length,
+        'Ortak görünüm yeni V24 ileri-test başlangıcından önceki V21 kayıtlarını dışarıda bırakır.');
     const status=get('/api/status').body.testLabTracking.v21Shadow;
     assert.equal(status.summary.overall.total,current.signals.length);
     assert.equal(api.v21ShadowTracker.hasSignal(901,'strong'),true,'Reporting filters do not erase fixture locks');

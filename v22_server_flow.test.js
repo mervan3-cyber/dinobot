@@ -80,12 +80,13 @@ function get(route,query={}){let body,headers={};const handler=routes.get(route)
     assert.equal(status.v22Shadow.telegram,false);assert.equal(status.v21Shadow.policy.edgeHigh,0);
     assert.equal(status.v22Shadow.summary.overall.total,3);
     const comparison=get('/api/test-lab-comparison',{date:'2026-09-13'}).body;
-    assert.equal(comparison.v22Shadow.signals.length,3);assert.equal(comparison.v22Shadow.filterSummaries.A.total,2);
-    assert.equal(comparison.v22Shadow.filterSummaries.B.total,1);assert.equal(comparison.v22Shadow.filterSummaries.C.total,1);
+    assert.equal(comparison.v22Shadow.signals.length,0,'Yeni ortak V24 dönemi öncesi V22 kayıtları karşılaştırmaya girmez.');
+    assert.equal(comparison.v22Shadow.filterSummaries.A.total,0);
+    assert.equal(comparison.v22Shadow.filterSummaries.B.total,0);assert.equal(comparison.v22Shadow.filterSummaries.C.total,0);
     assert.equal(get('/api/test-lab-comparison',{date:'2026-09-12'}).body.v22Shadow.signals.length,0,'No backfill');
     assert.equal(get('/api/test-lab-comparison').body.comparisonStartedAt,beforeStart,'New V22 does not reset comparison period');
     const route='/api/v22-union-shadow-history';
-    const exported=JSON.parse(get(route+'/export',{date:'2026-09-13',scope:'test-lab'}).body);
+    const exported=JSON.parse(get(route+'/export',{date:'2026-09-13'}).body);
     assert.equal(exported.signals.length,3);assert.equal(exported.telegram,false);assert.equal(exported.rules.combination,'OR');
     assert.equal(exported.filterSummaries.A.total,2);assert(exported.signals.every(s=>s.matchedFilters.length&&s.voteCount===3));
     const csv=get(route+'/export.csv',{date:'2026-09-13'}).body;

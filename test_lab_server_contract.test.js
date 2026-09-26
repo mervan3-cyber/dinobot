@@ -12,7 +12,10 @@ process.env.DINO_LEGACY_V17_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 
 process.env.DINO_V19_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v19.json');
 process.env.DINO_V21_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v21.json');
 process.env.DINO_V20_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v20.json');
-process.env.DINO_V24_SHADOW_HISTORY_FILE = path.join(temporaryDirectory, 'v24.json');
+process.env.DINO_V24_MAIN_V2_HISTORY_FILE = path.join(temporaryDirectory, 'v24.json');
+process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE = path.join(temporaryDirectory, 'v24-guard.json');
+process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE = path.join(temporaryDirectory, 'v24-quiet.json');
+process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE = path.join(temporaryDirectory, 'v24-gemini.json');
 process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
 process.env.DINO_V19_SHADOW_ENABLED = 'true';
 process.env.DINO_CORE_SHADOW_ENABLED = 'true';
@@ -92,9 +95,6 @@ try {
         '/api/two-rule-core-shadow-history',
         '/api/two-rule-core-shadow-history/export',
         '/api/two-rule-core-shadow-history/export.csv',
-        '/api/v17-legacy-shadow-history',
-        '/api/v17-legacy-shadow-history/export',
-        '/api/v17-legacy-shadow-history/export.csv',
         '/api/v19-independent-shadow-history',
         '/api/v19-independent-shadow-history/export',
         '/api/v19-independent-shadow-history/export.csv',
@@ -103,7 +103,10 @@ try {
         '/api/v21-consensus-shadow-history/export.csv',
         '/api/v24-shadow-history',
         '/api/v24-shadow-history/export',
-        '/api/v24-shadow-history/export.csv'
+        '/api/v24-shadow-history/export.csv',
+        '/api/v24-weekend-guard-history',
+        '/api/v24-weekend-quiet-history',
+        '/api/v24-gemini-weekend-history'
     ];
     for (const route of requiredGetRoutes) {
         assert.ok(routes.get.has(route), `GET route eksik: ${route}`);
@@ -127,7 +130,8 @@ try {
     );
     assert.ok(comparison?.activeV19?.summary);
     assert.equal(comparison?.coreShadow?.validationMode, 'fresh-required');
-    assert.equal(comparison?.legacyV17?.validationMode, 'fresh-required');
+    assert.equal(comparison?.legacyV17, undefined);
+    assert.equal(comparison?.v20Shadow, undefined);
     assert.equal(comparison?.hybridObservation, undefined);
     assert.equal(routes.get.has('/api/hybrid-observation-history/export'), false);
     assert.equal(comparison?.activeV19?.telegram, false);
@@ -138,13 +142,17 @@ try {
     assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 3);
     assert.deepEqual(comparison?.v21Shadow?.policy.markets, ['UST']);
     assert.equal(comparison?.v24Shadow?.telegram, false);
-    assert.equal(comparison?.v24Shadow?.policy?.over?.prematchMinimum, 32);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.SNIPER?.prematchByMarket?.['1.5_UST'], 72);
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeField, 'dino');
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeHigh, 0);
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeLow, null);
-    assert.equal(comparison?.v24Shadow?.policy?.over?.A?.v16Minimum, 50);
-    assert.equal(comparison?.v24Shadow?.policy?.over?.B?.v16Minimum, 60);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.A?.v16Minimum, 65);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.B?.v16Minimum, 60);
     assert.equal(comparison?.v24Shadow?.policy?.leadingWinner?.v16EdgeHigh, 5);
+    assert.equal(comparison?.v24Shadow?.maximumSignalsPerFixture, 1);
+    assert.equal(comparison?.v24WeekendGuard?.policy?.over?.branches?.B?.v18Minimum, 55);
+    assert.equal(comparison?.v24WeekendQuiet?.policy?.quietLeagueDailyLimit, 1);
+    assert.equal(comparison?.v24GeminiWeekend?.policy?.over?.edgeLow, -12);
     assert.deepEqual(
         comparison?.coreShadow?.rules?.map(rule => rule.market),
         ['MS2', '2.5_UST']
@@ -153,10 +161,14 @@ try {
     let status = null;
     routes.get.get('/api/status')({}, { json(value) { status = value; } });
     assert.ok(status?.testLabTracking?.coreShadow);
-    assert.ok(status?.testLabTracking?.legacyV17);
+    assert.equal(status?.testLabTracking?.legacyV17, undefined);
+    assert.equal(status?.testLabTracking?.v20Shadow, undefined);
     assert.ok(status?.testLabTracking?.v19Shadow);
     assert.ok(status?.testLabTracking?.v21Shadow);
     assert.ok(status?.testLabTracking?.v24Shadow);
+    assert.ok(status?.testLabTracking?.v24WeekendGuard);
+    assert.ok(status?.testLabTracking?.v24WeekendQuiet);
+    assert.ok(status?.testLabTracking?.v24GeminiWeekend);
     assert.equal(status?.v18ShadowTracking, undefined);
     assert.equal(status.testLabTracking.coreShadow.enabled, false);
     assert.equal(status.testLabTracking.v19Shadow.enabled, false);

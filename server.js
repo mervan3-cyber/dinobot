@@ -49,11 +49,8 @@ const { createV24Lab } = require('./v24_lab');
 const { AdaptiveScan, providerTrouble } = require('./adaptive_scan');
 const { CouponLab } = require('./coupon_lab');
 const { createIndependentLab, importV19History } = require('./independent_lab');
-const legacyV17Tariff = require('./market_tariff');
 const dinoSelectorV18 = require('./dino_selector_v18');
 const coreShadowTariff = require('./core_shadow_tariff');
-const { V20Engine, eligible: v20PolicyEligible } = require('./v20_selector');
-const { MARKETS: V20_MARKETS, fromMac: v20SnapshotFromMac } = require('./v20_features');
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -63,7 +60,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-dino-edge-nonpositive-test-lab-2026-09-24';
+const BUILD_VERSION = 'mac-yakala-v24-main-weekend-labs-2026-09-26';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -250,9 +247,18 @@ const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 't
 const DINO_V23_SHADOW_ENABLED = String(process.env.DINO_V23_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V23_V22_GATE_ENABLED = String(process.env.DINO_V23_V22_GATE_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V24_SHADOW_ENABLED = String(process.env.DINO_V24_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
-const V24_SHADOW_HISTORY_FILE = process.env.DINO_V24_SHADOW_HISTORY_FILE
-    ? path.resolve(process.env.DINO_V24_SHADOW_HISTORY_FILE)
-    : path.join(__dirname, 'dino_v24_shadow_history.json');
+const V24_SHADOW_HISTORY_FILE = process.env.DINO_V24_MAIN_V2_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_MAIN_V2_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_main_history_v2.json');
+const V24_WEEKEND_GUARD_HISTORY_FILE = process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_weekend_guard_history.json');
+const V24_WEEKEND_QUIET_HISTORY_FILE = process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_weekend_quiet_history.json');
+const V24_GEMINI_WEEKEND_HISTORY_FILE = process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_gemini_weekend_history.json');
 // V2 starts a clean prospective period because the V22 quality rule changed.
 // The V1 file is deliberately left untouched beside it.
 const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_filter_history_v2.json');
@@ -270,6 +276,15 @@ if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V22_S
     V19_SHADOW_HISTORY_FILE, V20_SHADOW_HISTORY_FILE, CORE_SHADOW_HISTORY_FILE, LEGACY_V17_SHADOW_HISTORY_FILE]
     .some(file => path.resolve(file) === V24_SHADOW_HISTORY_FILE)) {
     throw new Error('V24 geçmiş yolu diğer deneylerden ayrı olmalıdır.');
+}
+const V24_HISTORY_FILES = [
+    V24_SHADOW_HISTORY_FILE,
+    V24_WEEKEND_GUARD_HISTORY_FILE,
+    V24_WEEKEND_QUIET_HISTORY_FILE,
+    V24_GEMINI_WEEKEND_HISTORY_FILE
+].map(file => path.resolve(file));
+if (new Set(V24_HISTORY_FILES).size !== V24_HISTORY_FILES.length) {
+    throw new Error('V24 ana ve hafta sonu LAB geçmiş yolları birbirinden ayrı olmalıdır.');
 }
 
 const PREMATCH_CACHE_FILE =
@@ -306,13 +321,10 @@ const SIGNAL_RULES = Object.freeze({
     })
 });
 
-const DINO_V17_TARIFF_ENABLED =
-    String(
-        process.env.DINO_HYBRID_TARIFF_ENABLED ??
-        process.env.DINO_V17_TARIFF_ENABLED ??
-        'true'
-    ).toLowerCase() !== 'false';
-const TELEGRAM_MIN_MINUTE = DINO_V17_TARIFF_ENABLED ? 25 : 60;
+// V17 karar/gölge hattı emeklidir. Eski env anahtarları sistemi yeniden açamaz.
+const DINO_V17_TARIFF_ENABLED = false;
+// V17'nin emekli edilmesi V21/V22 ve V24'ün erken canlı penceresini daraltmaz.
+const TELEGRAM_MIN_MINUTE = 25;
 const TELEGRAM_MAX_MINUTE = 80;
 const MIN_SIGNAL_ODD = 1.40;
 
@@ -332,10 +344,8 @@ const ACTIVE_MIN_SIGNAL_ODD = DINO_V17_TARIFF_ENABLED
         : MIN_SIGNAL_ODD;
 
 const DINO_CORE_SHADOW_ENABLED = false; // Retired lab; no refresh, recording or result polling.
-const DINO_LEGACY_V17_SHADOW_ENABLED =
-    String(process.env.DINO_LEGACY_V17_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
-const DINO_V20_SHADOW_ENABLED =
-    String(process.env.DINO_V20_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const DINO_LEGACY_V17_SHADOW_ENABLED = false;
+const DINO_V20_SHADOW_ENABLED = false;
 // V20-only local acquisition limits. Provider-side publication delay is unknown;
 // the final fixture poll below also rejects intervening score/status changes.
 const V20_FRESH_DATA_POLICY = Object.freeze({
@@ -502,6 +512,12 @@ const v22ShadowTracker = new SignalTracker({ filePath: V22_SHADOW_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V22 lab sinyali')) });
 const v24ShadowTracker = new SignalTracker({ filePath: V24_SHADOW_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 lab sinyali')) });
+const v24WeekendGuardTracker = new SignalTracker({ filePath: V24_WEEKEND_GUARD_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Weekend Guard sinyali')) });
+const v24WeekendQuietTracker = new SignalTracker({ filePath: V24_WEEKEND_QUIET_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Weekend Quiet sinyali')) });
+const v24GeminiWeekendTracker = new SignalTracker({ filePath: V24_GEMINI_WEEKEND_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Gemini Weekend sinyali')) });
 const v22Lab = createV22Lab({ tracker: v22ShadowTracker, enabled: DINO_V22_SHADOW_ENABLED,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
@@ -509,7 +525,23 @@ const v22Lab = createV22Lab({ tracker: v22ShadowTracker, enabled: DINO_V22_SHADO
 const v24Lab = createV24Lab({ tracker: v24ShadowTracker, enabled: DINO_V24_SHADOW_ENABLED,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
-    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu });
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.main, source: 'V24' });
+const v24WeekendGuardLab = createV24Lab({ tracker: v24WeekendGuardTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.weekendGuard, source: 'V24-WEEKEND-GUARD' });
+const v24WeekendQuietLab = createV24Lab({ tracker: v24WeekendQuietTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.weekendQuiet, source: 'V24-WEEKEND-QUIET' });
+const v24GeminiWeekendLab = createV24Lab({ tracker: v24GeminiWeekendTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.geminiWeekend, source: 'V24-GEMINI-WEEKEND' });
 const independentLab = createIndependentLab({
     v19Tracker: v19ShadowTracker, v21Tracker: v21ShadowTracker,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
@@ -563,7 +595,8 @@ function v23YerelArsivBakimi() {
     } catch { /* Lab-only; timer failures never affect Telegram. */ }
 }
 
-const v20Engine = new V20Engine();
+// V20 emekli: model motoru artık başlatılmaz ve tarama döngüsüne girmez.
+const v20Engine = null;
 
 const prematchOddsCache = new PrematchOddsCache({
     filePath: PREMATCH_CACHE_FILE,
@@ -2514,6 +2547,7 @@ function enrichFixturesWithStats(fixtures) {
             mac_isim: `${fixture.teams?.home?.name || 'Ev Sahibi'} - ${fixture.teams?.away?.name || 'Deplasman'}`,
             lig: fixture.league?.name || 'Bilinmeyen Lig',
             league_id: Number(fixture.league?.id),
+            league_country: fixture.league?.country || null,
             season: Number(fixture.league?.season),
             home_team_id: Number(fixture.teams?.home?.id),
             home_team_name: fixture.teams?.home?.name || null,
@@ -3847,17 +3881,14 @@ function legacyV17GolgeOnSecimi(mac, dino) {
 
 function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
     if (telegramRouter.preselect(mac, dino)) return true; // Independent of legacy active-selector flags.
+    if (independentLab.preselect(mac, dino) || v22Lab.preselect(mac, dino) || v24Lab.preselect(mac, dino)) {
+        return true;
+    }
     if (!DINO_V2_SELECTOR_ENABLED) return true;
     const marketNames = [...new Set([
         ...Object.keys(mac?.canli_oranlar || {}),
         ...Object.keys(dino || {}).filter(key => MODEL_MARKET_PATTERN.test(key))
     ])];
-
-    if (DINO_V17_TARIFF_ENABLED) {
-        return telegramRouter.preselect(mac, dino) || independentLab.preselect(mac, dino) ||
-            v22Lab.preselect(mac, dino) || v24Lab.preselect(mac, dino) ||
-            legacyV17GolgeOnSecimi(mac, dino);
-    }
 
     const fullyVerifiedPlaceholder = {
         validation: { fullyVerified: true }
@@ -5115,15 +5146,15 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
         independentLab.select('v21', { mac, dino, liveOnlyDino }) ||
         telegramRouter.select({ mac, dino, liveOnlyDino }).length > 0 ||
         v22Lab.select({ mac, dino, liveOnlyDino }) ||
-        v24Selection.over || v24Selection.winner ||
-        legacyV17GolgeSeciminiBul({ mac, dino, liveOnlyDino })
+        v24Selection.selected
     );
 }
 
 
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
-    const results = { core: null, legacyV17: null, v19: null, v21: null, v22: null,
-        v23: {v21:null,v22:null}, v24: {over:null,winner:null,eventScore:null} };
+    const results = { core: null, v19: null, v21: null, v22: null,
+        v23: {v21:null,v22:null}, v24: {record:null,over:null,winner:null,eventScore:null},
+        v24WeekendGuard: null, v24WeekendQuiet: null, v24GeminiWeekend: null };
     for (const kind of ['v21']) {
         try {
             results[kind] = independentLab.record(kind, { mac, dino, liveOnlyDino, capturedAt });
@@ -5140,14 +5171,21 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
     }
     try {
         results.v24 = v24Lab.record({ mac, dino, liveOnlyDino, capturedAt });
-        if (results.v24.over) {
-            addSystemLog(`> 🧪 V24 ÜST [${results.v24.over.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results.v24.over.market} | olay/skor tutarlı | Telegram yok.`);
-        }
-        if (results.v24.winner) {
-            addSystemLog(`> 🧪 V24 MS: ${mac.mac_isim} | ${results.v24.winner.market} | V16 %${Number(results.v24.winner.selectorV2Probability).toFixed(1)} | V16 EDGE ${Number(results.v24.winner.v16Edge).toFixed(1)} | Telegram yok.`);
-        }
+        if (results.v24.record) addSystemLog(`> 🔵 V24 ANA [${results.v24.record.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results.v24.record.market} | maçın ilk uygun kaydı | Telegram yok.`);
     } catch (error) {
         addSystemLog(`> ⚠️ V24 lab kaydı atlandı: ${error.message}`);
+    }
+    for (const [key, lab, label] of [
+        ['v24WeekendGuard', v24WeekendGuardLab, 'Weekend Guard'],
+        ['v24WeekendQuiet', v24WeekendQuietLab, 'Weekend Quiet'],
+        ['v24GeminiWeekend', v24GeminiWeekendLab, 'Gemini Weekend']
+    ]) {
+        try {
+            results[key] = lab.record({ mac, dino, liveOnlyDino, capturedAt });
+            if (results[key].record) addSystemLog(`> 🛡️ V24 ${label} [${results[key].record.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results[key].record.market} | aynı taze veri | Telegram yok.`);
+        } catch (error) {
+            addSystemLog(`> ⚠️ V24 ${label} kaydı atlandı: ${error.message}`);
+        }
     }
     for (const source of ['v21','v22']) {
         try {
@@ -5159,11 +5197,6 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         } catch {
             addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
         }
-    }
-    try {
-        results.legacyV17 = legacyV17GolgeAdayiniKaydet({ mac, dino, liveOnlyDino, capturedAt });
-    } catch (error) {
-        addSystemLog(`> ⚠️ Legacy V17 gölge değerlendirmesi atlandı (${mac?.mac_isim}): ${error.message}`);
     }
     return results;
 }
@@ -5410,14 +5443,14 @@ async function botuCalistir() {
         try {
             dinoSonuclari = await yapayZekaAnaliziYap(macListesi);
         } catch (error) {
-            addSystemLog(`> ⚠️ Python model çağrısı başarısız; bağımsız V20 değerlendirmesi devam ediyor: ${error.message}`);
+            addSystemLog(`> ⚠️ Python model çağrısı başarısız: ${error.message}`);
         }
         if (
             !Array.isArray(dinoSonuclari) ||
             dinoSonuclari.length !== macListesi.length
         ) {
             addSystemLog(
-                `> ❌ Model sonuç hizası geçersiz: ${macListesi.length} maç / ${Array.isArray(dinoSonuclari) ? dinoSonuclari.length : 0} sonuç. Eski model sinyalleri engellendi; bağımsız V20 devam ediyor.`
+                `> ❌ Model sonuç hizası geçersiz: ${macListesi.length} maç / ${Array.isArray(dinoSonuclari) ? dinoSonuclari.length : 0} sonuç. Canlı model sinyalleri engellendi.`
             );
             dinoSonuclari = macListesi.map(() => ({ HATA: 'Python batch alignment unavailable' }));
         }
@@ -5453,37 +5486,15 @@ async function botuCalistir() {
             const liveOnlyDino = dino?.LIVE_ONLY || (
                 dino?.MODEL_VARYANTI === 'live_only' ? dino : null
             );
-            // V20 eski Temel/Python kararından bağımsızdır. Her tam-stat canlı
-            // anda çağrılır; böylece yalnız geçmiş gözlemleri kullanan delta
-            // özellikleri gelecekteki taramalar için nedensel kalır.
-            const v20InitialEvaluation = v20GolgeDegerlendir(
-                mac,
-                mac.observation_completed_at || scanCapturedAt
-            );
-            const v20GolgeOnAdayi = Boolean(
-                v20InitialEvaluation?.selected &&
-                !v20ShadowTracker.hasSignal(Number(mac.fixture_id), 'strong')
-            );
+            // V20 emekli: bu turda model puanlama, aday üretimi ve taze API
+            // doğrulaması yapılmaz.
+            const v20InitialEvaluation = null;
+            const v20GolgeOnAdayi = false;
 
             if (!dino || dino.HATA || Object.keys(dino).length === 0) {
                 addSystemLog(
                     `> ⚠️ ${mac.mac_isim}: model sonucu geçersiz${dino?.HATA ? ` (${dino.HATA})` : ''}.`
                 );
-                candidateAuditRows.push(...v20BagimsizDenetimKayitlari({
-                    mac,
-                    evaluation: v20InitialEvaluation,
-                    scanId,
-                    decision: 'model_error',
-                    decisionDetail: dino?.HATA || 'Model sonucu boş veya geçersiz.'
-                }));
-                if (v20GolgeOnAdayi) {
-                    await v20BagimsizTazeDogrulaVeKaydet(
-                        mac,
-                        v20InitialEvaluation,
-                        candidateAuditRows,
-                        scanId
-                    );
-                }
                 continue;
             }
 
@@ -5499,10 +5510,6 @@ async function botuCalistir() {
                     capturedAt: mac.observation_completed_at || scanCapturedAt,
                     liveOnlyDino
                 }
-            );
-            v20AdayKayitlariniZenginlestir(
-                degerlendirme.auditRecords,
-                v20InitialEvaluation
             );
             candidateAuditRows.push(...degerlendirme.auditRecords);
 
@@ -5531,14 +5538,6 @@ async function botuCalistir() {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: Python beklenmedik şekilde score_only döndürdü; sinyal engellendi.`
                 );
-                if (v20GolgeOnAdayi) {
-                    await v20BagimsizTazeDogrulaVeKaydet(
-                        mac,
-                        v20InitialEvaluation,
-                        candidateAuditRows,
-                        scanId
-                    );
-                }
                 continue;
             }
 
@@ -5607,20 +5606,7 @@ async function botuCalistir() {
                 firsat.auditRecord.statsValidation = freshValidation.validation;
             }
 
-            // V20 ilk gözlemde kendi dondurulmuş politikasını geçtiyse aynı
-            // ortak taze veride yeniden puanlanır. Taze puan da geçmeden kayıt
-            // oluşmaz; V21/V22 Telegram kararı bu kayıttan etkilenmez.
-            const freshV20Evaluation = v20GolgeDegerlendir(
-                mac,
-                freshValidation.verifiedAt
-            );
-            if (v20GolgeOnAdayi) {
-                await v20TazeSonSkorDogrulaVeKaydet({
-                    mac,
-                    evaluation: freshV20Evaluation,
-                    capturedAt: freshValidation.verifiedAt
-                });
-            }
+            const freshV20Evaluation = null;
 
             let freshModelResults;
             try {
@@ -5632,13 +5618,6 @@ async function botuCalistir() {
                 ? freshModelResults[0]
                 : null;
             if (!freshDino || freshDino.HATA || Object.keys(freshDino).length === 0) {
-                candidateAuditRows.push(...v20BagimsizDenetimKayitlari({
-                    mac,
-                    evaluation: freshV20Evaluation,
-                    scanId: `${scanId}-verified-${Number(mac.fixture_id)}`,
-                    decision: 'fresh_model_error',
-                    decisionDetail: freshDino?.HATA || 'Taze Python sonucu alınamadı.'
-                }));
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: taze veriyle Python sonucu alınamadı${freshDino?.HATA ? ` (${freshDino.HATA})` : ''}.`
                 );
@@ -5664,10 +5643,6 @@ async function botuCalistir() {
                     capturedAt: freshValidation.verifiedAt || new Date().toISOString(),
                     liveOnlyDino: freshLiveOnlyDino
                 }
-            );
-            v20AdayKayitlariniZenginlestir(
-                freshEvaluation.auditRecords,
-                freshV20Evaluation
             );
             for (const record of freshEvaluation.auditRecords) {
                 record.statsValidation = freshValidation.validation;
@@ -5844,17 +5819,15 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     const signalFixtureIDs = signalTracker.unresolvedFixtureIds();
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
     const coreShadowFixtureIDs = [];
-    const legacyV17ShadowFixtureIDs = legacyV17ShadowTracker.unresolvedFixtureIds();
     const independentFixtureIDs = [...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(),
-        ...v23GoalLab.unresolvedFixtureIds(), ...v24ShadowTracker.unresolvedFixtureIds()];
-    const v20ShadowFixtureIDs = v20ShadowTracker.unresolvedFixtureIds();
+        ...v23GoalLab.unresolvedFixtureIds(), ...v24ShadowTracker.unresolvedFixtureIds(),
+        ...v24WeekendGuardTracker.unresolvedFixtureIds(), ...v24WeekendQuietTracker.unresolvedFixtureIds(),
+        ...v24GeminiWeekendTracker.unresolvedFixtureIds()];
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
         ...candidateFixtureIDs,
         ...coreShadowFixtureIDs,
-        ...legacyV17ShadowFixtureIDs,
-        ...independentFixtureIDs,
-        ...v20ShadowFixtureIDs
+        ...independentFixtureIDs
     ])];
     if (fixtureIDs.length === 0) {
         await telegramDelivery.flushWins();
@@ -5903,22 +5876,21 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 resolvedSignals += signalTracker.settleFixture(fixture);
                 resolvedCandidates += candidateTracker.settleFixture(fixture);
                 // Retired core/V19 history is left untouched.
-                resolvedLegacyV17Shadow += legacyV17ShadowTracker.settleFixture(fixture);
                 resolvedIndependentLab += v21ShadowTracker.settleFixture(fixture) +
-                    v22ShadowTracker.settleFixture(fixture) + v24ShadowTracker.settleFixture(fixture);
+                    v22ShadowTracker.settleFixture(fixture) + v24ShadowTracker.settleFixture(fixture) +
+                    v24WeekendGuardTracker.settleFixture(fixture) + v24WeekendQuietTracker.settleFixture(fixture) +
+                    v24GeminiWeekendTracker.settleFixture(fixture);
                 try { resolvedIndependentLab += v23GoalLab.settleFixture(fixture); }
                 catch { addSystemLog('> ⚠️ V23 sonuç kaydı yazılamadı; diğer sonuç takipleri devam ediyor.'); }
-                resolvedV20Shadow += v20ShadowTracker.settleFixture(fixture);
             }
         }
 
         if (
             resolvedSignals > 0 || resolvedCandidates > 0 ||
-            resolvedCoreShadow > 0 || resolvedLegacyV17Shadow > 0 ||
-            resolvedIndependentLab > 0 || resolvedV20Shadow > 0 || manuel
+            resolvedCoreShadow > 0 || resolvedIndependentLab > 0 || manuel
         ) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedCoreShadow} çekirdek | ${resolvedLegacyV17Shadow} legacy V17 | ${resolvedIndependentLab} V21/V22/V23/V24 lab | ${resolvedV20Shadow} V20 gölge sonuçlandı.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedIndependentLab} V21/V22/V23/V24 lab sonucu güncellendi.`
             );
         }
 
@@ -5932,9 +5904,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             resolvedIndependentLab,
             resolvedV20Shadow,
             message: resolvedSignals > 0 || resolvedCandidates > 0 ||
-                resolvedCoreShadow > 0 || resolvedLegacyV17Shadow > 0 ||
-                resolvedIndependentLab > 0 || resolvedV20Shadow > 0
-                ? `${resolvedSignals} Telegram, ${resolvedCandidates} aday, ${resolvedCoreShadow} çekirdek, ${resolvedLegacyV17Shadow} legacy V17, ${resolvedIndependentLab} V21/V22/V23/V24 lab ve ${resolvedV20Shadow} V20 gölge sonucu güncellendi.`
+                resolvedCoreShadow > 0 || resolvedIndependentLab > 0
+                ? `${resolvedSignals} Telegram, ${resolvedCandidates} aday ve ${resolvedIndependentLab} V21/V22/V23/V24 lab sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -6373,10 +6344,10 @@ function v18GolgeCsvOlustur(signals, includeRouting = false, includeV24Audit = f
 
 
 function testLabOrtakKarsilastirmaBaslangici() {
-    // Her deney kolunun aynı ileri-test dönemini görmesi için en geç başlayan
-    // kol baz alınır. V20'nin kurulmasından önceki V19/V17 sonuçları onunla
-    // aynı tabloda karşılaştırılmaz.
-    const starts = [legacyV17ShadowTracker, v20ShadowTracker]
+    // Yeni V24 ana ve hafta sonu kollarını aynı ileri-test başlangıcında tut.
+    // Emekli V17/V20 geçmişleri bu dönemi artık belirlemez.
+    const starts = [v24ShadowTracker, v24WeekendGuardTracker, v24WeekendQuietTracker,
+        v24GeminiWeekendTracker]
         .map(tracker => tracker.data?.startedAt || tracker.data?.signals?.[0]?.sentAt)
         .filter(value => value && Number.isFinite(new Date(value).getTime()))
         .map(value => new Date(value));
@@ -6408,12 +6379,13 @@ function testLabKarsilastirmaSecimi(req, res) {
         res,
         [
             ...testLabDonemineGoreSec(coreShadowTracker, null),
-            ...testLabDonemineGoreSec(legacyV17ShadowTracker, null),
             ...testLabDonemineGoreSec(v21ShadowTracker, null),
             ...testLabDonemineGoreSec(v22ShadowTracker, null),
             ...testLabDonemineGoreSec(v23GoalLab, null),
             ...testLabDonemineGoreSec(v24ShadowTracker, null),
-            ...testLabDonemineGoreSec(v20ShadowTracker, null),
+            ...testLabDonemineGoreSec(v24WeekendGuardTracker, null),
+            ...testLabDonemineGoreSec(v24WeekendQuietTracker, null),
+            ...testLabDonemineGoreSec(v24GeminiWeekendTracker, null),
             ...aktifV19SinyalleriniSec(null)
         ],
         'sentAt'
@@ -6428,12 +6400,6 @@ app.get(
         if (!selection) return;
         const activeSignals = aktifV19SinyalleriniSec(selection.date);
         const coreSignals = testLabDonemineGoreSec(coreShadowTracker, selection.date);
-        const legacySignals = testLabDonemineGoreSec(legacyV17ShadowTracker, selection.date);
-        const v20Signals = testLabDonemineGoreSec(
-            v20ShadowTracker,
-            selection.date
-        );
-        const v20Info = v20ModelBilgisi();
         const activeV19 = {
             enabled: DINO_V19_SHADOW_ENABLED,
             label: 'V19 · tüm mevcut marketler',
@@ -6452,8 +6418,7 @@ app.get(
             filter: selection.filter,
             modelVersions: {
                 v16: dinoSelectorV2.MODEL.version,
-                v18: dinoSelectorV18.MODEL.version,
-                v20: v20Info.modelVersion
+                v18: dinoSelectorV18.MODEL.version
             },
             activeV19,
             v21Shadow: {
@@ -6477,6 +6442,18 @@ app.get(
                 ...v24Lab.metadata(testLabDonemineGoreSec(v24ShadowTracker, selection.date)),
                 signals: v24ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v24ShadowTracker, selection.date))
             },
+            v24WeekendGuard: {
+                ...v24WeekendGuardLab.metadata(testLabDonemineGoreSec(v24WeekendGuardTracker, selection.date)),
+                signals: v24WeekendGuardTracker.list(req.query.limit, testLabDonemineGoreSec(v24WeekendGuardTracker, selection.date))
+            },
+            v24WeekendQuiet: {
+                ...v24WeekendQuietLab.metadata(testLabDonemineGoreSec(v24WeekendQuietTracker, selection.date)),
+                signals: v24WeekendQuietTracker.list(req.query.limit, testLabDonemineGoreSec(v24WeekendQuietTracker, selection.date))
+            },
+            v24GeminiWeekend: {
+                ...v24GeminiWeekendLab.metadata(testLabDonemineGoreSec(v24GeminiWeekendTracker, selection.date)),
+                signals: v24GeminiWeekendTracker.list(req.query.limit, testLabDonemineGoreSec(v24GeminiWeekendTracker, selection.date))
+            },
             // Geçici istemci uyumluluğu: yeni panel activeV19 anahtarını kullanır.
             currentSystemSummary: activeV19.summary,
             coreShadow: {
@@ -6490,31 +6467,6 @@ app.get(
                 maximumSignalsPerFixture: 1,
                 summary: coreShadowTracker.summary(coreSignals),
                 signals: coreShadowTracker.list(req.query.limit, coreSignals)
-            },
-            legacyV17: {
-                enabled: DINO_LEGACY_V17_SHADOW_ENABLED,
-                label: 'Legacy V17',
-                decisionImpact: false,
-                telegram: false,
-                validationMode: 'fresh-required',
-                tariffVersion: legacyV17Tariff.VERSION,
-                primaryRules: legacyV17Tariff.PRIMARY_RULES,
-                followRules: legacyV17Tariff.FOLLOW_RULES,
-                maximumSignalsPerFixture: 2,
-                summary: legacyV17ShadowTracker.summary(legacySignals),
-                signals: legacyV17ShadowTracker.list(req.query.limit, legacySignals)
-            },
-            v20Shadow: {
-                ...v20Info,
-                label: 'V20 Yeni Model',
-                decisionImpact: false,
-                telegram: false,
-                validationMode: 'fresh-required',
-                maximumSignalsPerFixture: 1,
-                summary: v20ShadowTracker.summary(v20Signals),
-                signals: v20ShadowTracker
-                    .list(req.query.limit, v20Signals)
-                    .map(v20SinyalSunumu)
             }
         });
     }
@@ -6536,11 +6488,21 @@ function labHistorySignals(req, tracker) {
     return tracker === v21ShadowTracker ? v21History.select(signals, req.query.cohort) : signals;
 }
 
+function v24LabForTracker(tracker) {
+    return new Map([
+        [v24ShadowTracker, v24Lab],
+        [v24WeekendGuardTracker, v24WeekendGuardLab],
+        [v24WeekendQuietTracker, v24WeekendQuietLab],
+        [v24GeminiWeekendTracker, v24GeminiWeekendLab]
+    ]).get(tracker) || null;
+}
+
 function labHistoryResponse(req, res, tracker, metadata) {
+    const selectedV24Lab = v24LabForTracker(tracker);
     const selection = gecmisSeciminiHazirla(
         req,
         res,
-        tracker === v21ShadowTracker || tracker === v22ShadowTracker || tracker === v24ShadowTracker
+        tracker === v21ShadowTracker || tracker === v22ShadowTracker || selectedV24Lab
             ? labHistorySignals(req, tracker)
             : tracker.list(100000),
         'sentAt'
@@ -6556,7 +6518,7 @@ function labHistoryResponse(req, res, tracker, metadata) {
             ? v21History.summary(tracker, selection.items, req.query.cohort) : tracker.summary(selection.items),
         signals: tracker.list(req.query.limit, selection.items),
         ...(tracker === v22ShadowTracker ? v22Lab.metadata(selection.items) : {}),
-        ...(tracker === v24ShadowTracker ? v24Lab.metadata(selection.items) : {})
+        ...(selectedV24Lab ? selectedV24Lab.metadata(selection.items) : {})
     });
 }
 
@@ -6592,87 +6554,6 @@ function v20GolgeCsvOlustur(signals) {
 
 
 app.get(
-    '/api/v20-shadow-history',
-    (req, res) => {
-        const selection = gecmisSeciminiHazirla(
-            req,
-            res,
-            v20ShadowTracker.list(100000),
-            'sentAt'
-        );
-        if (!selection) return;
-        const info = v20ModelBilgisi();
-        res.json({
-            ...info,
-            label: 'V20 Yeni Model',
-            decisionImpact: false,
-            telegram: false,
-            validationMode: 'fresh-required',
-            maximumSignalsPerFixture: 1,
-            filter: selection.filter,
-            summary: v20ShadowTracker.summary(selection.items),
-            signals: v20ShadowTracker
-                .list(req.query.limit, selection.items)
-                .map(v20SinyalSunumu)
-        });
-    }
-);
-
-
-app.get(
-    '/api/v20-shadow-history/export',
-    (req, res) => {
-        const sourceSignals = req.query.scope === 'test-lab'
-            ? testLabDonemineGoreSec(v20ShadowTracker, null)
-            : v20ShadowTracker.list(100000);
-        const selection = gecmisSeciminiHazirla(req, res, sourceSignals, 'sentAt');
-        if (!selection) return;
-        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
-        const info = v20ModelBilgisi();
-        const presented = selection.items.map(v20SinyalSunumu);
-        const payload = v20ShadowTracker.exportPayload({
-            format: 'dino-v20-independent-shadow-signals',
-            version: 1,
-            buildVersion: BUILD_VERSION,
-            decisionImpact: false,
-            telegram: false,
-            validationMode: 'fresh-required',
-            modelVersion: info.modelVersion,
-            policy: info.policy,
-            maximumSignalsPerFixture: 1,
-            historyFilter: selection.filter,
-            note: 'V20 yalnız taze fixture, canlı istatistik ve canlı oran doğrulamasından geçen bağımsız gölge kaydıdır; Telegram kararını etkilemez.'
-        }, presented);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader(
-            'Content-Disposition',
-            `attachment; filename="dino-v20-golge-sinyaller-${dosyaEtiketi}.json"`
-        );
-        res.send(JSON.stringify(payload, null, 2));
-    }
-);
-
-
-app.get(
-    '/api/v20-shadow-history/export.csv',
-    (req, res) => {
-        const sourceSignals = req.query.scope === 'test-lab'
-            ? testLabDonemineGoreSec(v20ShadowTracker, null)
-            : v20ShadowTracker.list(100000);
-        const selection = gecmisSeciminiHazirla(req, res, sourceSignals, 'sentAt');
-        if (!selection) return;
-        const dosyaEtiketi = gecmisDosyaEtiketi(selection);
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader(
-            'Content-Disposition',
-            `attachment; filename="dino-v20-golge-sinyaller-${dosyaEtiketi}.csv"`
-        );
-        res.send(`\uFEFF${v20GolgeCsvOlustur(selection.items)}`);
-    }
-);
-
-
-app.get(
     ['/api/two-rule-core-shadow-history', '/api/core-shadow-history'],
     (req, res) => labHistoryResponse(req, res, coreShadowTracker, {
         enabled: DINO_CORE_SHADOW_ENABLED,
@@ -6682,21 +6563,6 @@ app.get(
         tariffVersion: coreShadowTariff.VERSION,
         rules: coreShadowTariff.RULES,
         maximumSignalsPerFixture: 1
-    })
-);
-
-
-app.get(
-    '/api/v17-legacy-shadow-history',
-    (req, res) => labHistoryResponse(req, res, legacyV17ShadowTracker, {
-        enabled: DINO_LEGACY_V17_SHADOW_ENABLED,
-        label: 'Legacy V17',
-        validationMode: 'fresh-required',
-        modelVersion: dinoSelectorV2.MODEL.version,
-        tariffVersion: legacyV17Tariff.VERSION,
-        primaryRules: legacyV17Tariff.PRIMARY_RULES,
-        followRules: legacyV17Tariff.FOLLOW_RULES,
-        maximumSignalsPerFixture: 2
     })
 );
 
@@ -6722,7 +6588,8 @@ function labJsonExport(req, res, tracker, options) {
     }, selection.items);
     if (tracker === v21ShadowTracker) payload.summary = v21History.summary(tracker, selection.items, req.query.cohort);
     if (tracker === v22ShadowTracker) Object.assign(payload, v22Lab.metadata(selection.items));
-    if (tracker === v24ShadowTracker) Object.assign(payload, v24Lab.metadata(selection.items));
+    const selectedV24Lab = v24LabForTracker(tracker);
+    if (selectedV24Lab) Object.assign(payload, selectedV24Lab.metadata(selection.items));
     const cohortSuffix = tracker === v21ShadowTracker && req.query.cohort === 'previous' ? '-previous' : '';
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader(
@@ -6746,15 +6613,15 @@ function labCsvExport(req, res, tracker, filePrefix) {
     );
     res.send(`\uFEFF${v18GolgeCsvOlustur(
         selection.items,
-        tracker === v22ShadowTracker || tracker === v24ShadowTracker,
-        tracker === v24ShadowTracker
+        tracker === v22ShadowTracker || Boolean(v24LabForTracker(tracker)),
+        Boolean(v24LabForTracker(tracker))
     )}`);
 }
 
 for (const suffix of ['', '/export', '/export.csv']) {
     app.get(`/api/v23-goal-history${suffix}`, async (req, res) => {
         const source = req.query.source || 'all';
-        const selected = selectV23Source(testLabDonemineGoreSec(v23GoalLab,null),source);
+        const selected = selectV23Source(v23GoalLab.indexList(100000),source);
         if (!selected) return res.status(400).json({ success:false, message:'Geçersiz V23 kaynak filtresi.' });
         const selection = gecmisSeciminiHazirla(req, res, selected, 'sentAt');
         if (!selection) return;
@@ -6794,7 +6661,16 @@ for (const [slug, tracker, tariff, enabled] of [
     ['v19-independent-shadow', v19ShadowTracker, v19Tariff, DINO_V19_SHADOW_ENABLED],
     ['v21-consensus-shadow', v21ShadowTracker, v21Tariff, DINO_V21_SHADOW_ENABLED],
     ['v22-union-shadow', v22ShadowTracker, v22Tariff, DINO_V22_SHADOW_ENABLED],
-    ['v24-shadow', v24ShadowTracker, v24Tariff, DINO_V24_SHADOW_ENABLED]
+    ['v24-shadow', v24ShadowTracker, v24Tariff, DINO_V24_SHADOW_ENABLED],
+    ['v24-weekend-guard', v24WeekendGuardTracker,
+        { VERSION: v24Tariff.POLICIES.weekendGuard.version, POLICY: v24Tariff.POLICIES.weekendGuard },
+        DINO_V24_SHADOW_ENABLED],
+    ['v24-weekend-quiet', v24WeekendQuietTracker,
+        { VERSION: v24Tariff.POLICIES.weekendQuiet.version, POLICY: v24Tariff.POLICIES.weekendQuiet },
+        DINO_V24_SHADOW_ENABLED],
+    ['v24-gemini-weekend', v24GeminiWeekendTracker,
+        { VERSION: v24Tariff.POLICIES.geminiWeekend.version, POLICY: v24Tariff.POLICIES.geminiWeekend },
+        DINO_V24_SHADOW_ENABLED]
 ]) {
     const metadata = { enabled, tariffVersion: tariff.VERSION,
         validationMode: 'fresh-required', rules: tariff.POLICY || [...tariff.PRIMARY_RULES, ...tariff.FOLLOW_RULES] };
@@ -6827,33 +6703,6 @@ app.get(
         res,
         coreShadowTracker,
         'dino-iki-kuralli-cekirdek-golge-sinyaller'
-    )
-);
-
-
-app.get(
-    '/api/v17-legacy-shadow-history/export',
-    (req, res) => labJsonExport(req, res, legacyV17ShadowTracker, {
-        format: 'dino-v17-legacy-shadow-signals',
-        filePrefix: 'dino-v17-legacy-golge-sinyaller',
-        modelVersion: dinoSelectorV2.MODEL.version,
-        tariffVersion: legacyV17Tariff.VERSION,
-        rules: {
-            primary: legacyV17Tariff.PRIMARY_RULES,
-            follow: legacyV17Tariff.FOLLOW_RULES
-        },
-        note: 'V19 öncesi dondurulmuş V17 ilk/takip tarifesinin ortak taze doğrulamalı gölge sonuçlarıdır; Telegram kararını etkilemez.'
-    })
-);
-
-
-app.get(
-    '/api/v17-legacy-shadow-history/export.csv',
-    (req, res) => labCsvExport(
-        req,
-        res,
-        legacyV17ShadowTracker,
-        'dino-v17-legacy-golge-sinyaller'
     )
 );
 
@@ -7641,6 +7490,9 @@ app.get(
                 v22Shadow: v22Lab.metadata(),
                 v23Goal: v23GoalLab.metadata(),
                 v24Shadow: v24Lab.metadata(),
+                v24WeekendGuard: v24WeekendGuardLab.metadata(),
+                v24WeekendQuiet: v24WeekendQuietLab.metadata(),
+                v24GeminiWeekend: v24GeminiWeekendLab.metadata(),
                 coreShadow: {
                     enabled: DINO_CORE_SHADOW_ENABLED,
                     validationMode: 'fresh-required',
@@ -7651,25 +7503,6 @@ app.get(
                     rules: coreShadowTariff.RULES,
                     maximumSignalsPerFixture: 1,
                     summary: coreShadowTracker.summary()
-                },
-                legacyV17: {
-                    enabled: DINO_LEGACY_V17_SHADOW_ENABLED,
-                    validationMode: 'fresh-required',
-                    modelVersion: dinoSelectorV2.MODEL.version,
-                    tariffVersion: legacyV17Tariff.VERSION,
-                    minimumOdd: legacyV17Tariff.MINIMUM_ODD,
-                    primaryRules: legacyV17Tariff.PRIMARY_RULES,
-                    followRules: legacyV17Tariff.FOLLOW_RULES,
-                    maximumSignalsPerFixture: 2,
-                    summary: legacyV17ShadowTracker.summary()
-                },
-                v20Shadow: {
-                    ...v20ModelBilgisi(),
-                    decisionImpact: false,
-                    telegram: false,
-                    validationMode: 'fresh-required',
-                    maximumSignalsPerFixture: 1,
-                    summary: v20ShadowTracker.summary()
                 }
             },
 
@@ -7697,20 +7530,20 @@ candidateTracker.load();
 
 // Retired core history is not opened or rewritten.
 
-legacyV17ShadowTracker.load();
-
-v20ShadowTracker.load();
-
 // Retired V19 history is not opened or rewritten.
 v21ShadowTracker.load();
 v22ShadowTracker.load();
 v23GoalLab.load();
 v24ShadowTracker.load();
+v24WeekendGuardTracker.load();
+v24WeekendQuietTracker.load();
+v24GeminiWeekendTracker.load();
 couponLab.load();
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
 addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
-addSystemLog(`> 🧪 V24 LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 0-0 yasak | A: Pre/Dino/V16/V18 ≥ %32/%45/%50/%50 | B (1 gol): ≥ %32/%45/%60/%50 | Dino EDGE ≤ %0, negatifte alt sınır yok | yalnız olay/skor filtresi | ayrıca 25–44 öndeki taraf MS, V16 ≥ %50, EDGE 0…+5 | Telegram YOK.`);
+addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST | B tam 1 gol | A tam 2 gol | MS 25–44 | maç başına tek kayıt | Telegram YOK.`);
+addSystemLog('> 🛡️ V24 HAFTA SONU LAB: Guard + Quiet + Gemini Weekend aynı taze veriden ayrı geçmiş toplar; V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.');
 addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
@@ -7741,18 +7574,7 @@ app.listen(
         );
 
         addSystemLog(
-            `> 🧠 V20 BAĞIMSIZ GÖLGE: ${DINO_V20_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | ${v20Engine.model?.version || v20Engine.error || 'model yok'} | taze veri + son fixture kontrolü | maç başına 1 | Telegram YOK.`
-        );
-
-
-        addSystemLog(
-            `> 🧭 LEGACY V17 GÖLGE: ${DINO_LEGACY_V17_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | ${legacyV17Tariff.VERSION} | ilk + daha ileri dakika takip | ortak taze doğrulama | Telegram YOK.`
-        );
-
-
-
-        addSystemLog(
-            `> 🧭 TELEGRAM: yalnız V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} | V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK (açık override)' : 'yalnız LAB'} | V20/V17 yalnız LAB | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
+            `> 🧭 TELEGRAM: yalnız V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} | V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK (açık override)' : 'yalnız LAB'} | V17/V20 emekli ve çalışmıyor | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
         );
 
         addSystemLog(
