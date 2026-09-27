@@ -16,6 +16,9 @@ process.env.DINO_V24_MAIN_V2_HISTORY_FILE = path.join(temporaryDirectory, 'v24.j
 process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE = path.join(temporaryDirectory, 'v24-guard.json');
 process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE = path.join(temporaryDirectory, 'v24-quiet.json');
 process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE = path.join(temporaryDirectory, 'v24-gemini.json');
+process.env.DINO_V24_SELECTIVE_WEEKEND_HISTORY_FILE = path.join(temporaryDirectory, 'v24-selective.json');
+process.env.DINO_V24_V25_JOINT_WEEKEND_HISTORY_FILE = path.join(temporaryDirectory, 'v24-v25.json');
+process.env.DINO_V24_FOCUS_HISTORY_FILE = path.join(temporaryDirectory, 'v24-focus.json');
 process.env.DINO_V20_SNAPSHOT_ARCHIVE_DIR = path.join(temporaryDirectory, 'snapshots');
 process.env.DINO_V19_SHADOW_ENABLED = 'true';
 process.env.DINO_CORE_SHADOW_ENABLED = 'true';
@@ -106,7 +109,16 @@ try {
         '/api/v24-shadow-history/export.csv',
         '/api/v24-weekend-guard-history',
         '/api/v24-weekend-quiet-history',
-        '/api/v24-gemini-weekend-history'
+        '/api/v24-gemini-weekend-history',
+        '/api/v24-selective-weekend-history',
+        '/api/v24-selective-weekend-history/export',
+        '/api/v24-selective-weekend-history/export.csv',
+        '/api/v24-v25-joint-weekend-history',
+        '/api/v24-v25-joint-weekend-history/export',
+        '/api/v24-v25-joint-weekend-history/export.csv',
+        '/api/v24-focus-history',
+        '/api/v24-focus-history/export',
+        '/api/v24-focus-history/export.csv'
     ];
     for (const route of requiredGetRoutes) {
         assert.ok(routes.get.has(route), `GET route eksik: ${route}`);
@@ -153,6 +165,24 @@ try {
     assert.equal(comparison?.v24WeekendGuard?.policy?.over?.branches?.B?.v18Minimum, 55);
     assert.equal(comparison?.v24WeekendQuiet?.policy?.quietLeagueDailyLimit, 1);
     assert.equal(comparison?.v24GeminiWeekend?.policy?.over?.edgeLow, -12);
+    assert.deepEqual(comparison?.v24SelectiveWeekend?.policy?.priority, ['SNIPER', 'A', 'B']);
+    assert.deepEqual(comparison?.v24SelectiveWeekend?.policy?.excludedLeagues,
+        ['League One', 'League Two', 'Eerste Divisie']);
+    assert.equal(comparison?.v24SelectiveWeekend?.policy?.excludedNationalCompetitions, true);
+    assert.equal(comparison?.v24SelectiveWeekend?.policy?.leadingWinner?.enabled, false);
+    assert.equal(comparison?.v24V25JointWeekend?.v25ModelVersion, 'v25-lean-runtime-2026-09-27');
+    assert.deepEqual(comparison?.v24V25JointWeekend?.policy?.excludedLeagues, ['League One']);
+    assert.equal(comparison?.v24V25JointWeekend?.policy?.excludedNationalCompetitions, false);
+    assert.equal(comparison?.v24V25JointWeekend?.policy?.v25Joint?.branches?.A?.edgeLow, -5);
+    assert.equal(comparison?.v24V25JointWeekend?.policy?.v25Joint?.branches?.A?.edgeHigh, 0);
+    assert.equal(comparison?.v24V25JointWeekend?.policy?.v25Joint?.branches?.B?.edgeLow, 0);
+    assert.equal(comparison?.v24V25JointWeekend?.policy?.v25Joint?.branches?.B?.edgeHigh, 7);
+    assert.equal(comparison?.v24Focus?.label, 'V24 Odak LAB');
+    assert.equal(comparison?.v24Focus?.telegram, false);
+    assert.equal(comparison?.v24Focus?.maximumSignalsPerFixturePerArm, 1);
+    assert.equal(comparison?.v24Focus?.arms?.length, 6);
+    assert.equal(comparison?.v24Focus?.armSummaries?.B15_REACTION?.reaction, true);
+    assert.equal(comparison?.v24Focus?.armSummaries?.A25?.market, '2.5_UST');
     assert.deepEqual(
         comparison?.coreShadow?.rules?.map(rule => rule.market),
         ['MS2', '2.5_UST']
@@ -169,6 +199,9 @@ try {
     assert.ok(status?.testLabTracking?.v24WeekendGuard);
     assert.ok(status?.testLabTracking?.v24WeekendQuiet);
     assert.ok(status?.testLabTracking?.v24GeminiWeekend);
+    assert.ok(status?.testLabTracking?.v24SelectiveWeekend);
+    assert.ok(status?.testLabTracking?.v24V25JointWeekend);
+    assert.ok(status?.testLabTracking?.v24Focus);
     assert.equal(status?.v18ShadowTracking, undefined);
     assert.equal(status.testLabTracking.coreShadow.enabled, false);
     assert.equal(status.testLabTracking.v19Shadow.enabled, false);

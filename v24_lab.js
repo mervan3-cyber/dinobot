@@ -44,7 +44,16 @@ function excludedLeague(mac, policy) {
     const league = normalizeText(mac?.lig);
     if (!policy.excludedLeagues?.some(item => normalizeText(item) === league)) return false;
     const country = normalizeText(mac?.league_country || mac?.country);
-    return !country || country === 'england' || country === 'ingiltere';
+    if (['league one', 'league two'].includes(league)) {
+        return !country || country === 'england' || country === 'ingiltere';
+    }
+    return true;
+}
+
+function isNationalCompetition(mac) {
+    const league = normalizeText(mac?.lig);
+    if (/\b(?:club world cup|friendlies clubs?|club friendlies)\b/.test(league)) return false;
+    return /(?:^|\b)(?:nations league|friendlies?|world cup|africa cup of nations|asian cup|euro championship|european championship|copa america|gold cup|asean cup|african nations championship|olympic games|u\d+ championship)(?:\b|$)/.test(league);
 }
 
 function eventScoreAudit(mac, capturedAt) {
@@ -76,6 +85,7 @@ function createV24Lab({
     prematchSupport,
     prematchSource,
     liveSnapshot,
+    v25Scorer = null,
     enabled = true,
     policy = tariff.POLICY,
     source = 'V24'
@@ -114,8 +124,27 @@ function createV24Lab({
         if (policy.weekendOnly && !isWeekend(capturedAt)) return false;
         if (policy.womenExcluded && isWomenCompetition(mac)) return false;
         if (excludedLeague(mac, policy)) return false;
+        if (policy.excludedNationalCompetitions && isNationalCompetition(mac)) return false;
         if (hasFixtureSignal(mac) || leagueQuotaReached(mac, capturedAt)) return false;
         return true;
+    }
+
+    function v25Assessment(mac, check, market, capturedAt) {
+        const rule = policy.v25Joint?.branches?.[check?.branch] || null;
+        if (!rule) return { required: false, eligible: true, reasons: [], score: null, rule: null };
+        if (!v25Scorer || typeof v25Scorer.checkJoint !== 'function') {
+            return { required: true, eligible: false, reasons: ['V25_SCORER_UNAVAILABLE'], score: null, rule };
+        }
+        const assessed = v25Scorer.checkJoint({
+            branch: check.branch,
+            market,
+            score: mac?.skor,
+            minute: mac?.dakika,
+            odds: oddsValue(mac, market),
+            prematchSupport: prematchSupport(mac, market),
+            isWeekend: isWeekend(capturedAt)
+        }, rule);
+        return { required: true, ...assessed };
     }
 
     function preselect(mac, dino, capturedAt = null) {
@@ -127,8 +156,9 @@ function createV24Lab({
                 v18Probability: 100,
                 eventScoreStatus: 'approve'
             }, { policy, requireEventScore: false, skipModelThresholds: true });
-            if (check.eligible) return true;
+            if (check.eligible && v25Assessment(mac, check, market, capturedAt).eligible) return true;
         }
+        if (policy.leadingWinner.enabled === false) return false;
         const market = tariff.leadingWinnerMarket(mac?.skor);
         if (!market) return false;
         return tariff.winnerCheck({
@@ -160,7 +190,10 @@ function createV24Lab({
                 v18Probability: score18?.v18Probability,
                 eventScoreStatus: eventScore.status
             }, { policy, requireEventScore });
-            if (check.eligible) candidates.push({ kind: 'over', market, args, score16, score18, policy: check });
+            const v25 = check.eligible ? v25Assessment(mac, check, market, capturedAt) : null;
+            if (check.eligible && (!v25 || v25.eligible)) {
+                candidates.push({ kind: 'over', market, args, score16, score18, policy: check, v25 });
+            }
         }
 
         const winnerMarket = tariff.leadingWinnerMarket(mac?.skor);
@@ -272,8 +305,16 @@ function createV24Lab({
                 turkeyDate: turkeyDate(capturedAt),
                 eventScore: choice.eventScore,
                 eventScoreRequired: true,
-                thresholds: selected.policy.thresholds
-            }
+                thresholds: selected.policy.thresholds,
+                v25Joint: selected.v25 || null
+            },
+            v25ModelVersion: selected.v25?.score?.modelVersion || null,
+            v25TrainedThrough: selected.v25?.score?.trainedThrough || null,
+            v25Probability: selected.v25?.score?.probability ?? null,
+            v25RawProbability: selected.v25?.score?.rawProbability ?? null,
+            v25Edge: selected.v25?.score?.edge ?? null,
+            v25JointEligible: selected.v25?.eligible ?? null,
+            v25JointRule: selected.v25?.rule || null
         });
         return {
             record,
@@ -296,6 +337,8 @@ function createV24Lab({
             validationMode: 'fresh-required',
             weekendOnly: policy.weekendOnly,
             tariffVersion: policy.version,
+            v25ModelVersion: policy.v25Joint?.modelVersion || null,
+            v25TrainedThrough: policy.v25Joint?.trainedThrough || null,
             policy,
             maximumSignalsPerFixture: 1,
             startedAt: tracker.data.startedAt,
@@ -315,5 +358,6 @@ module.exports = {
     isWeekend,
     turkeyDate,
     isWomenCompetition,
-    excludedLeague
+    excludedLeague,
+    isNationalCompetition
 };

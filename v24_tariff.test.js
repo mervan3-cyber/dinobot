@@ -77,6 +77,24 @@ assert.equal(check({ odds: 1.8, dinoProbability: 44 }, tariff.POLICIES.geminiWee
     'A kolunun Dino %45 ortak tabanı korunmalı.');
 assert.equal(check({ odds: 1.8, dinoProbability: 45 }, tariff.POLICIES.geminiWeekend).eligible, true);
 
+const selectiveA = check({}, tariff.POLICIES.selectiveWeekend);
+assert.equal(selectiveA.eligible, true);
+assert.equal(check({ market: '3.5_UST', score: '2-0', prematchSupport: 25 }, tariff.POLICIES.selectiveWeekend).eligible, false);
+assert.ok(check({ market: '3.5_UST', score: '2-0', prematchSupport: 25 }, tariff.POLICIES.selectiveWeekend)
+    .reasons.includes('MARKET_NOT_ENABLED_FOR_BRANCH'));
+assert.deepEqual(tariff.POLICIES.selectiveWeekend.priority, ['SNIPER', 'A', 'B']);
+assert.equal(tariff.POLICIES.selectiveWeekend.excludedNationalCompetitions, true);
+assert.deepEqual(tariff.POLICIES.selectiveWeekend.excludedLeagues, ['League One', 'League Two', 'Eerste Divisie']);
+
+assert.equal(check({}, tariff.POLICIES.v25JointWeekend).eligible, true,
+    'V25 ortak onayı tarife sonrasındaki ayrı model kapısıdır.');
+assert.deepEqual(tariff.POLICIES.v25JointWeekend.excludedLeagues, ['League One']);
+assert.equal(tariff.POLICIES.v25JointWeekend.excludedNationalCompetitions, false);
+assert.deepEqual(tariff.POLICIES.v25JointWeekend.v25Joint.branches.A,
+    { market: '2.5_UST', probabilityMinimum: 60, edgeLow: -5, edgeHigh: 0 });
+assert.deepEqual(tariff.POLICIES.v25JointWeekend.v25Joint.branches.B,
+    { market: '1.5_UST', probabilityMinimum: 60, edgeLow: 0, edgeHigh: 7 });
+
 const winner = (extra = {}, policy = tariff.POLICY) => tariff.winnerCheck({
     market: 'MS2',
     score: '0-1',
@@ -96,8 +114,11 @@ assert.equal(winner({ v16Probability: 64.9 }, tariff.POLICIES.weekendGuard).elig
 assert.equal(winner({ v16Probability: 65 }, tariff.POLICIES.weekendGuard).eligible, false,
     'V16 65 olsa bile EDGE +5 üzeriyse reddedilmeli.');
 assert.equal(winner({ odds: 1.6, v16Probability: 65 }, tariff.POLICIES.weekendGuard).eligible, true);
+assert.equal(winner({ odds: 1.6, v16Probability: 99 }, tariff.POLICIES.selectiveWeekend).eligible, false);
+assert.ok(winner({ odds: 1.6, v16Probability: 99 }, tariff.POLICIES.selectiveWeekend)
+    .reasons.includes('LEADING_WINNER_DISABLED'));
 assert.equal(tariff.leadingWinnerMarket('2-1'), 'MS1');
 assert.equal(tariff.leadingWinnerMarket('1-2'), 'MS2');
 assert.equal(tariff.leadingWinnerMarket('1-1'), null);
 
-console.log('V24 tariff: main Sniper/B/A/MS and three weekend policies passed.');
+console.log('V24 tariff: main Sniper/B/A/MS and five weekend policies passed.');

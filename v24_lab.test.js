@@ -67,7 +67,7 @@ const dino = {
     MS1: 65
 };
 
-function makeLab(name, policy = tariff.POLICY) {
+function makeLab(name, policy = tariff.POLICY, v25Scorer = null) {
     const tracker = new SignalTracker({ filePath: path.join(root, `${name}.json`) });
     tracker.load();
     const lab = createV24Lab({
@@ -77,6 +77,7 @@ function makeLab(name, policy = tariff.POLICY) {
         prematchSupport: (current, market) => current.preByMarket?.[market],
         prematchSource: () => 'test',
         liveSnapshot: () => ({ home: {}, away: {} }),
+        v25Scorer,
         enabled: true,
         policy,
         source: name
@@ -140,6 +141,49 @@ try {
         capturedAt: saturday
     }).record, 'Premier League Gemini Weekend kara listesinde değildir.');
 
+    const selective = makeLab('selective', tariff.POLICIES.selectiveWeekend);
+    const selectiveRecord = selective.lab.record({ mac: mac(40), dino, capturedAt: saturday }).record;
+    assert.equal(selectiveRecord.matchedFilters[0], 'A', 'Seçici guard A kolunu B kolundan önce almalı.');
+    assert.equal(selectiveRecord.market, '2.5_UST');
+    for (const [fixtureId, lig, leagueCountry] of [
+        [41, 'League One', 'England'],
+        [42, 'League Two', 'England'],
+        [43, 'Eerste Divisie', 'Netherlands'],
+        [44, 'International Friendlies', 'World']
+    ]) {
+        assert.equal(selective.lab.record({
+            mac: mac(fixtureId, saturday, { lig, league_country: leagueCountry }), dino, capturedAt: saturday
+        }).record, null, `${lig} Seçici Weekend içinde kapanmalı.`);
+    }
+    assert.ok(selective.lab.record({
+        mac: mac(45, saturday, { lig: 'Friendlies Clubs', league_country: 'World' }), dino, capturedAt: saturday
+    }).record, 'Kulüp hazırlık maçı milli maç olarak yanlış sınıflanmamalı.');
+
+    const rejectingV25 = { checkJoint: () => ({ eligible: false, reasons: ['TEST_REJECT'], score: null }) };
+    const jointRejected = makeLab('joint-rejected', tariff.POLICIES.v25JointWeekend, rejectingV25);
+    assert.equal(jointRejected.lab.record({ mac: mac(50), dino, capturedAt: saturday }).record, null,
+        'A/B, V25 ortak onayı olmadan kaydedilmemeli.');
+
+    const approvingV25 = { checkJoint: (input, rule) => ({
+        eligible: true, reasons: [], rule,
+        score: { modelVersion: 'v25-test', trainedThrough: '2026-09-25', probability: 66, rawProbability: 64, edge: -2 }
+    }) };
+    const joint = makeLab('joint', tariff.POLICIES.v25JointWeekend, approvingV25);
+    const jointRecord = joint.lab.record({ mac: mac(51), dino, capturedAt: saturday }).record;
+    assert.equal(jointRecord.matchedFilters[0], 'A');
+    assert.equal(jointRecord.v25Probability, 66);
+    assert.equal(jointRecord.v25Edge, -2);
+    assert.equal(jointRecord.v25JointEligible, true);
+    assert.ok(joint.lab.record({
+        mac: mac(52, saturday, { lig: 'League Two', league_country: 'England' }), dino, capturedAt: saturday
+    }).record, 'League Two ortak guardda otomatik kapanmamalı; V25 geçirebilmeli.');
+    assert.ok(joint.lab.record({
+        mac: mac(53, saturday, { lig: 'International Friendlies', league_country: 'World' }), dino, capturedAt: saturday
+    }).record, 'Milli maç ortak guardda otomatik kapanmamalı; V25 geçirebilmeli.');
+    assert.equal(joint.lab.record({
+        mac: mac(54, saturday, { lig: 'League One', league_country: 'England' }), dino, capturedAt: saturday
+    }).record, null, 'League One ortak guardda daima kapalı olmalı.');
+
     const fixture = {
         fixture: { id: 1, status: { short: 'FT' } },
         score: { fulltime: { home: 2, away: 1 } },
@@ -150,7 +194,7 @@ try {
     assert.equal(main.lab.metadata().maximumSignalsPerFixture, 1);
     assert.equal(main.lab.metadata().filterSummaries.SNIPER.total, 1);
 
-    console.log('V24 Lab: global first-signal lock, event gate, Sniper and weekend variants passed.');
+    console.log('V24 Lab: global first-signal lock, event gate, Sniper and five weekend variants passed.');
 } finally {
     fs.rmSync(root, { recursive: true, force: true });
 }

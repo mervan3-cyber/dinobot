@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v24-main-sniper-ab-ms-weekend-labs-2026-09-26';
+const VERSION = 'v24-main-sniper-ab-ms-five-weekend-labs-2026-09-27';
 
 function freezePolicy(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -18,6 +18,9 @@ const MAIN_POLICY = freezePolicy({
     womenExcluded: true,
     maximumSignalsPerFixture: 1,
     priority: ['SNIPER', 'B', 'A', 'MS'],
+    allowedOverMarketsByBranch: null,
+    excludedNationalCompetitions: false,
+    v25Joint: null,
     over: {
         minuteLow: 25,
         minuteHigh: 70,
@@ -65,6 +68,7 @@ const MAIN_POLICY = freezePolicy({
         }
     },
     leadingWinner: {
+        enabled: true,
         minuteLow: 25,
         minuteHigh: 44,
         minimumOdd: 1.5,
@@ -108,6 +112,35 @@ const POLICIES = freezePolicy({
         policy.over.minuteHigh = 68;
         policy.over.edgeLow = -12;
         policy.excludedLeagues = ['League One', 'League Two'];
+    }),
+    selectiveWeekend: variant('selective-weekend', 'V24 Seçici Weekend', policy => {
+        policy.priority = ['SNIPER', 'A', 'B'];
+        policy.allowedOverMarketsByBranch = {
+            SNIPER: ['1.5_UST'],
+            A: ['2.5_UST'],
+            B: ['1.5_UST']
+        };
+        policy.leadingWinner.enabled = false;
+        policy.excludedLeagues = ['League One', 'League Two', 'Eerste Divisie'];
+        policy.excludedNationalCompetitions = true;
+    }),
+    v25JointWeekend: variant('v25-joint-weekend', 'V24 + V25 Ortak Weekend', policy => {
+        policy.priority = ['SNIPER', 'A', 'B'];
+        policy.allowedOverMarketsByBranch = {
+            SNIPER: ['1.5_UST'],
+            A: ['2.5_UST'],
+            B: ['1.5_UST']
+        };
+        policy.leadingWinner.enabled = false;
+        policy.excludedLeagues = ['League One'];
+        policy.v25Joint = {
+            modelVersion: 'v25-lean-runtime-2026-09-27',
+            trainedThrough: '2026-09-25',
+            branches: {
+                A: { market: '2.5_UST', probabilityMinimum: 60, edgeLow: -5, edgeHigh: 0 },
+                B: { market: '1.5_UST', probabilityMinimum: 60, edgeLow: 0, edgeHigh: 7 }
+            }
+        };
     })
 });
 
@@ -166,6 +199,9 @@ function overCheck(args, {
     const v18Probability = percent(args?.v18Probability);
     const resolved = resolveOverBranch(score, String(args?.market || ''), policy);
     const branchPolicy = resolved.branch ? policy.over.branches[resolved.branch] : null;
+    const allowedMarkets = resolved.branch && policy.allowedOverMarketsByBranch
+        ? policy.allowedOverMarketsByBranch[resolved.branch]
+        : null;
     const prematchMinimum = branchPolicy?.prematchByMarket?.[String(args?.market || '')] ?? null;
     const dinoMinimum = branchPolicy?.dinoMinimum ?? policy.over.dinoMinimum;
     const v16Minimum = branchPolicy?.v16Minimum ?? null;
@@ -181,6 +217,9 @@ function overCheck(args, {
     if (resolved.goalsNeeded !== null && resolved.goalsNeeded <= 0) reasons.push('MARKET_ALREADY_DECIDED');
     if (resolved.goalsNeeded !== null && resolved.goalsNeeded > policy.over.goalsNeededMaximum) reasons.push('MORE_THAN_TWO_GOALS_REQUIRED');
     if (!resolved.branch) reasons.push('BRANCH_NOT_RESOLVED');
+    if (Array.isArray(allowedMarkets) && !allowedMarkets.includes(String(args?.market || ''))) {
+        reasons.push('MARKET_NOT_ENABLED_FOR_BRANCH');
+    }
     if (minute === null || minute < policy.over.minuteLow || minute > policy.over.minuteHigh) reasons.push('MINUTE_OUTSIDE');
     if (odds === null || odds < policy.over.minimumOdd || odds > policy.over.maximumOdd) reasons.push('ODDS_OUTSIDE');
     if (prematchMinimum === null) reasons.push('PREMATCH_THRESHOLD_UNDEFINED');
@@ -238,6 +277,7 @@ function winnerCheck(args, {
         : null;
     const reasons = [];
 
+    if (policy.leadingWinner.enabled === false) reasons.push('LEADING_WINNER_DISABLED');
     if (!score) reasons.push('SCORE_INVALID');
     if (!expectedMarket) reasons.push('LEADING_SIDE_REQUIRED');
     if (String(args?.market || '') !== expectedMarket) reasons.push('LEADING_MARKET_MISMATCH');
