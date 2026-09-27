@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dino İddaa | Admin Kontrol Merkezi</title>
+    <title>Maç Yakala | Canlı Kontrol Merkezi</title>
     <style>
         :root {
             --primary: #ff9800;
@@ -68,6 +68,7 @@
         input[type="password"],
         input[type="number"],
         input[type="time"],
+        input[type="date"],
         select {
             width: 100%;
             padding: 11px;
@@ -271,6 +272,189 @@
         .metric.warning .metric-value { color: #ffd34f; }
         .metric.info .metric-value { color: #64b5f6; }
 
+        .signal-metrics {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .v18-comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin: 12px 0;
+        }
+
+        .v18-arm-card {
+            padding: 12px;
+            border: 1px solid #34404c;
+            border-radius: 12px;
+            background: #151a1f;
+        }
+
+        .v18-arm-card.active { border-color: rgba(255,177,59,.55); }
+        .v18-arm-card.v20 {
+            grid-column: 1 / -1;
+            border-color: rgba(66,223,152,.58);
+            background: linear-gradient(135deg, rgba(22,55,45,.66), rgba(17,28,31,.96));
+        }
+        .v18-arm-card.core { border-color: rgba(100,181,246,.58); }
+        .v18-arm-card.legacy { border-color: rgba(177,137,255,.52); }
+        .v18-arm-card.v21 { border-color: rgba(255,211,79,.55); }
+        .v18-arm-card.v22 { border-color: rgba(45,212,191,.65); }
+        .v18-arm-card.v24 {
+            border-color: rgba(129,140,248,.72);
+            background: linear-gradient(135deg, rgba(40,43,85,.56), rgba(17,25,31,.96));
+        }
+
+        .v18-arm-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 9px;
+            font-weight: 850;
+        }
+
+        .v18-arm-metrics {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .v18-arm-metric {
+            padding: 8px;
+            border-radius: 8px;
+            background: #101419;
+        }
+
+        .v18-arm-metric span { display:block; color:#8d99a7; font-size:.66rem; }
+        .v18-arm-metric strong { display:block; margin-top:3px; color:#f3f6f8; font-size:.94rem; }
+
+        .v18-table-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .v18-table-panel {
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid #303a44;
+            border-radius: 11px;
+            background: #11161b;
+        }
+
+        .v18-table-panel h4 { margin: 0; }
+        .v18-table-panel.v20 {
+            grid-column: 1 / -1;
+            border-color: rgba(66,223,152,.4);
+            background: linear-gradient(145deg, rgba(18,39,34,.48), rgba(14,19,24,.96));
+        }
+        .v18-table-panel.core { border-color: rgba(100,181,246,.38); }
+        .v18-table-panel.legacy { border-color: rgba(177,137,255,.34); }
+        .v18-table-panel.v21 { grid-column: 1 / -1; border-color: rgba(255,211,79,.38); }
+        .v18-table-panel.v22 { grid-column: 1 / -1; border-color: rgba(45,212,191,.5); }
+        .v18-table-panel.v24 { grid-column: 1 / -1; border-color: rgba(129,140,248,.58); }
+
+        .test-lab-table-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .test-lab-table-actions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .test-lab-table-actions button {
+            width: auto;
+            margin: 0;
+            padding: 6px 8px;
+            background: #27313b;
+            color: #dce3e9;
+            font-size: .68rem;
+        }
+
+        .test-lab-rules {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin: 12px 0 14px;
+        }
+
+        .test-lab-rule {
+            padding: 7px 9px;
+            border: 1px solid rgba(100,181,246,.27);
+            border-radius: 999px;
+            background: rgba(48,116,179,.1);
+            color: #b8dcff;
+            font-size: .74rem;
+            font-weight: 750;
+        }
+
+        .tracker-actions {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .tracker-actions button {
+            width: auto;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.75rem;
+        }
+
+        .history-filter {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 2px 0 12px;
+            border: 1px solid #3a4249;
+            border-radius: 8px;
+            background: #181c1f;
+        }
+
+        .history-filter-copy strong {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.8rem;
+        }
+
+        .history-date-select {
+            width: auto;
+            min-width: 215px;
+            margin: 0;
+            padding: 8px 10px;
+            font-size: 0.78rem;
+        }
+
+        .signal-type-label,
+        .result-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 7px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .signal-type-label.strong { background:#285f31; color:#8df095; }
+        .signal-type-label.surprise { background:#665515; color:#ffe078; }
+        .result-label.win { background:#285f31; color:#8df095; }
+        .result-label.loss { background:#702b27; color:#ffaaa3; }
+        .result-label.pending { background:#414850; color:#d6dce1; }
+        .result-label.neutral { background:#44546a; color:#b9d7ff; }
+
         .ml-panel {
             display: grid;
             grid-template-columns: 1.5fr repeat(3, minmax(110px, 0.6fr));
@@ -421,6 +605,7 @@
             .container { padding: 13px; }
             .top-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .signal-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .metric:first-child { grid-column: span 2; }
             .ml-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
             .ml-main { grid-column: 1 / -1; }
@@ -432,12 +617,723 @@
             .ml-main { grid-column: auto; }
             .status-action { flex-direction: column; align-items: stretch; }
             .status-action button { width: 100% !important; }
+            .history-filter { align-items: stretch; flex-direction: column; }
+            .history-date-select { width: 100%; }
         }
++        /* V17.3 Operations Center */
+        html {
+            scroll-behavior: smooth;
+            color-scheme: dark;
+        }
+
+        body {
+            position: relative;
+            padding: 0;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 12% -10%, rgba(255, 177, 59, 0.13), transparent 30rem),
+                radial-gradient(circle at 90% 10%, rgba(60, 214, 156, 0.08), transparent 34rem),
+                #080b10;
+            font-family: "Segoe UI Variable", "Segoe UI", Tahoma, sans-serif;
+            font-size: 16px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.26;
+            background-image:
+                linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+            background-size: 38px 38px;
+            mask-image: linear-gradient(to bottom, #000, transparent 74%);
+        }
+
+        * {
+            font-family: inherit;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 24px 32px 64px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        #login-screen {
+            max-width: 460px;
+            margin-top: min(16vh, 140px);
+            padding: 32px;
+            background: rgba(15, 20, 27, .96);
+            border: 1px solid #28313d;
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+        }
+
+        #login-screen h2 {
+            letter-spacing: -.025em;
+        }
+
+        .command-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 8px 2px 20px;
+        }
+
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 177, 59, .42);
+            border-radius: 15px;
+            color: #ffbd58;
+            background: linear-gradient(145deg, rgba(255,177,59,.16), rgba(255,177,59,.035));
+            box-shadow: inset 0 0 24px rgba(255,177,59,.08), 0 10px 30px rgba(0,0,0,.35);
+            font-weight: 900;
+            letter-spacing: -.08em;
+        }
+
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            right: 7px;
+            top: 7px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #42df98;
+            box-shadow: 0 0 0 4px rgba(66,223,152,.11), 0 0 15px rgba(66,223,152,.75);
+            animation: statusPulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            50% { opacity: .45; transform: scale(.82); }
+        }
+
+        .brand-copy h1 {
+            margin: 0;
+            color: #f7f9fb;
+            font-size: clamp(1.2rem, 2vw, 1.55rem);
+            line-height: 1.15;
+            letter-spacing: -.035em;
+        }
+
+        .brand-copy p {
+            margin-top: 5px;
+            color: #8793a2;
+            font-size: .87rem;
+        }
+
+        .header-health {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .connection-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 8px 13px;
+            border: 1px solid #283440;
+            border-radius: 999px;
+            background: rgba(15, 21, 28, .9);
+            color: #aeb8c4;
+            font-size: .86rem;
+            font-weight: 750;
+        }
+
+        .istanbul-clock {
+            color: #dce2e8;
+            font-variant-numeric: tabular-nums;
+            font-size: .88rem;
+            font-weight: 700;
+        }
+
+        .command-nav {
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            display: flex;
+            gap: 6px;
+            margin: 0 0 18px;
+            padding: 8px;
+            overflow-x: auto;
+            border: 1px solid rgba(53, 64, 76, .9);
+            border-radius: 14px;
+            background: rgba(10, 14, 19, .9);
+            box-shadow: 0 12px 34px rgba(0,0,0,.24);
+            backdrop-filter: blur(16px);
+            scrollbar-width: none;
+        }
+
+        .command-nav::-webkit-scrollbar { display: none; }
+
+        .command-nav button {
+            width: auto;
+            min-width: max-content;
+            margin: 0;
+            padding: 9px 13px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: #99a5b3;
+            font-size: .82rem;
+            font-weight: 750;
+        }
+
+        .command-nav button:hover,
+        .command-nav button.active {
+            color: #fff;
+            opacity: 1;
+            border-color: #35414e;
+            background: #1a212a;
+        }
+
+        .command-nav button.active {
+            color: #ffc063;
+            border-color: rgba(255,177,59,.38);
+            background: rgba(255,177,59,.11);
+        }
+
+        .workspace-overview {
+            scroll-margin-top: 76px;
+        }
+
+        .top-meta {
+            grid-template-columns: 1.05fr 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .meta-item,
+        .metric {
+            position: relative;
+            overflow: hidden;
+            padding: 14px;
+            border: 1px solid #28323d;
+            border-radius: 13px;
+            background: linear-gradient(145deg, rgba(21,27,35,.98), rgba(15,20,27,.98));
+        }
+
+        .meta-item::before,
+        .metric::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.09), transparent);
+        }
+
+        .meta-label,
+        .metric-label {
+            color: #8793a2;
+            font-size: .82rem;
+            line-height: 1.25;
+        }
+
+        .meta-value {
+            margin-top: 3px;
+            color: #edf1f5;
+            font-size: .9rem;
+            font-weight: 760;
+        }
+
+        .meta-subvalue {
+            display: block;
+            margin-top: 5px;
+            color: #6f7c8b;
+            font-size: .76rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .quota-track {
+            height: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #222b35;
+        }
+
+        .quota-track span {
+            display: block;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #42df98, #8af0c0);
+            transition: width .35s ease, background .35s ease;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(250px, .8fr) minmax(220px, .65fr);
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .control-card {
+            min-height: 126px;
+            padding: 17px;
+            border: 1px solid #2a3541;
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(19,25,33,.98), rgba(13,18,24,.98));
+            box-shadow: 0 14px 36px rgba(0,0,0,.18);
+        }
+
+        .control-card__top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .control-card h3 {
+            color: #f1f4f7;
+            font-size: 1rem;
+        }
+
+        .control-card p {
+            margin-top: 7px;
+            color: #8793a2;
+            font-size: .86rem;
+            line-height: 1.5;
+        }
+
+        .control-card.primary-control {
+            border-color: rgba(255,177,59,.32);
+            background:
+                linear-gradient(125deg, rgba(255,177,59,.09), transparent 48%),
+                linear-gradient(145deg, #151b23, #0e1319);
+        }
+
+        .control-card.auto-control {
+            border-color: rgba(66,223,152,.26);
+        }
+
+        .control-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .control-actions button,
+        .quick-scan-button {
+            width: auto;
+            margin: 0;
+            padding: 10px 14px;
+            border-radius: 10px;
+        }
+
+        .quick-scan-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .quick-scan-button {
+            width: 100%;
+            background: linear-gradient(135deg, #ff9d1f, #ffc45f);
+            color: #1b1205;
+            box-shadow: 0 8px 24px rgba(255,157,31,.18);
+        }
+
+        .overview-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .overview-metric {
+            min-height: 102px;
+            padding: 15px;
+            border: 1px solid #27323d;
+            border-radius: 15px;
+            background: rgba(13,18,24,.88);
+        }
+
+        .overview-metric__label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #8692a0;
+            font-size: .82rem;
+        }
+
+        .overview-metric strong {
+            display: block;
+            margin-top: 12px;
+            color: #f5f7fa;
+            font-size: 1.65rem;
+            line-height: 1;
+            letter-spacing: -.04em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .overview-metric small {
+            display: block;
+            margin-top: 9px;
+            color: #647181;
+            font-size: .76rem;
+        }
+
+        .overview-metric.accent strong { color: #ffbc56; }
+        .overview-metric.success strong { color: #55e39e; }
+        .overview-metric.info strong { color: #6eb7ff; }
+
+        .dashboard-sections {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-sections > .card {
+            scroll-margin-top: 76px;
+        }
+
+        #section-decision { order: 1; }
+        #section-signals { order: 2; }
+        #section-v18-shadow { order: 3; }
+        #section-coupon-lab { order: 4; }
+        #section-coverage { order: 5; }
+        #section-audit { order: 6; }
+        #section-tariff { order: 7; }
+        #section-schedule { order: 8; }
+        #section-radar { order: 9; }
+
+        .card {
+            margin-bottom: 12px;
+            padding: 18px;
+            border-color: #28333e;
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(19,25,32,.98), rgba(13,18,24,.98));
+            box-shadow: 0 16px 40px rgba(0,0,0,.17);
+        }
+
+        .section-title {
+            margin-bottom: 14px;
+        }
+
+        .section-title h3,
+        .card > h3 {
+            color: #f4f6f8;
+            font-size: 1.02rem;
+            letter-spacing: -.012em;
+        }
+
+        .muted {
+            color: #8c98a6;
+            font-size: .87rem;
+            line-height: 1.5;
+        }
+
+        button,
+        .button-link {
+            border-radius: 10px;
+        }
+
+        .status-badge,
+        .mini-badge {
+            border: 1px solid rgba(255,255,255,.08);
+            font-size: .74rem;
+            letter-spacing: .015em;
+        }
+
+        .bg-success { background: rgba(52,168,108,.2); color: #69e8aa; border-color: rgba(80,222,151,.24); }
+        .bg-danger { background: rgba(211,70,70,.19); color: #ff8b86; border-color: rgba(255,105,98,.24); }
+        .bg-warning { background: rgba(211,154,43,.2); color: #ffd36d; border-color: rgba(255,195,77,.25); }
+        .bg-info { background: rgba(58,135,210,.2); color: #86c6ff; border-color: rgba(103,177,245,.24); }
+        .bg-muted { background: #252e38; color: #b4bdc7; }
+
+        .metrics {
+            gap: 9px;
+        }
+
+        .metric-value {
+            margin-top: 8px;
+            font-size: 1.42rem;
+            letter-spacing: -.03em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .table-wrap {
+            border-color: #29343f;
+            border-radius: 12px;
+            background: #0d1217;
+        }
+
+        table {
+            background: transparent;
+        }
+
+        th,
+        td {
+            padding: 11px 10px;
+            border-bottom-color: #252e37;
+            font-size: .85rem;
+        }
+
+        th {
+            background: #1b232c;
+            color: #cbd3db;
+            font-weight: 750;
+        }
+
+        tbody tr {
+            transition: background .16s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(255,255,255,.025);
+        }
+
+        input[type="password"],
+        input[type="number"],
+        input[type="time"],
+        input[type="date"],
+        select {
+            min-height: 42px;
+            border-color: #303b47;
+            border-radius: 10px;
+            background: #151b22;
+        }
+
+        .table-search {
+            width: min(260px, 100%);
+            min-height: 38px;
+            margin: 0;
+            padding: 8px 11px;
+            border: 1px solid #303b47;
+            border-radius: 9px;
+            background: #11171d;
+            color: #eef2f5;
+            font-size: .84rem;
+            outline: none;
+        }
+
+        .table-search:focus {
+            border-color: rgba(255,177,59,.65);
+            box-shadow: 0 0 0 3px rgba(255,177,59,.09);
+        }
+
+        .tariff-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 12px 0 14px;
+        }
+
+        .tariff-chip {
+            padding: 7px 10px;
+            border: 1px solid #303b46;
+            border-radius: 999px;
+            background: #131920;
+            color: #aeb8c3;
+            font-size: .79rem;
+            font-weight: 700;
+        }
+
+        .tariff-chip strong { color: #f4f6f8; }
+
+        .tariff-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .tariff-group {
+            padding: 14px;
+            border: 1px solid #29343f;
+            border-radius: 13px;
+            background: #0f141a;
+        }
+
+        .tariff-group h4 {
+            margin-bottom: 10px;
+            color: #dfe5eb;
+            font-size: .9rem;
+        }
+
+        .tariff-rule-list {
+            display: grid;
+            gap: 7px;
+        }
+
+        .tariff-rule {
+            display: grid;
+            grid-template-columns: minmax(78px, .7fr) repeat(3, 1fr);
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border: 1px solid #252f39;
+            border-radius: 9px;
+            background: #141a21;
+            color: #9da8b4;
+            font-size: .78rem;
+        }
+
+        .tariff-rule strong {
+            color: #f0f3f6;
+            font-size: .82rem;
+        }
+
+        .decision-breakdown {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .decision-breakdown__item {
+            padding: 10px;
+            border: 1px solid #28333e;
+            border-radius: 10px;
+            background: #11171d;
+        }
+
+        .decision-breakdown__item span {
+            display: block;
+            overflow: hidden;
+            color: #8793a0;
+            font-size: .74rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .decision-breakdown__item strong {
+            display: block;
+            margin-top: 7px;
+            color: #e9edf1;
+            font-size: 1.08rem;
+        }
+
+        .log-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .log-filter {
+            width: auto;
+            margin: 0;
+            padding: 7px 10px;
+            background: #222b35;
+            color: #aeb8c3;
+            font-size: .77rem;
+        }
+
+        .log-filter.active {
+            background: rgba(255,177,59,.13);
+            color: #ffc264;
+            border: 1px solid rgba(255,177,59,.32);
+        }
+
+        .logs {
+            height: 300px;
+            border-color: #26313b;
+            border-radius: 12px;
+            background: #05080b;
+            color: #58e598;
+            font-size: .8rem;
+        }
+
+        .log-line {
+            padding: 2px 5px;
+            border-left: 2px solid transparent;
+        }
+
+        .log-line.warning { color: #ffd16b; border-left-color: #d99d39; }
+        .log-line.error { color: #ff8d87; border-left-color: #e45a53; }
+        .log-line.signal { color: #75bfff; border-left-color: #4a9fe8; }
+
+        @media (max-width: 980px) {
+            .container { padding: 18px 16px 50px; }
+            .control-grid { grid-template-columns: 1fr 1fr; }
+            .primary-control { grid-column: 1 / -1; }
+            .top-meta,
+            .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tariff-columns { grid-template-columns: 1fr; }
+            .decision-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .v18-comparison-grid,
+            .v18-table-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 640px) {
+            .container { padding: 12px 10px 42px; }
+            .command-header { align-items: flex-start; }
+            .header-health { align-items: flex-end; flex-direction: column; }
+            .istanbul-clock { font-size: .78rem; }
+            .control-grid,
+            .top-meta,
+            .overview-metrics { grid-template-columns: 1fr; }
+            .primary-control { grid-column: auto; }
+            .control-card { min-height: auto; }
+            .tariff-rule { grid-template-columns: 1fr 1fr; }
+            .tracker-actions { justify-content: flex-start; }
+            .section-title { align-items: flex-start; flex-direction: column; }
+            .v18-arm-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            .brand-mark::after { animation: none; }
+            *, *::before, *::after { transition: none !important; }
+        }
+        .filterlab-model { margin:16px 0; padding:16px; border:1px solid #304952; border-radius:14px; background:#11191f; }
+        .filterlab-v21 { border-top:3px solid #ecc35c; }
+        .filterlab-v22 { border-top:3px solid #4db6ac; }
+        .filterlab-model h4 { margin:0 0 6px; font-size:17px; }
+        .filterlab-baseline { color:#d3e3eb; margin:5px 0; }
+        .filterlab-scroll { overflow-x:auto; margin-top:12px; }
+        .filterlab-table { min-width:1080px; width:100%; border-collapse:collapse; }
+        .filterlab-table th { font-size:12px; white-space:normal; background:#1d2a34; padding:12px 10px; }
+        .filterlab-table td { font-size:13px; padding:14px 10px; vertical-align:top; border-bottom:1px solid #293740; }
+        .filterlab-table th:first-child,.filterlab-table td:first-child { min-width:250px; max-width:330px; }
+        .filterlab-table details summary { cursor:pointer; font-weight:600; }
+        .filterlab-table details p { white-space:normal; color:#aebec8; font-size:12px; margin:8px 0; }
+        .filterlab-quality-row { background:#14242a; }
+        .filterlab-positive { color:#79dbad; font-weight:600; }
+        .filterlab-negative { color:#f3a294; font-weight:600; }
+        .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
+        #testlab-v23-rows details { min-width:240px; }
+        #testlab-v23-rows details p { white-space:normal; max-width:550px; }
     </style>
 </head>
 <body>
     <div class="container" id="login-screen">
-        <h2>🦖 Dino Admin Paneli</h2>
+        <div class="brand-lockup" style="justify-content:center; margin-bottom:18px;">
+            <div class="brand-mark" aria-hidden="true">DN</div>
+            <div class="brand-copy">
+                <h1>Maç Yakala</h1>
+                <p>Yetkili kontrol merkezi</p>
+            </div>
+        </div>
         <input type="password" id="admin-pass" placeholder="Admin Şifresini Girin" autocomplete="current-password">
         <button id="login-button" type="button" onclick="login()">Giriş Yap</button>
         <p id="login-error" class="hidden" style="color: var(--danger); text-align: center; margin-top: 10px;">Hatalı şifre!</p>
@@ -445,59 +1341,293 @@
     </div>
 
     <div class="container hidden" id="dashboard">
-        <h2>⚙️ Sistem Kontrolü</h2>
-
-        <div class="top-meta">
-            <div class="meta-item">
-                <span class="meta-label">Sunucu bağlantısı</span>
-                <span class="meta-value" id="connection-state">Bağlanıyor…</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Sürüm</span>
-                <span class="meta-value" id="build-version">-</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">API kalan istek</span>
-                <span class="meta-value" id="quota-remaining">-</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Sonraki tarama</span>
-                <span class="meta-value" id="next-run">-</span>
-            </div>
-        </div>
-
-        <div class="card flex-between status-action">
-            <div>
-                <h3 style="margin-bottom: 6px;">Sistem Şalteri</h3>
-                <span class="status-badge bg-danger" id="bot-status-badge">SİSTEM KAPALI</span>
-                <span class="status-badge bg-muted" id="scan-status-badge">TARAMA BEKLİYOR</span>
-            </div>
-            <button id="toggle-btn" type="button" style="width:auto; padding:10px 20px;" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
-        </div>
-
-        <div class="card flex-between" style="background:#17221a; border-color:#356e3a;">
-            <div>
-                <div class="flex-between" style="justify-content:flex-start; margin-bottom:5px;">
-                    <h3 style="color:#76df7b;">🔄 10 Dakika Otomatik Tarama</h3>
-                    <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+        <header class="command-header">
+            <div class="brand-lockup">
+                <div class="brand-mark" aria-hidden="true">DN</div>
+                <div class="brand-copy">
+                    <h1>Maç Yakala</h1>
+                    <p>Canlı karar ve sinyal kontrol merkezi</p>
                 </div>
-                <p class="muted" id="auto-scan-description">Gün boyu yalnızca 25–80. dakikadaki canlı maçları tarar.</p>
             </div>
-            <label class="switch" title="Otomatik taramayı aç/kapat">
-                <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
-                <span class="switch-slider"></span>
-            </label>
-        </div>
+            <div class="header-health">
+                <time class="istanbul-clock" id="istanbul-clock">--:--:-- TSİ</time>
+                <span class="connection-pill" id="connection-state">● Bağlanıyor…</span>
+            </div>
+        </header>
 
-        <div class="card flex-between status-action" style="background:#191c1f; border-color:var(--primary);">
+        <nav class="command-nav" aria-label="Panel bölümleri">
+            <button type="button" class="active" data-target="section-overview" onclick="jumpToSection('section-overview', this)">Genel Bakış</button>
+            <button type="button" data-target="section-decision" onclick="jumpToSection('section-decision', this)">Son Karar</button>
+            <button type="button" data-target="section-signals" onclick="jumpToSection('section-signals', this)">Sinyaller</button>
+            <button type="button" data-target="section-v18-shadow" onclick="jumpToSection('section-v18-shadow', this)">Test Lab</button>
+            <button type="button" data-target="section-coupon-lab" onclick="jumpToSection('section-coupon-lab', this)">Kupon LAB</button>
+            <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
+            <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
+            <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
+            <button type="button" data-target="section-radar" onclick="jumpToSection('section-radar', this)">Sistem Radarı</button>
+            <button type="button" data-target="section-sharing" onclick="jumpToSection('section-sharing', this)">Paylaşım Ayarları</button>
+            <button type="button" onclick="logout()">Çıkış</button>
+        </nav>
+
+        <section class="workspace-overview" id="section-sharing" style="margin-bottom:20px">
+            <div class="control-card">
+                <h3>📣 Paylaşım Ayarları</h3>
+                <p>Ana Telegram kanalı mevcut kurallarıyla devam eder. Ek kopyalar sinyal sayısını artırmaz. Anahtarlar ve hedef ID yalnız sunucudaki .env dosyasından okunur.</p>
+                <div class="control-grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))">
+                    <div class="control-card">
+                        <h3>Ek Telegram grubu</h3>
+                        <p>Aynı sinyal + kendi mesajına “Yakaladık!” yanıtı.</p>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-extraTelegram" type="checkbox" disabled onchange="saveSharing('extraTelegram', this.checked)"> Ek gruba paylaş</label>
+                        <p id="sharing-extraTelegram-status" role="status">Ayarlar yükleniyor…</p>
+                    </div>
+                    <div class="control-card">
+                        <h3>X paylaşımı</h3>
+                        <p>Yalnız sinyal. Otomatik sonuç, yanıt ve gün sonu paylaşımı yok.</p>
+                        <p>Telegram metni aynen gönderilir. Standart 280 karakter sınırını aşan metinleri X reddedebilir; kısaltma veya zincir otomatik yapılmaz.</p>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-x" type="checkbox" disabled onchange="saveSharing('x', this.checked)"> X’te paylaş</label>
+                        <p id="sharing-x-status" role="status">Ayarlar yükleniyor…</p>
+                    </div>
+                </div>
+                <p id="sharing-message" role="status" aria-live="polite">Yeni hedefler başlangıçta kapalıdır. Açınca yalnız yeni sinyaller gider; eski sinyaller tekrar paylaşılmaz.</p>
+                <button type="button" onclick="fetchSharing()">Durumu yenile</button>
+            </div>
+        </section>
+        <section class="workspace-overview" id="section-overview">
+            <div class="top-meta">
+                <div class="meta-item">
+                    <span class="meta-label">Çalışan sürüm</span>
+                    <span class="meta-value" id="build-version">-</span>
+                    <span class="meta-subvalue" id="tariff-status">Tarife okunuyor…</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">API kalan istek</span>
+                    <span class="meta-value" id="quota-remaining">-</span>
+                    <div class="quota-track" aria-hidden="true"><span id="quota-progress"></span></div>
+                    <span class="meta-subvalue" id="quota-note">Günlük 7.500 kota üzerinden</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Sonraki otomatik tarama</span>
+                    <span class="meta-value" id="next-run">-</span>
+                    <span class="meta-subvalue" id="next-run-countdown">Sayaç bekliyor</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Karar güvenliği</span>
+                    <span class="meta-value">Tam-stat + taze doğrulama</span>
+                    <span class="meta-subvalue">Telegram yalnız ÜST · oran 1.50+</span>
+                </div>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-card primary-control">
+                    <div class="control-card__top">
+                        <div>
+                            <h3>Ana sistem</h3>
+                            <p>Tarama motoru, model ve Telegram hattını tek noktadan yönet.</p>
+                        </div>
+                        <div>
+                            <span class="status-badge bg-danger" id="bot-status-badge">SİSTEM KAPALI</span>
+                            <span class="status-badge bg-muted" id="scan-status-badge">TARAMA BEKLİYOR</span>
+                        </div>
+                    </div>
+                    <div class="control-actions">
+                        <button id="toggle-btn" type="button" onclick="toggleBot()">SİSTEMİ BAŞLAT</button>
+                    </div>
+                </div>
+
+                <div class="control-card auto-control">
+                    <div class="control-card__top">
+                        <div>
+                            <h3>Otomatik tarama</h3>
+                            <p id="auto-scan-description">25–80. dakikadaki tam-stat maçları 10 dakikada bir tarar.</p>
+                        </div>
+                        <label class="switch" title="Otomatik taramayı aç/kapat">
+                            <input type="checkbox" id="auto-scan-enabled" checked onchange="saveAutoScan(this.checked)">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-actions">
+                        <span class="mini-badge bg-success" id="auto-scan-badge">AÇIK</span>
+                    </div>
+                    <div class="adaptive-scan-control" style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+                        <div class="control-card__top">
+                            <label for="adaptive-scan-enabled"><strong>Tam-stat varsa 5 dk</strong></label>
+                            <label class="switch" title="Uygun tam-stat maç varken taramayı hızlandır">
+                                <input type="checkbox" id="adaptive-scan-enabled" onchange="saveAdaptiveScan(this.checked)">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <p>Normal döngü 10 dk. Açıkken uygun tam-stat maç varsa 5 dk; maç kalmazsa tekrar 10 dk.</p>
+                        <p id="adaptive-scan-status" aria-live="polite" style="color:var(--primary);">Kapalı · normal 10 dakika</p>
+                        <small class="muted">API tüketimi artabilir. Kota/hata koruması vardır. Ana tarama ve çalışma saatleri geçerlidir; özel programdaki sabit 5 dk seçimi ayrıdır.</small>
+                    </div>
+                </div>
+
+                <div class="control-card quick-scan-card">
+                    <div>
+                        <h3>Hızlı tarama</h3>
+                        <p>Program saatini beklemeden canlı havuzu şimdi kontrol et.</p>
+                    </div>
+                    <button class="quick-scan-button" id="force-scan-btn" type="button" onclick="forceScan()">ŞİMDİ TARA</button>
+                </div>
+            </div>
+
+            <div class="overview-metrics">
+                <div class="overview-metric accent">
+                    <span class="overview-metric__label">Paylaşılan sinyal <span>↗</span></span>
+                    <strong id="overview-signal-total">0</strong>
+                    <small>Seçili tarih görünümü</small>
+                </div>
+                <div class="overview-metric success">
+                    <span class="overview-metric__label">Başarı oranı <span>✓</span></span>
+                    <strong id="overview-hit-rate">-</strong>
+                    <small>Sonuçlanan paylaşımlar</small>
+                </div>
+                <div class="overview-metric info">
+                    <span class="overview-metric__label">Teorik ROI <span>₺</span></span>
+                    <strong id="overview-roi">-</strong>
+                    <small>Sabit 1 birim bahis hesabı</small>
+                </div>
+                <div class="overview-metric">
+                    <span class="overview-metric__label">Tam-stat canlı maç <span>●</span></span>
+                    <strong id="overview-full-stats">0</strong>
+                    <small>Son taramadaki hazır maçlar</small>
+                </div>
+            </div>
+        </section>
+
+        <main class="dashboard-sections">
+        <div class="card" id="section-audit">
+            <div class="section-title">
+                <div>
+                    <h3>🧪 Tam-Stat Aday Denetimi</h3>
+                    <p class="muted" id="candidate-history-updated" style="margin-top:4px;">%60–69 gölge sinyaller ve pre-match filtreleri dahil bütün tam-stat market anları tutulur.</p>
+                </div>
+                <div class="tracker-actions">
+                    <input class="table-search" id="candidate-search" type="search" placeholder="Maç veya market ara…" aria-label="Aday tablosunda ara" oninput="filterTableRows(this.value, 'candidate-history-rows')">
+                    <button type="button" style="background:var(--info);" onclick="downloadCandidateExport('json')">ADAY JSON</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadCandidateExport('csv')">ADAY CSV</button>
+                </div>
+            </div>
+
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>📅 Aday görünümü</strong>
+                    <span class="muted">Gün sınırları Türkiye saatine göre hesaplanır.</span>
+                </div>
+                <select id="candidate-history-date" class="history-date-select" aria-label="Tam-stat aday tarihi" onchange="changeCandidateHistoryDate(this.value)">
+                    <option value="">🗂️ Tüm Veriler</option>
+                </select>
+            </div>
+
+            <div class="metrics signal-metrics">
+                <div class="metric info">
+                    <span class="metric-label">Market anı</span>
+                    <span class="metric-value" id="candidate-total">0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Farklı maç</span>
+                    <span class="metric-value" id="candidate-fixtures">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Sonuç bekleyen</span>
+                    <span class="metric-value" id="candidate-pending">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Telegram'a giden</span>
+                    <span class="metric-value" id="candidate-sent">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Gönderilmeyen kazanan</span>
+                    <span class="metric-value" id="candidate-missed">0</span>
+                </div>
+                <div class="metric danger">
+                    <span class="metric-label">Hatalı/bitmiş market</span>
+                    <span class="metric-value" id="candidate-invalid">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Gölge sinyal</span>
+                    <span class="metric-value" id="candidate-shadow">0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Pre-match engeli</span>
+                    <span class="metric-value" id="candidate-prematch-blocked">0</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Karma model anı</span>
+                    <span class="metric-value" id="candidate-prematch-model">0</span>
+                </div>
+            </div>
+
             <div>
-                <h3 style="margin-bottom: 5px; color: var(--primary);">⚡ Hızlı Tarama</h3>
-                <p class="muted">Saati beklemeden hemen bir tarama başlatır.</p>
+                <p class="muted" style="margin-bottom:8px;">En sık karar ve eleme nedenleri</p>
+                <div class="decision-breakdown" id="decision-breakdown">
+                    <div class="decision-breakdown__item"><span>Veri bekleniyor</span><strong>—</strong></div>
+                </div>
             </div>
-            <button id="force-scan-btn" type="button" style="width:auto; padding:10px 15px; margin:0;" onclick="forceScan()">ŞİMDİ TARA</button>
+
+            <div class="card" style="margin:12px 0; background:#151d22; border-color:#32789b;">
+                <div class="section-title" style="margin-bottom:10px;">
+                    <div>
+                        <h3 style="color:#64b5f6;">🧬 V16 Güç Bağlamı</h3>
+                        <p class="muted" style="margin-top:4px;">Takım gücü, puan durumu ve API tahmini V16 puanına ek bağlam sağlar; eksik olması tek başına sinyali engellemez.</p>
+                    </div>
+                    <span class="mini-badge bg-info">MODEL GİRDİSİ · VETO YOK</span>
+                </div>
+                <div class="metrics signal-metrics">
+                    <div class="metric info"><span class="metric-label">Bağlam anı</span><span class="metric-value" id="candidate-shadow-context">0</span></div>
+                    <div class="metric success"><span class="metric-label">Takım gücü tam</span><span class="metric-value" id="candidate-shadow-team">0</span></div>
+                    <div class="metric success"><span class="metric-label">Puan durumu tam</span><span class="metric-value" id="candidate-shadow-standings">0</span></div>
+                    <div class="metric info"><span class="metric-label">API tahmini var</span><span class="metric-value" id="candidate-shadow-predictions">0</span></div>
+                    <div class="metric info"><span class="metric-label">Kimlik doğrulandı</span><span class="metric-value" id="candidate-shadow-identity">0</span></div>
+                    <div class="metric info"><span class="metric-label">Örneklem yeterli</span><span class="metric-value" id="candidate-shadow-sample">0</span></div>
+                    <div class="metric success"><span class="metric-label">Tam doğrulandı</span><span class="metric-value" id="candidate-shadow-verified">0</span></div>
+                </div>
+            </div>
+
+            <p class="muted" style="margin-bottom:10px;">Her satır bir taramadaki market anıdır. Aynı maç ve market ilerleyen dakikalarda yeniden kaydedilebilir; böylece kararın nasıl değiştiği görülür.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tarih (TSİ)</th>
+                            <th>Maç</th>
+                            <th>Dk.</th>
+                            <th>Market</th>
+                            <th>Sınıf</th>
+                            <th>Temel</th>
+                            <th>V16 / V18</th>
+                            <th>Pre Destek</th>
+                            <th>Gölge Test</th>
+                            <th>EDGE (kayıt)</th>
+                            <th>Oran</th>
+                            <th>Karar</th>
+                            <th>Sonuç</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidate-history-rows">
+                        <tr><td colspan="13" class="empty-row">Henüz tam-stat aday kaydı yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="history-filter" style="margin-top:12px;">
+                <div class="history-filter-copy">
+                    <strong id="candidate-page-summary">Sayfa 1 / 1</strong>
+                    <span class="muted">Her sayfada en fazla 200 kayıt gösterilir.</span>
+                </div>
+                <div class="tracker-actions">
+                    <button id="candidate-page-first" type="button" onclick="goCandidateHistoryPage(1)">İLK</button>
+                    <button id="candidate-page-prev" type="button" onclick="goCandidateHistoryPage(candidateHistoryPage - 1)">ÖNCEKİ</button>
+                    <select id="candidate-page-select" class="history-date-select" aria-label="Tam-stat aday sayfası" onchange="goCandidateHistoryPage(this.value)">
+                        <option value="1">Sayfa 1 / 1</option>
+                    </select>
+                    <button id="candidate-page-next" type="button" onclick="goCandidateHistoryPage(candidateHistoryPage + 1)">SONRAKİ</button>
+                    <button id="candidate-page-last" type="button" onclick="goCandidateHistoryPage(candidateHistoryTotalPages)">SON</button>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-decision">
             <div class="section-title">
                 <div>
                     <h3>🧠 Son Makine Kararı</h3>
@@ -515,18 +1645,408 @@
                     <strong id="ml-market">-</strong>
                 </div>
                 <div class="ml-cell">
-                    <span class="muted">Dino ihtimali</span>
+                    <span class="muted">V16 gerçekleşme</span>
                     <strong id="ml-probability">-</strong>
                 </div>
                 <div class="ml-cell">
-                    <span class="muted">EDGE</span>
+                    <span class="muted">Eski Temel</span>
                     <strong class="positive" id="ml-edge">-</strong>
                 </div>
             </div>
             <p class="muted" id="ml-note" style="margin-top:10px;">Canlı şut, isabet, korner, dakika ve skor verisi tamamlandığında model çalışır.</p>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-signals">
+            <div class="section-title">
+                <div>
+                    <h3>📈 Paylaşılan Sinyal Takibi</h3>
+                    <p class="muted" id="signal-history-updated" style="margin-top:4px;">Yalnızca Telegram'da başarıyla paylaşılan sinyaller burada tutulur.</p>
+                </div>
+                <div class="tracker-actions">
+                    <input class="table-search" id="signal-search" type="search" placeholder="Maç veya market ara…" aria-label="Sinyal tablosunda ara" oninput="filterTableRows(this.value, 'signal-history-rows')">
+                    <button id="signal-refresh-btn" type="button" style="background:var(--success);" onclick="refreshSignalResults()">Sonuçları Kontrol Et</button>
+                    <button type="button" style="background:var(--info);" onclick="downloadSignalExport('json')">JSON İndir</button>
+                    <button type="button" style="background:#59636d;" onclick="downloadSignalExport('csv')">CSV İndir</button>
+                </div>
+            </div>
+
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>📅 Sinyal görünümü</strong>
+                    <span class="muted">Paylaşımlar Türkiye saatine göre günlere ayrılır.</span>
+                </div>
+                <select id="signal-history-date" class="history-date-select" aria-label="Paylaşılan sinyal tarihi" onchange="changeSignalHistoryDate(this.value)">
+                    <option value="">🗂️ Tüm Veriler</option>
+                </select>
+            </div>
+
+            <div class="metrics signal-metrics">
+                <div class="metric info">
+                    <span class="metric-label">Paylaşılan</span>
+                    <span class="metric-value" id="signal-total">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Sonuç bekleyen</span>
+                    <span class="metric-value" id="signal-pending">0</span>
+                </div>
+                <div class="metric warning">
+                    <span class="metric-label">Takip başarı</span>
+                    <span class="metric-value" id="signal-surprise-rate">-</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">İlk sinyal başarı</span>
+                    <span class="metric-value" id="signal-strong-rate">-</span>
+                </div>
+                <div class="metric success">
+                    <span class="metric-label">Kazanan / Kaybeden</span>
+                    <span class="metric-value" id="signal-win-loss">0 / 0</span>
+                </div>
+                <div class="metric info">
+                    <span class="metric-label">Teorik ROI</span>
+                    <span class="metric-value" id="signal-roi">-</span>
+                </div>
+            </div>
+
+            <p class="muted" style="margin-bottom:10px;">Telegram: V22 ve V21 bağımsızdır. Aynı giriş tek mesajda iki model; farklı dakika veya market ayrı mesaj. Eski kayıtlar korunur.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tür</th>
+                            <th>Tarih (TSİ)</th>
+                            <th>Maç</th>
+                            <th>Dk.</th>
+                            <th>Market</th>
+                            <th>Model / kaynak</th>
+                            <th>Pre destek</th>
+                            <th>Oran</th>
+                            <th>Sonuç</th>
+                            <th>Final</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signal-history-rows">
+                        <tr><td colspan="10" class="empty-row">Henüz paylaşılan sinyal yok.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" id="section-v18-shadow" style="border-color:rgba(100,181,246,.48);">
+            <div class="section-title">
+                <div>
+                    <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24 Ana, V24 Odak, hafta sonu deneyleri, V22, V21 ve V23 aynı Türkiye tarihinde izlenir.</p>
+                </div>
+                <div class="tracker-actions">
+                    <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
+                    <button id="test-lab-refresh-btn" type="button" style="background:var(--success);" onclick="refreshTestLabResults()">Sonuçları Kontrol Et</button>
+                </div>
+            </div>
+
+            <div class="history-filter">
+                <div class="history-filter-copy">
+                    <strong>📅 Ortak test görünümü</strong>
+                    <span class="muted">V24 Ana hafta sonunda da çalışır; Guard, Quiet ve Gemini Weekend yalnız cumartesi/pazar karşılaştırmasıdır.</span>
+                </div>
+                <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
+                    <option value="">🗂️ Tüm Ortak Test Dönemi</option>
+                </select>
+            </div>
+
+            <div class="v18-comparison-grid">
+                
+                <div class="v18-arm-card v21">
+                    <div class="v18-arm-title"><span>🟡 V21 · ÜST · 3/3</span><span class="mini-badge bg-warning" id="testlab-v21-mode-badge">TAZE DOĞRULAMA</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v21-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v21-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v21-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v21-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v21-average-odds">-</strong></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="v18-arm-card v22" style="margin:14px 0;">
+                <div class="v18-arm-title"><span>🟢 V22 · ÜST · A/B/C</span><span class="mini-badge bg-info" id="testlab-v22-mode-badge">TAZE DOĞRULAMA</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v22-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v22-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v22-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v22-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v22-average-odds">-</strong></div>
+                </div>
+                <p class="muted" id="testlab-v22-start-note">İlk uygun canlı V22 sinyali bekleniyor; geçmiş sonuçlar aktarılmaz.</p>
+                <div class="test-lab-rules" aria-label="V22 filtre sonuçları">
+                    <span class="test-lab-rule" id="testlab-v22-filter-A">A · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v22-filter-B">B · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v22-filter-C">C · 0 sinyal</span>
+                </div>
+                <p class="muted">A/B/C etiketleri çakışabilir; alt toplamları toplamayın. V22 toplamı maç başına tektir.</p>
+            </div>
+            <div class="test-lab-rules" id="test-lab-v22-rules" aria-label="V22 üç filtre OR kuralları">
+                <span class="test-lab-rule">A · Ev sahibi önde → ÜST · EDGE −5…−2,5 · Pre &gt; %20</span>
+                <span class="test-lab-rule">B · 2.5 ÜST · Skor 1–0/0–1 · EDGE −5…−2,5 · Pre &gt; %40</span>
+                <span class="test-lab-rule">C · Yalnız 1 gol gerekiyor · EDGE −10…+5 · Pre &gt; %75</span>
+                <span class="test-lab-rule">A VEYA B VEYA C · Temel/V16/V18: üçü de &gt; %50</span>
+                <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · EDGE uçları dahil · İlk uygun an · Model başına maçta 1 · Telegram ayrı izlenir</span>
+            </div>
+            <div class="v18-arm-card v24" style="margin:14px 0;">
+                <div class="v18-arm-title"><span>🔵 V24 Ana · Sniper/B/A/MS</span><span class="mini-badge bg-info" id="testlab-v24-mode-badge">TAZE DOĞRULAMA · YALNIZ LAB</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Toplam kayıt</span><strong id="testlab-v24-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-average-odds">-</strong></div>
+                </div>
+                <p class="muted" id="testlab-v24-start-note">İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.</p>
+                <div class="test-lab-rules" aria-label="V24 kol sonuçları">
+                    <span class="test-lab-rule" id="testlab-v24-filter-SNIPER">Sniper · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-filter-A">A · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-filter-B">B · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-filter-MS">MS · 0 sinyal</span>
+                </div>
+                <p class="muted">Sniper → B → A → MS önceliğiyle maçın yalnız ilk uygun kaydı alınır. Dört kol aynı tek maç kilidini paylaşır. Telegram’a gönderilmez.</p>
+            </div>
+            <div class="test-lab-rules" id="test-lab-v24-rules" aria-label="V24 kuralları">
+                <span class="test-lab-rule">Ortak · kadın maçları hariç · olay/skor tutarlı · maç başına 1 · Dino EDGE ≤ %0</span>
+                <span class="test-lab-rule">Sniper · 0-0 · 1.5 ÜST · Pre/V16 ≥ %72 · Dino/V18 ≥ %50</span>
+                <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %60 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
+                <span class="test-lab-rule">A · tam 2 gol · V16 ≥ %65 · Pre: 2.5 %52 · 3.5/4.5 %25</span>
+                <span class="test-lab-rule">ÜST · 25–70 · oran 1.50–4.00 · Dino ≥ %45 · V18 ≥ %50 · gereken gol en fazla 2</span>
+                <span class="test-lab-rule">MS · 25–44 · öndeki taraf · oran 1.50–2.50 · V16 ≥ %60 · V16 EDGE %0…+5</span>
+            </div>
+            <div class="v18-arm-card v24" style="margin:14px 0;border-color:#7e57c2;">
+                <div class="v18-arm-title"><span>🎯 V24 Odak LAB · 6 bağımsız kol</span><span class="mini-badge bg-info" id="testlab-v24-focus-mode-badge">YALNIZ LAB</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Toplam kayıt</span><strong id="testlab-v24-focus-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-focus-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-focus-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-focus-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-focus-average-odds">-</strong></div>
+                </div>
+                <div class="test-lab-rules" aria-label="V24 Odak LAB kol sonuçları">
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-SNIPER_15">Sniper 1.5 · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-B15">B 1.5 · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-B15_REACTION">B 1.5 reaksiyon · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-B25">B 2.5 · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-B25_REACTION">B 2.5 reaksiyon · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-A25">A 2.5 · 0 sinyal</span>
+                </div>
+                <p class="muted">Sniper yalnız 0-0/1.5 ÜST · B 1.5 ve B 2.5 mevcut/reaksiyon yan yana · A yalnız 2.5 ÜST. Reaksiyon: gerideki takım ≥4 şut ve ≥1 isabet; 1-1 ve eksik veri reaksiyon onayı değildir. Her kol maçtaki kendi ilk uygun anını bağımsız kilitler.</p>
+            </div>
+            <div class="v18-comparison-grid" style="margin:14px 0;">
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🛡️ Weekend Guard</span><span class="mini-badge bg-info" id="testlab-v24-guard-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-guard-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-guard-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-guard-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-guard-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-guard-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">Ana kurallar + B kolu V18 ≥ %55 + MS V16 ≥ %65.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🤫 Weekend Quiet</span><span class="mini-badge bg-info" id="testlab-v24-quiet-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-quiet-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-quiet-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-quiet-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-quiet-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-quiet-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">25–68 + B V18 ≥ %65 + MS V16 ≥ %65 + lig ID başına günde ilk 1 sinyal.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>💎 Gemini Weekend</span><span class="mini-badge bg-info" id="testlab-v24-gemini-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-gemini-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-gemini-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-gemini-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-gemini-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-gemini-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">25–68 + İngiltere League One/Two hariç + ÜST Dino EDGE −12…0.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🧭 Seçici Weekend</span><span class="mini-badge bg-info" id="testlab-v24-selective-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-selective-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-selective-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-selective-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-selective-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-selective-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">Sniper 1.5 → A 2.5 → B 1.5 · League One/Two, Eerste Divisie ve milli maçlar kapalı · MS kapalı.</p>
+                </div>
+                <div class="v18-arm-card">
+                    <div class="v18-arm-title"><span>🤝 V24 + V25 Ortak Weekend</span><span class="mini-badge bg-info" id="testlab-v24-v25-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-metrics">
+                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-v25-total">0</strong></div>
+                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-v25-win-loss">0 / 0</strong></div>
+                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-v25-hit-rate">-</strong></div>
+                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-v25-roi">-</strong></div>
+                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-v25-average-odds">-</strong></div>
+                    </div>
+                    <p class="muted">Sniper saf V24 · A 2.5: V25 ≥ %60 / EDGE −5…0 · B 1.5: V25 ≥ %60 / EDGE 0…+7 · yalnız League One kapalı.</p>
+                </div>
+            </div>
+            <div class="test-lab-rules" id="test-lab-v21-rules" aria-label="V21 yalnız ÜST 3/3 kuralları">
+                <span class="test-lab-rule">V21 · Yalnız ÜST · Pre &gt; %50</span>
+                <span class="test-lab-rule">Temel / V16 / V18: üçü de &gt; %50 · eksik model varsa sinyal yok</span>
+                <span class="test-lab-rule">−5 ≤ Kayıt EDGE ≤ 0 · iki uç dahil</span>
+                <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · Model başına maçta 1 · Telegram ayrı izlenir</span>
+                <span class="test-lab-rule">Aynı anda birden çok aday: onay sayısı ↓, oran ↑, market adı</span>
+            </div>
+
+            <div class="section-title" style="margin:14px 0 9px;">
+                <p class="muted">V24 Ana ve V24 Odak her gün; beş ek guard yalnız hafta sonu ileri test kaydı toplar. Aynı taze doğrulama paylaşılır; Odak için yeni bir kol adayı ortak doğrulamayı tetikleyebilir fakat ayrı endpoint çağırmaz. Telegram kararı değişmez. V17/V20 emekli edilmiştir.</p>
+                <span class="mini-badge bg-info">BAĞIMSIZ LAB + EŞLEŞTİRİLMİŞ V23</span>
+            </div>
+
+            <div class="v18-arm-card" id="testlab-v23-card" style="margin:14px 0;border-color:#4db6ac;">
+                <div class="v18-arm-title"><span>🧪 V21 / V22 · Yeni filtre deneyleri</span><span class="mini-badge bg-info" id="testlab-v23-mode">YALNIZ LAB</span></div>
+                <p class="filterlab-notice">V21 yalnız LAB’dır. V22’de yalnız açık V23 retleri canlı sinyal kaynağını çıkarır; yetersiz ölçüm korunur. İsabet oranı ve ceza içi/dışı şut yalnız veridir.</p>
+                <div class="table-wrap"><table><thead><tr><th>Kontrol grubu</th><th>Sinyal</th><th>Kazanç / Kayıp</th><th>Bekleyen</th><th>İsabet</th><th>Net birim</th><th>ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
+                <p class="muted" id="testlab-v23-impact">İlk yeni kaynak sinyali bekleniyor.</p>
+                <p class="muted" id="testlab-v23-storage">Eski deneyler kapalı. Yeni testler mevcut giriş verisini kullanır.</p>
+                <p class="muted" id="testlab-v23-cohort"></p>
+                <div class="test-lab-table-title">
+                    <label for="testlab-v23-source">Kaynak / deney grubu</label>
+                    <select id="testlab-v23-source" onchange="setV23Source(this.value)" aria-label="V23 kaynak filtresi">
+                        <option value="all">V21 + V22 · ayrı karşılaştırma</option><option value="v21">V21</option><option value="v22">V22</option>
+                        <option value="v22:A">V22 · A dahil</option><option value="v22:B">V22 · B dahil</option><option value="v22:C">V22 · C dahil</option>
+                    </select>
+                </div>
+                <p class="muted">Kural ve gerekçeleri açmak için deney adına tıkla. Dar ekranda tabloları yana kaydırabilirsin.</p>
+                <div id="testlab-v23-controls"></div>
+                <div class="test-lab-table-title">
+                    <h4>Sinyaller · gerekçeler ve ölçümler satırda açılır</h4>
+                    <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v23','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v23','csv')">CSV</button></div>
+                </div>
+                <div class="table-wrap"><table><thead><tr><th>Tarih / Kaynak</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Deney kararları / Gerekçeler</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
+                <p class="muted">K/Y = kazanç / kayıp. Kararlar sinyal anında görünür; kazanç/kayıp sonuç geldikçe güncellenir. Filtre sonrası: yalnız “elenirdi” kayıtları çıkarılır; yetersiz ve kapsam dışı kayıtlar korunur. Δ birim, mevcut modele göre farktır. Her sinyal 1 birim, giriş oranı sabittir. Bekleyenler ROI’ye girmez; iptal/iade ayrı saklanır. Şutlar girişe kadar biriken toplamdır, son 10 dakika değildir. Özetler tüm seçili döneme, satırlar son kayıtlara aittir; JSON/CSV tamdır.</p>
+                <details><summary>Eski deney arşivi · durduruldu</summary><p class="muted">Eski sonuçlar son saklandıkları haliyle korunur; yeniden hesaplanmaz ve yeni testlere katılmaz. Geçmiş toplama / pencere hazırlığı kapalıdır.</p><button type="button" onclick="downloadRetiredV23('json')">Eski LAB · tüm JSON</button><button type="button" onclick="downloadRetiredV23('csv')">Eski LAB · tüm CSV</button></details>
+            </div>
+
+            <div class="v18-table-grid">
+                
+                <div class="v18-table-panel v22">
+                    <div class="test-lab-table-title">
+                        <h4>🟢 V22 · ÜST · A/B/C · taze doğrulama</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v22','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v22','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Filtre</th><th>Gereken gol</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v22-rows"><tr><td colspan="13" class="empty-row">Henüz V22 sinyali yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🔵 V24 Ana · Sniper/B/A/MS · taze doğrulama</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-rows"><tr><td colspan="15" class="empty-row">Henüz V24 kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🎯 V24 Odak LAB · 6 bağımsız kol · taze doğrulama</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Focus','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Focus','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Odak kolu</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / reaksiyon</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-focus-rows"><tr><td colspan="15" class="empty-row">Henüz V24 Odak LAB kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🛡️ V24 Weekend Guard · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Guard','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Guard','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-guard-rows"><tr><td colspan="15" class="empty-row">Henüz Weekend Guard kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🤫 V24 Weekend Quiet · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Quiet','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Quiet','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-quiet-rows"><tr><td colspan="15" class="empty-row">Henüz Weekend Quiet kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>💎 V24 Gemini Weekend · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Gemini','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Gemini','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-gemini-rows"><tr><td colspan="15" class="empty-row">Henüz Gemini Weekend kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🧭 V24 Seçici Weekend · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Selective','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Selective','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-selective-rows"><tr><td colspan="15" class="empty-row">Henüz Seçici Weekend kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v24">
+                    <div class="test-lab-table-title">
+                        <h4>🤝 V24 + V25 Ortak Weekend · yalnız hafta sonu</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24V25','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24V25','csv')">CSV</button></div>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-v25-rows"><tr><td colspan="15" class="empty-row">Henüz V24 + V25 ortak kaydı yok.</td></tr></tbody></table></div>
+                </div>
+                <div class="v18-table-panel v21">
+                    <div class="test-lab-table-title">
+                        <h4>🟡 V21 · ÜST · 3/3 · EDGE −5…0</h4>
+                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v21','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v21','csv')">CSV</button><button type="button" onclick="downloadTestLabExport('v21','json','previous')" title="Önceki V21 tarifelerinin tüm tarihlerdeki kayıtları">Eski V21 JSON</button></div>
+                    </div>
+                    <p class="muted" id="testlab-v21-cohort-note">Yeni 3/3 ÜST dönemi · eski V21 sonuçları bu tabloya dahil değildir.</p>
+                    <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v21-rows"><tr><td colspan="10" class="empty-row">Henüz V21 sinyali yok.</td></tr></tbody></table></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="section-coupon-lab">
+            <div class="section-title">
+                <div>
+                    <h3>🎟️ Kupon LAB · Maç Önü</h3>
+                    <p class="muted" id="coupon-lab-status" style="margin-top:4px;">Durum yükleniyor…</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                    <button class="quick-scan-button" id="coupon-lab-settle" type="button" onclick="settleCouponLab()" style="width:auto;padding:10px 18px;background:linear-gradient(135deg,#2196f3,#71bcf4);">SONUÇLARI GÜNCELLE</button>
+                    <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
+                </div>
+            </div>
+            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Çifte şans API ile marjsız MS1/X/MS2 piyasa desteğini; İY/MS ayrıca en az 5 maçlık gol profili ve İY/2Y üretim-yeme dağılımını kullanır. Sonuçlar LAB’dır; Telegram’a ve canlı V22 kararına katkı yapmaz.</p>
+            <div class="control-card" style="min-height:auto;margin:14px 0 16px;">
+                <div class="control-card__top">
+                    <div><h3>Kupon tarama ayarları</h3><p>Değişiklikler sunucuda kalıcı tutulur ve yalnız Kupon LAB’ı etkiler.</p></div>
+                    <span class="mini-badge bg-muted" id="coupon-settings-state">YÜKLENİYOR</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;align-items:end;">
+                    <div style="display:flex;flex-direction:column;gap:8px;"><span>Kupon modu</span><span style="display:flex;align-items:center;gap:10px;min-height:45px;"><label class="switch" title="Kupon LAB'ı aç/kapat"><input type="checkbox" id="coupon-setting-enabled" onchange="markCouponSettingsDirty()"><span class="switch-slider"></span></label><strong id="coupon-setting-enabled-label">Kapalı</strong></span></div>
+                    <label>Ana tarama<input type="time" id="coupon-setting-scan-time" value="09:00" onchange="markCouponSettingsDirty()"></label>
+                    <div style="display:flex;flex-direction:column;gap:8px;"><span>Yarının maçlarını dahil et</span><span style="display:flex;align-items:center;gap:10px;min-height:45px;"><label class="switch" title="Yarının maçlarını da tara"><input type="checkbox" id="coupon-setting-tomorrow" onchange="markCouponSettingsDirty()"><span class="switch-slider"></span></label><strong id="coupon-setting-tomorrow-label">Kapalı</strong></span></div>
+                    <label>Maç önü kontrol (dk)<input type="number" id="coupon-setting-final-minutes" min="15" max="240" step="1" value="75" onchange="markCouponSettingsDirty()"></label>
+                    <label>Günlük API bütçesi<input type="number" id="coupon-setting-budget" min="20" max="2000" step="1" value="200" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum aday<input type="number" id="coupon-setting-max-candidates" min="1" max="100" step="1" value="30" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum kupon maçı<input type="number" id="coupon-setting-max-selected" min="1" max="30" step="1" value="10" onchange="markCouponSettingsDirty()"></label>
+                    <label>Maksimum çifte şans<input type="number" id="coupon-setting-max-double-chance" min="0" max="30" step="1" value="2" onchange="markCouponSettingsDirty()"></label>
+                    <button class="quick-scan-button" id="coupon-settings-save" type="button" onclick="saveCouponLabSettings()" style="margin:8px 0;">AYARLARI KAYDET</button>
+                </div>
+            </div>
+            <div class="metrics">
+                <div class="metric info"><span class="metric-label">Marketteki maç</span><span class="metric-value" id="coupon-market-count">0</span></div>
+                <div class="metric warning"><span class="metric-label">İncelenen</span><span class="metric-value" id="coupon-candidate-count">0</span></div>
+                <div class="metric success"><span class="metric-label">LAB seçimi</span><span class="metric-value" id="coupon-selected-count">0</span></div>
+                <div class="metric info"><span class="metric-label">Maç önü geçti</span><span class="metric-value" id="coupon-passed-count">0</span></div>
+                <div class="metric warning"><span class="metric-label">Kupon API</span><span class="metric-value" id="coupon-api-usage">0 / 200</span></div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Saat</th><th>Lig / Maç</th><th>API tahmini</th><th>Takım gol profili</th><th>Bulunan marketler</th><th>LAB seçimleri</th><th>Maç önü kontrol</th><th>Sonuç</th></tr></thead>
+                    <tbody id="coupon-lab-rows"><tr><td colspan="8" class="empty-row">Henüz Kupon LAB taraması yapılmadı.</td></tr></tbody>
+                </table>
+            </div>
+            <p class="muted" id="coupon-lab-footnote">Ana tarama her gün bir kez çalışır. Seçilen maçlar başlangıçtan önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden seçili gün kapsamını tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
+        </div>
+
+        <div class="card" id="section-coverage">
             <div class="section-title">
                 <div>
                     <h3>📊 Canlı İstatistik Kapsamı</h3>
@@ -563,6 +2083,7 @@
                 <button type="button" class="filter-button" data-filter="complete" onclick="setCoverageFilter('complete', this)">✅ Stats tam</button>
                 <button type="button" class="filter-button" data-filter="incomplete" onclick="setCoverageFilter('incomplete', this)">❌ Stats eksik</button>
                 <button type="button" class="filter-button" data-filter="unsupported" onclick="setCoverageFilter('unsupported', this)">🚫 Coverage yok</button>
+                <input class="table-search" id="coverage-search" type="search" placeholder="Maç veya lig ara…" aria-label="Canlı maçlarda ara" oninput="filterTableRows(this.value, 'coverage-rows')">
             </div>
 
             <div class="table-wrap">
@@ -574,27 +2095,52 @@
                             <th>Dk.</th>
                             <th>Lig kapsamı</th>
                             <th>Gerçek veri</th>
+                            <th>Pre-Match</th>
                             <th>API takım</th>
                         </tr>
                     </thead>
                     <tbody id="coverage-rows">
-                        <tr><td colspan="6" class="empty-row">Henüz tarama sonucu yok.</td></tr>
+                        <tr><td colspan="7" class="empty-row">Henüz tarama sonucu yok.</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin-bottom:10px;">📊 Filtre Ayarları (Value Engine)</h3>
-            <label class="muted" for="min-edge">Minimum EDGE (Değer) %</label>
-            <input type="number" min="0" max="100" step="0.5" id="min-edge" value="15" placeholder="Örn: 15">
-            <p class="muted">Yalnızca bu eşiğe ulaşan ve güvenlik filtrelerini geçen ML sinyalleri gönderilir.</p>
-            <button type="button" style="background:var(--info);" onclick="saveSettings()">EDGE Filtresini Güncelle</button>
+        <div class="card" id="section-tariff">
+            <div class="section-title">
+                <div>
+                    <h3>🗺️ Telegram · V22 + V21 · bağımsız</h3>
+                    <p class="muted" style="margin-top:4px;">Kör test boyunca kurallar salt okunurdur; panelden yanlışlıkla değiştirilemez.</p>
+                </div>
+                <span class="mini-badge bg-success">🔒 KİLİTLİ</span>
+            </div>
+            <input type="hidden" id="min-edge" value="3">
+            <div class="tariff-summary">
+                <span class="tariff-chip">Sürüm <strong id="tariff-version-label">-</strong></span>
+                <span class="tariff-chip">Minimum oran <strong id="tariff-minimum-odd">1.50</strong></span>
+                <span class="tariff-chip">Aktif model <strong id="tariff-primary-count">6</strong></span>
+                <span class="tariff-chip">Gönderim kilidi <strong id="tariff-follow-count">3</strong></span>
+                <span class="tariff-chip">ALT marketleri <strong style="color:#ff8b86;">Kapalı</strong></span>
+            </div>
+            <div class="tariff-columns">
+                <div class="tariff-group">
+                    <h4>Bağımsız modeller</h4>
+                    <div class="tariff-rule-list" id="tariff-primary-rules">
+                        <div class="muted">Tarife sunucudan okunuyor…</div>
+                    </div>
+                </div>
+                <div class="tariff-group">
+                    <h4>Gönderim düzeni</h4>
+                    <div class="tariff-rule-list" id="tariff-follow-rules">
+                        <div class="muted">Tarife sunucudan okunuyor…</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-schedule">
             <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
-            <p class="muted" style="margin-bottom:12px;">Kapalı bırakırsan otomatik sistem gün boyu 10 dakikada bir çalışır. Açarsan yalnızca aşağıdaki saat aralıklarında çalışır.</p>
+            <p class="muted" style="margin-bottom:12px;">Kapalıysa normal döngü gün boyu 10 dk; tam-stat hızlandırma açıksa uygun maç varken 5 dk olur. Açarsan yalnız aşağıdaki saatlerde çalışır. Sabit 5 dk ve tek sefer programları kendi kurallarını korur.</p>
             <div class="flex-between" style="margin-bottom:15px;">
                 <label class="muted" for="schedule-enabled">Özel saat programını aktifleştir</label>
                 <input type="checkbox" id="schedule-enabled">
@@ -623,35 +2169,79 @@
             <button type="button" style="background:var(--success);" onclick="saveSchedule()">Tüm Programı Sunucuya İlet</button>
         </div>
 
-        <div class="card">
+        <div class="card" id="section-radar">
             <div class="section-title">
                 <div>
                     <h3>📡 Canlı Sistem Radarı</h3>
                     <p class="muted" style="margin-top:4px;">Tarama, istatistik ve ML işlemleri anlık olarak burada görünür.</p>
                 </div>
-                <button type="button" style="width:auto; margin:0; padding:7px 10px; background:#454c52; font-size:.75rem;" onclick="fetchLogs()">Yenile</button>
+                <div class="tracker-actions">
+                    <span class="mini-badge bg-muted" id="log-visible-count">0 KAYIT</span>
+                    <button type="button" style="background:#454c52;" onclick="fetchLogs()">Yenile</button>
+                </div>
+            </div>
+            <div class="log-toolbar">
+                <button type="button" class="log-filter active" data-log-filter="all" onclick="setLogFilter('all', this)">Tümü</button>
+                <button type="button" class="log-filter" data-log-filter="signal" onclick="setLogFilter('signal', this)">Sinyaller</button>
+                <button type="button" class="log-filter" data-log-filter="warning" onclick="setLogFilter('warning', this)">Uyarılar</button>
+                <button type="button" class="log-filter" data-log-filter="error" onclick="setLogFilter('error', this)">Hatalar</button>
+                <input class="table-search" id="log-search" type="search" placeholder="Kayıtlarda ara…" aria-label="Sistem kayıtlarında ara" oninput="setLogSearch(this.value)">
             </div>
             <div class="logs" id="log-box"><div class="log-line">&gt; Panel sunucuya bağlandı. Kayıtlar bekleniyor...</div></div>
         </div>
+        </main>
     </div>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
+    <script src="/v23_filter_panel.js?v=20260921"></script>
+<script src="/coupon_lab_panel.js?v=20260924a"></script>
     <script>
-        const CORRECT_PASS = "enessro";
-        const REMOTE_BACKEND_URL = "http://91.198.66.192:3000";
-        const BACKEND_URL = window.location.protocol === "file:"
-            ? REMOTE_BACKEND_URL
-            : window.location.origin;
+        const BACKEND_URL = window.location.origin;
+        let authenticated = false;
+        let sharingState = null;
+        let sharingSaving = false;
+        const API_DAILY_QUOTA = 7500;
+        const TEST_LAB_API = Object.freeze({
+            comparison: "/api/test-lab-comparison",
+            refresh: "/api/test-lab-results/refresh",
+            exports: Object.freeze({
+                v21: "/api/v21-consensus-shadow-history",
+                v22: "/api/v22-union-shadow-history",
+                v23: "/api/v23-goal-history",
+                v24: "/api/v24-shadow-history",
+                v24guard: "/api/v24-weekend-guard-history",
+                v24quiet: "/api/v24-weekend-quiet-history",
+                v24gemini: "/api/v24-gemini-weekend-history",
+                v24selective: "/api/v24-selective-weekend-history",
+                v24v25: "/api/v24-v25-joint-weekend-history",
+                v24focus: "/api/v24-focus-history"
+            })
+        });
 
         let isBotRunning = false;
         let isScanning = false;
         let autoScanEnabled = true;
+        let adaptiveScanEnabled = false;
+        let latestAdaptiveScan = null;
+        let adaptiveScanSaving = false;
         let schedules = [];
         let autoScroll = true;
         let coverageMatches = [];
         let coverageFilter = "all";
+        let signalHistoryDate = "";
+        let testLabDate = "";
+        let v23Source = "all";
+        let latestV23Data = null;
+        const CANDIDATE_HISTORY_PAGE_SIZE = 200;
+        let candidateHistoryDate = "";
+        let candidateHistoryPage = 1;
+        let candidateHistoryTotalPages = 1;
         let pollingStarted = false;
+        let nextRunTarget = 0;
+        let latestSystemLogs = [];
+        let activeLogFilter = "all";
+        let activeLogSearch = "";
 
         const logBox = document.getElementById("log-box");
         document.getElementById("login-server").textContent = `Sunucu: ${BACKEND_URL}`;
@@ -674,17 +2264,296 @@
             showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
         }
 
+        function updateIstanbulClock() {
+            const element = document.getElementById("istanbul-clock");
+            if (!element) return;
+            element.textContent = `${new Intl.DateTimeFormat("tr-TR", {
+                timeZone: "Europe/Istanbul",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            }).format(new Date())} TSİ`;
+        }
+
+        function updateNextRunCountdown() {
+            renderAdaptiveScanState();
+            const element = document.getElementById("next-run-countdown");
+            if (!element) return;
+            if (!autoScanEnabled) {
+                element.textContent = "Otomatik tarama kapalı";
+                return;
+            }
+            if (!Number.isFinite(nextRunTarget) || nextRunTarget <= 0) {
+                element.textContent = "Sayaç bekliyor";
+                return;
+            }
+            const remainingSeconds = Math.max(0, Math.ceil((nextRunTarget - Date.now()) / 1000));
+            if (remainingSeconds <= 0) {
+                element.textContent = isScanning ? "Tarama devam ediyor" : "Tarama başlamak üzere";
+                return;
+            }
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            element.textContent = `${minutes} dk ${String(seconds).padStart(2, "0")} sn kaldı`;
+        }
+
+        function renderQuota(remaining) {
+            const value = Number(remaining);
+            const bar = document.getElementById("quota-progress");
+            const note = document.getElementById("quota-note");
+            if (!bar || !note || !Number.isFinite(value)) {
+                if (bar) bar.style.width = "0";
+                if (note) note.textContent = "Kota bilgisi bekleniyor";
+                return;
+            }
+            const percent = Math.max(0, Math.min(100, (value / API_DAILY_QUOTA) * 100));
+            bar.style.width = `${percent.toFixed(1)}%`;
+            bar.style.background = value < 1500
+                ? "linear-gradient(90deg, #e65e58, #ff8b86)"
+                : value < 3000
+                    ? "linear-gradient(90deg, #d79b35, #ffd16b)"
+                    : "linear-gradient(90deg, #42df98, #8af0c0)";
+            note.textContent = `Günlük kotanın %${percent.toFixed(0)} kadarı kaldı`;
+        }
+
+        function jumpToSection(sectionId, button) {
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+            document.querySelectorAll(".command-nav button").forEach(item => item.classList.remove("active"));
+            button?.classList.add("active");
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function setupNavigationObserver() {
+            if (!("IntersectionObserver" in window)) return;
+            const sections = document.querySelectorAll("[id^='section-']");
+            const observer = new IntersectionObserver(entries => {
+                const visible = entries
+                    .filter(entry => entry.isIntersecting)
+                    .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+                if (!visible) return;
+                document.querySelectorAll(".command-nav button").forEach(button => {
+                    button.classList.toggle("active", button.dataset.target === visible.target.id);
+                });
+            }, { rootMargin: "-72px 0px -62% 0px", threshold: [0.05, 0.3] });
+            sections.forEach(section => observer.observe(section));
+        }
+
+        function orderDashboardSections() {
+            const container = document.querySelector(".dashboard-sections");
+            if (!container) return;
+            [
+                "section-decision",
+                "section-signals",
+                "section-v18-shadow",
+                "section-coupon-lab",
+                "section-coverage",
+                "section-audit",
+                "section-tariff",
+                "section-schedule",
+                "section-radar"
+            ].forEach(id => {
+                const section = document.getElementById(id);
+                if (section) container.appendChild(section);
+            });
+        }
+
+        function filterTableRows(query, bodyId) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            const normalized = String(query || "").trim().toLocaleLowerCase("tr-TR");
+            for (const row of body.querySelectorAll("tr")) {
+                if (row.querySelector(".empty-row")) {
+                    row.hidden = false;
+                    continue;
+                }
+                row.hidden = normalized.length > 0 &&
+                    !row.textContent.toLocaleLowerCase("tr-TR").includes(normalized);
+            }
+        }
+
+        function applyTableSearch(inputId, bodyId) {
+            const input = document.getElementById(inputId);
+            if (input) filterTableRows(input.value, bodyId);
+        }
+
+        function marketDisplayName(market) {
+            return String(market || "-").replace("_UST", " ÜST").replace("_ALT", " ALT");
+        }
+
+        function edgeDisplay(rule) {
+            const source = rule?.edgeField === "v18Edge" ? "V18" : rule?.edgeField === "v16Edge" ? "V16" : "Temel";
+            if (Number(rule?.edgeLow) <= -99) return `${source} ≤ +${rule.edgeHigh}`;
+            const high = Number(rule?.edgeHigh) > 0 ? `+${rule.edgeHigh}` : rule?.edgeHigh;
+            return `${source} ${rule?.edgeLow}…${high}`;
+        }
+
+        function renderTariffRuleList(containerId, rules) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.replaceChildren();
+            for (const rule of Array.isArray(rules) ? rules : []) {
+                const row = document.createElement("div");
+                row.className = "tariff-rule";
+                const values = [
+                    marketDisplayName(rule.market),
+                    `${rule.minuteLow}–${rule.minuteHigh}. dk`,
+                    `${rule.signalSource || ''} · ${String(rule.decisionModel || 'v16').toUpperCase()} %${rule.probabilityMinimum ?? rule.v16Minimum ?? '-'}${rule.probabilityMaximum < 100 ? '–' + rule.probabilityMaximum : '+'}`,
+                    edgeDisplay(rule)
+                ];
+                values.forEach((value, index) => {
+                    const cell = document.createElement(index === 0 ? "strong" : "span");
+                    cell.textContent = value;
+                    row.appendChild(cell);
+                });
+                container.appendChild(row);
+            }
+            if (container.childElementCount === 0) {
+                const empty = document.createElement("span");
+                empty.className = "muted";
+                empty.textContent = "Aktif kural yok.";
+                container.appendChild(empty);
+            }
+        }
+
+        function renderMarketTariff(tariff) {
+            const enabledModels = tariff?.telegramSources || ["V22", "V21"];
+            document.getElementById("tariff-status").textContent = tariff?.deliveryDisabled ? "Gönderim günlüğü hatalı · Telegram kapalı" : (enabledModels.join(" + ") || "Telegram kapalı") + " · bağımsız";
+            document.getElementById("tariff-version-label").textContent = "Maç Yakala · 16.09.2026";
+            document.getElementById("tariff-minimum-odd").textContent = "1.50";
+            document.getElementById("tariff-primary-count").textContent = String(enabledModels.length);
+            document.getElementById("tariff-follow-count").textContent = "Model başına ayrı";
+            document.getElementById("tariff-primary-rules").textContent = "V22: A/B/C kuralları korunur. V21: 3/3 model >%50, pre >%50, EDGE −5…0. Modeller birbirinin onayını beklemez.";
+            document.getElementById("tariff-follow-rules").textContent = "V21 35′te 1.5 ÜST verdiyse V22 60′ta aynı marketi ayrıca gönderebilir. Her modelin kendi maç başına bir sinyal sınırı korunur. V17 ve V20 emeklidir.";
+        }
+
+        function renderDecisionBreakdown(byDecision) {
+            const container = document.getElementById("decision-breakdown");
+            if (!container) return;
+            const entries = Object.entries(byDecision || {})
+                .map(([key, count]) => ({ key, count: Number(count) || 0 }))
+                .sort((left, right) => right.count - left.count)
+                .slice(0, 4);
+            container.replaceChildren();
+            for (const entry of entries) {
+                const item = document.createElement("div");
+                item.className = "decision-breakdown__item";
+                const label = document.createElement("span");
+                label.textContent = candidateDecisionInfo(entry.key).text;
+                label.title = entry.key;
+                const value = document.createElement("strong");
+                value.textContent = entry.count;
+                item.append(label, value);
+                container.appendChild(item);
+            }
+            if (entries.length === 0) {
+                const item = document.createElement("div");
+                item.className = "decision-breakdown__item";
+                item.innerHTML = "<span>Veri bekleniyor</span><strong>—</strong>";
+                container.appendChild(item);
+            }
+        }
+
+        function logKind(entry) {
+            const text = String(entry || "").toLocaleUpperCase("tr-TR");
+            if (text.includes("❌") || text.includes("⛔") || text.includes("HATA")) return "error";
+            if (text.includes("⚠️") || text.includes("TIMEOUT") || text.includes("UYARI")) return "warning";
+            if (text.includes("SİNYAL") || text.includes("ML VALUE") || text.includes("✅")) return "signal";
+            return "info";
+        }
+
+        function renderLogEntries() {
+            const shouldScroll = autoScroll;
+            const filtered = latestSystemLogs.filter(entry => {
+                const kind = logKind(entry);
+                const typeMatches = activeLogFilter === "all" || kind === activeLogFilter;
+                const searchMatches = !activeLogSearch ||
+                    String(entry).toLocaleLowerCase("tr-TR").includes(activeLogSearch);
+                return typeMatches && searchMatches;
+            });
+            logBox.replaceChildren();
+            const rows = filtered.length > 0 ? filtered : ["> Bu filtreye uygun kayıt yok."];
+            for (const entry of rows) {
+                const line = document.createElement("div");
+                const kind = logKind(entry);
+                line.className = `log-line ${kind === "info" ? "" : kind}`.trim();
+                line.textContent = String(entry);
+                logBox.appendChild(line);
+            }
+            const count = document.getElementById("log-visible-count");
+            if (count) count.textContent = `${filtered.length} KAYIT`;
+            if (shouldScroll) logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setLogFilter(filter, button) {
+            activeLogFilter = filter;
+            document.querySelectorAll(".log-filter").forEach(item => item.classList.remove("active"));
+            button?.classList.add("active");
+            renderLogEntries();
+        }
+
+        function setLogSearch(value) {
+            activeLogSearch = String(value || "").trim().toLocaleLowerCase("tr-TR");
+            renderLogEntries();
+        }
+
+        function renderSharing(data) {
+            sharingState = data;
+            const names = {sent:'Gönderildi',declined:'Reddedildi',uncertain:'Sonuç belirsiz; tekrar gönderilmedi',skipped:'Atlandı',sending:'Gönderiliyor'};
+            for (const kind of ['extraTelegram','x']) {
+                const state = data[kind];
+                const toggle = document.getElementById(`sharing-${kind}`);
+                toggle.checked = !!state.enabled;
+                toggle.disabled = sharingSaving || data.disabled || (!state.enabled && (data.delivery?.disabled || !state.configured));
+                const last = data.delivery?.[kind]?.last;
+                document.getElementById(`sharing-${kind}-status`).textContent =
+                    `${state.active && !data.delivery?.disabled ? 'AÇIK' : 'KAPALI'} · ${state.configured ? '.env hazır (API yetkisi gönderimde doğrulanır)' : state.reason}` +
+                    (last ? ` · Son paylaşım: ${names[last.status] || last.status}${last.errorCode ? ' ('+last.errorCode+')' : ''}${last.reason ? ' — '+last.reason : ''}` : ' · Henüz paylaşım yok');
+            }
+            if (data.disabled || data.delivery?.disabled) document.getElementById('sharing-message').textContent = 'Ek paylaşım dosyasında hata var. Ana Telegram etkilenmedi; sunucu günlüklerini kontrol edin.';
+        }
+        async function fetchSharing() {
+            if (sharingSaving) return;
+            try { renderSharing(await apiFetch('/api/sharing-settings')); }
+            catch(error) { document.getElementById('sharing-message').textContent = error.message; }
+        }
+        async function saveSharing(kind, enabled) {
+            if (!sharingState || sharingSaving) return;
+            sharingSaving = true; renderSharing(sharingState);
+            document.getElementById('sharing-message').textContent = 'Kaydediliyor…';
+            try {
+                sharingState = await apiFetch('/api/sharing-settings',{method:'POST',body:JSON.stringify({revision:sharingState.revision,[kind]:enabled})});
+                document.getElementById('sharing-message').textContent = 'Kaydedildi. Ana kanal değişmedi. Değişiklik yeni sinyaller için hemen geçerli.';
+            } catch(error) { document.getElementById('sharing-message').textContent = `Kaydedilemedi: ${error.message}`; }
+            finally { sharingSaving = false; renderSharing(sharingState); }
+        }
+        function showLogin() {
+            authenticated = false;
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+        async function logout() {
+            try { await apiFetch('/api/auth/logout',{method:'POST',body:'{}'}); showLogin(); }
+            catch(error) { showToast(error.message,true); }
+        }
         async function apiFetch(path, options = {}) {
+            if (!authenticated && path !== '/api/auth/login') throw new Error('Panel oturumu gerekli.');
+            const mutating = !['GET','HEAD'].includes(String(options.method || 'GET').toUpperCase());
             const response = await fetch(`${BACKEND_URL}${path}`, {
                 ...options,
+                ...(mutating && options.body == null ? {body:'{}'} : {}),
+                credentials: 'same-origin',
                 headers: {
-                    ...(options.body ? { "Content-Type": "application/json" } : {}),
+                    'X-Mac-Yakala-Request': '1',
+                    ...(mutating || options.body ? { "Content-Type": "application/json" } : {}),
                     ...(options.headers || {})
                 }
             });
 
             if (!response.ok) {
-                throw new Error(`Sunucu ${response.status} hatası döndürdü.`);
+                if (response.status === 401 && path !== '/api/auth/login') showLogin();
+                const data = await response.json().catch(()=>({}));
+                throw new Error(data.error || `Sunucu ${response.status} hatası döndürdü.`);
             }
 
             return response.json();
@@ -692,11 +2561,16 @@
 
         async function login() {
             const password = document.getElementById("admin-pass").value;
-            if (password !== CORRECT_PASS) {
+            try {
+                if (window.location.protocol === 'file:') throw new Error('Paneli sunucu adresinden açın; yerel HTML girişi kapalı.');
+                await apiFetch('/api/auth/login',{method:'POST',body:JSON.stringify({password})});
+            } catch(error) {
+                document.getElementById("login-error").textContent = error.message;
                 document.getElementById("login-error").classList.remove("hidden");
                 return;
             }
-
+            authenticated = true;
+            document.getElementById("admin-pass").value = '';
             document.getElementById("login-error").classList.add("hidden");
             document.getElementById("login-screen").classList.add("hidden");
             document.getElementById("dashboard").classList.remove("hidden");
@@ -707,17 +2581,38 @@
                 setInterval(fetchLogs, 2500);
                 setInterval(checkStatus, 5000);
                 setInterval(fetchCoverage, 7500);
+                setInterval(fetchSignalHistory, 10000);
+                setInterval(fetchTestLabHistory, 10000);
+                setInterval(fetchCandidateHistory, 15000);
+                setInterval(fetchSharing, 15000);
+                setInterval(fetchCouponLab, 10000);
             }
         }
 
         async function refreshAll() {
-            await Promise.allSettled([checkStatus(), fetchSettings(), fetchCoverage(), fetchLogs()]);
+            await Promise.allSettled([
+                checkStatus(),
+                fetchSettings(),
+                fetchSharing(),
+                fetchCoverage(),
+                fetchSignalHistory(),
+                fetchTestLabHistory(),
+                fetchCandidateHistory(),
+                fetchCouponLab(),
+                fetchLogs()
+            ]);
         }
 
         function setConnection(connected) {
             const element = document.getElementById("connection-state");
             element.textContent = connected ? "● Bağlı" : "● Bağlantı yok";
             element.style.color = connected ? "#68d66d" : "#ff7167";
+            element.style.borderColor = connected
+                ? "rgba(80,222,151,.28)"
+                : "rgba(255,105,98,.28)";
+            element.style.background = connected
+                ? "rgba(52,168,108,.11)"
+                : "rgba(211,70,70,.11)";
         }
 
         function formatDateTime(value) {
@@ -726,6 +2621,63 @@
             return Number.isNaN(date.getTime())
                 ? "-"
                 : date.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
+        }
+
+        function formatHistoryDateLabel(dateKey) {
+            const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!match) return "Tüm Veriler";
+            const date = new Date(Date.UTC(
+                Number(match[1]),
+                Number(match[2]) - 1,
+                Number(match[3]),
+                12
+            ));
+            return date.toLocaleDateString("tr-TR", {
+                timeZone: "Europe/Istanbul",
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            });
+        }
+
+        function syncHistoryDateOptions(selectId, filter, selectedDate) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+
+            const availableDates = Array.isArray(filter?.availableDates)
+                ? filter.availableDates
+                : [];
+            const dates = selectedDate && !availableDates.includes(selectedDate)
+                ? [selectedDate, ...availableDates]
+                : availableDates;
+
+            select.replaceChildren();
+            const allOption = document.createElement("option");
+            allOption.value = "";
+            allOption.textContent = "🗂️ Tüm Veriler";
+            select.appendChild(allOption);
+
+            for (const date of dates) {
+                const option = document.createElement("option");
+                option.value = date;
+                option.textContent = `📅 ${formatHistoryDateLabel(date)}`;
+                select.appendChild(option);
+            }
+
+            select.value = selectedDate || "";
+        }
+
+        function historyApiPath(basePath, limit, selectedDate, page = null) {
+            const params = new URLSearchParams({ limit: String(limit) });
+            if (selectedDate) params.set("date", selectedDate);
+            if (page !== null && page !== undefined) params.set("page", String(page));
+            return `${basePath}?${params.toString()}`;
+        }
+
+        function historyExportQuery(selectedDate) {
+            return selectedDate
+                ? `?date=${encodeURIComponent(selectedDate)}`
+                : "";
         }
 
         function renderBotState() {
@@ -754,7 +2706,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "Gün boyu yalnızca 25–80. dakikadaki canlı maçları 10 dakikada bir tarar."
+                ? "25–80. dakikadaki maçları tarar. V21/V22 kuralları ve taze veri doğrulaması değişmez."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -765,16 +2717,22 @@
                 isBotRunning = Boolean(data.isRunning);
                 isScanning = Boolean(data.isScanning);
                 autoScanEnabled = data.autoScanEnabled !== false;
+                latestAdaptiveScan = data.adaptiveScan || null;
+                if (!adaptiveScanSaving) adaptiveScanEnabled = data.adaptiveScan?.enabled === true;
                 renderBotState();
                 renderAutoScanState();
 
                 document.getElementById("build-version").textContent = data.buildVersion || "-";
                 document.getElementById("quota-remaining").textContent = data.quotaRemaining ?? "-";
+                renderQuota(data.quotaRemaining);
+                nextRunTarget = Number(data.nextRunTime) || 0;
                 document.getElementById("next-run").textContent = !autoScanEnabled
                     ? "Otomatik kapalı"
                     : data.nextRunTime
                         ? formatDateTime(data.nextRunTime)
                         : "Bekliyor";
+                updateNextRunCountdown();
+                renderMarketTariff(data.marketTariff);
 
                 if (data.minEdge !== undefined && data.minEdge !== null) {
                     document.getElementById("min-edge").value = data.minEdge;
@@ -795,6 +2753,8 @@
                     document.getElementById("min-edge").value = data.globalMinEdge;
                 }
                 autoScanEnabled = data.autoScanEnabled !== false;
+                if (!adaptiveScanSaving) adaptiveScanEnabled = data.adaptiveScanEnabled === true;
+                renderAdaptiveScanState();
                 renderAutoScanState();
                 document.getElementById("schedule-enabled").checked = Boolean(data.scheduleEnabled);
                 schedules = Array.isArray(data.schedules) ? data.schedules : [];
@@ -810,23 +2770,8 @@
                 setConnection(true);
                 if (!Array.isArray(logs)) return;
 
-                const shouldScroll = autoScroll;
-                logBox.replaceChildren();
-                if (logs.length === 0) {
-                    const line = document.createElement("div");
-                    line.className = "log-line";
-                    line.textContent = "> Henüz log kaydı yok.";
-                    logBox.appendChild(line);
-                } else {
-                    for (const entry of logs) {
-                        const line = document.createElement("div");
-                        line.className = "log-line";
-                        line.textContent = String(entry);
-                        logBox.appendChild(line);
-                    }
-                }
-
-                if (shouldScroll) logBox.scrollTop = logBox.scrollHeight;
+                latestSystemLogs = logs;
+                renderLogEntries();
                 renderLatestMlDecision(logs);
             } catch (error) {
                 setConnection(false);
@@ -908,17 +2853,19 @@
             document.getElementById("ml-match").textContent = selection?.matchName || output.matchName;
             document.getElementById("ml-market").textContent = selection?.market || "Filtreyi geçmedi";
 
-            const probability = selection?.market ? Number(output.values?.[selection.market]) : NaN;
-            document.getElementById("ml-probability").textContent = Number.isFinite(probability)
-                ? `%${probability.toFixed(1)}`
+            const dinoProbability = selection?.market ? Number(output.values?.[selection.market]) : NaN;
+            document.getElementById("ml-probability").textContent = selection?.edge !== null && selection?.edge !== undefined
+                ? `%${selection.edge.toFixed(1)}`
                 : "-";
-            document.getElementById("ml-edge").textContent = selection?.edge !== null && selection?.edge !== undefined
-                ? `+%${selection.edge.toFixed(1)}`
+            document.getElementById("ml-edge").textContent = Number.isFinite(dinoProbability)
+                ? `%${dinoProbability.toFixed(1)}`
                 : "-";
 
             document.getElementById("ml-note").textContent = output.variant === "score_only"
-                ? "Uyarı: Skor fallback sonucu oluşmuş. Son backend bu sinyalin Telegram'a gönderilmesini engeller."
-                : "Bu olasılık Python modelinden gelir. Gemini yalnızca seçilen sonucu metin olarak açıklar.";
+                ? "Uyarı: Skor fallback sonucu oluşmuş. Backend bu sinyalin Telegram'a gönderilmesini engeller."
+                : output.variant === "live_plus_prematch"
+                    ? "Canlı istatistik ile pre-match takım gücü birlikte hesaplandı. Gemini yalnızca sonucu açıklar."
+                    : "Live-only sonuç yalnız gölge denetimde kalabilir; Telegram precision modu pre-match ister.";
         }
 
         async function toggleBot() {
@@ -994,7 +2941,7 @@
                 autoScanEnabled = Boolean(enabled);
                 renderAutoScanState();
                 showToast(autoScanEnabled
-                    ? "10 dakikalık otomatik tarama açıldı."
+                    ? "Otomatik tarama açıldı."
                     : "Otomatik tarama kapatıldı; manuel tarama kullanılabilir.");
                 await Promise.allSettled([checkStatus(), fetchLogs()]);
             } catch (error) {
@@ -1004,6 +2951,36 @@
             } finally {
                 checkbox.disabled = false;
             }
+        }
+
+        function renderAdaptiveScanState() {
+            const checkbox = document.getElementById("adaptive-scan-enabled");
+            const status = document.getElementById("adaptive-scan-status");
+            if (!checkbox || !status) return;
+            checkbox.checked = adaptiveScanEnabled;
+            const cadence = latestAdaptiveScan;
+            const label = cadence?.reasonLabel || (adaptiveScanEnabled ? "Açık · ilk tarama / güncel durum bekleniyor" : "Kapalı · normal 10 dakika");
+            const left = Math.max(0, Math.ceil((nextRunTarget - Date.now()) / 1000));
+            const countdown = !isBotRunning || !autoScanEnabled ? "" : isScanning ? " · Tarama sürüyor" : nextRunTarget > 0
+                ? ` · Sonraki: ${Math.floor(left / 60)}:${String(left % 60).padStart(2,"0")}` : "";
+            status.textContent = `${label}${cadence ? " · Son taramada " + cadence.candidateCount + " uygun maç" : ""}${countdown}`;
+        }
+
+        async function saveAdaptiveScan(enabled) {
+            const checkbox = document.getElementById("adaptive-scan-enabled"), previous = adaptiveScanEnabled;
+            checkbox.disabled = true; adaptiveScanSaving = true;
+            try {
+                const result = await apiFetch("/api/settings", {method:"POST",body:JSON.stringify({adaptiveScanEnabled:Boolean(enabled)})});
+                if (result.success === false) throw new Error(result.message || "Hızlandırma ayarı kaydedilemedi.");
+                adaptiveScanEnabled = result.state?.adaptiveScanEnabled === true;
+                latestAdaptiveScan = null;
+                showToast(adaptiveScanEnabled ? "Tam-stat hızlandırma açıldı; uygun maç varsa 5 dk." : "Hızlandırma kapatıldı; normal döngü 10 dk.");
+            } catch (error) {
+                adaptiveScanEnabled = previous; showToast(error.message, true);
+            } finally {
+                adaptiveScanSaving = false; checkbox.disabled = false; renderAdaptiveScanState();
+            }
+            await checkStatus();
         }
 
         function renderSchedules() {
@@ -1081,12 +3058,884 @@
             }
         }
 
+        function formatPercent(value) {
+            if (value === null || value === undefined || value === "") return "-";
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? `%${parsed.toFixed(1)}` : "-";
+        }
+
+        function signalTypeInfo(type, tariffSlot) {
+            if (tariffSlot === "primary" || type === "first" || type === "primary") return { text: "🟢 İlk", className: "strong" };
+            if (tariffSlot === "follow" || type === "follow") return { text: "🔁 Takip", className: "surprise" };
+            return type === "strong"
+                ? { text: "🟢 Güçlü", className: "strong" }
+                : { text: "🟡 Sürpriz", className: "surprise" };
+        }
+
+        function signalResultInfo(result) {
+            if (result === "W") return { text: "✅ Kazandı", className: "win" };
+            if (result === "L") return { text: "❌ Kaybetti", className: "loss" };
+            if (result === "PUSH") return { text: "↩️ İade", className: "neutral" };
+            if (result === "VOID") return { text: "🚫 Geçersiz", className: "neutral" };
+            return { text: "⏳ Bekliyor", className: "pending" };
+        }
+
+        function renderSignalHistory(data) {
+            const summary = data?.summary || {};
+            const overall = summary.overall || {};
+            const surprise = summary.byTariffSlot?.follow || summary.byType?.surprise || {};
+            const strong = summary.byTariffSlot?.primary || summary.byType?.strong || {};
+
+            document.getElementById("signal-total").textContent = overall.total ?? 0;
+            document.getElementById("signal-pending").textContent = overall.pending ?? 0;
+            document.getElementById("signal-surprise-rate").textContent = formatPercent(surprise.hitRate);
+            document.getElementById("signal-strong-rate").textContent = formatPercent(strong.hitRate);
+            document.getElementById("signal-win-loss").textContent = `${overall.wins ?? 0} / ${overall.losses ?? 0}`;
+            document.getElementById("signal-roi").textContent = formatPercent(overall.roi);
+            document.getElementById("overview-signal-total").textContent = overall.total ?? 0;
+            document.getElementById("overview-hit-rate").textContent = formatPercent(overall.hitRate);
+            document.getElementById("overview-roi").textContent = formatPercent(overall.roi);
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate
+                ? `${formatHistoryDateLabel(selectedDate)} (TSİ)`
+                : "Tüm Veriler";
+            document.getElementById("signal-history-updated").textContent = summary.updatedAt
+                ? `Görünüm: ${viewLabel} · Son güncelleme: ${formatDateTime(summary.updatedAt)}`
+                : `Görünüm: ${viewLabel} · Yalnızca Telegram paylaşımları`;
+            syncHistoryDateOptions(
+                "signal-history-date",
+                data?.filter,
+                selectedDate
+            );
+
+            const body = document.getElementById("signal-history-rows");
+            body.replaceChildren();
+            const signals = Array.isArray(data?.signals) ? data.signals : [];
+
+            if (signals.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 10;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde paylaşılan sinyal yok.`
+                    : "Henüz paylaşılan sinyal yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const signal of signals) {
+                const row = document.createElement("tr");
+                const typeInfo = signalTypeInfo(signal.signalType, signal.tariffSlot);
+                const resultInfo = signalResultInfo(signal?.settlement?.result);
+
+                const typeCell = document.createElement("td");
+                const typeBadge = document.createElement("span");
+                typeBadge.className = `signal-type-label ${typeInfo.className}`;
+                typeBadge.textContent = typeInfo.text;
+                typeCell.appendChild(typeBadge);
+                row.appendChild(typeCell);
+
+                const dateCell = document.createElement("td");
+                dateCell.textContent = formatDateTime(signal.sentAt);
+                row.appendChild(dateCell);
+
+                const plainValues = [
+                    signal.match || "-",
+                    signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
+                    signal.market || "-",
+                    signal.deliveryKey ? (signal.signalSources || []).join(" + ") : `${(signal.signalSources || []).join(' + ')}${signal.signalSources?.length ? ' · ' : ''}${String(signal.decisionModel || "V16").toUpperCase()} ${formatPercent(signal.decisionProbability ?? signal.selectorV2Probability ?? signal.dinoProbability)}`,
+                    formatPercent(testLabNumber(signal.prematchMarketSupport)),
+                    Number.isFinite(Number(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                ];
+                for (const value of plainValues) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                }
+                row.title = (signal.signalSources || []).join(' + ');
+
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+
+                const finalCell = document.createElement("td");
+                finalCell.textContent = signal?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+                body.appendChild(row);
+            }
+        }
+
+        async function fetchSignalHistory() {
+            try {
+                const data = await apiFetch(
+                    historyApiPath("/api/signal-history", 100, signalHistoryDate)
+                );
+                renderSignalHistory(data || {});
+                applyTableSearch("signal-search", "signal-history-rows");
+            } catch (_) {
+                // Takip uç noktası geçici olarak cevap vermezse diğer panel
+                // kontrolleri çalışmaya devam etsin.
+            }
+        }
+
+        async function changeSignalHistoryDate(value) {
+            signalHistoryDate = value || "";
+            await fetchSignalHistory();
+        }
+
+        async function refreshSignalResults() {
+            const button = document.getElementById("signal-refresh-btn");
+            button.disabled = true;
+            button.textContent = "KONTROL EDİLİYOR…";
+            try {
+                const result = await apiFetch("/api/signal-history/refresh", { method: "POST" });
+                if (result.success === false && !result.busy) {
+                    throw new Error(result.message || "Sonuçlar güncellenemedi.");
+                }
+                showToast(result.message || "Sonuç kontrolü tamamlandı.");
+                await Promise.allSettled([
+                    fetchSignalHistory(),
+                    fetchTestLabHistory(),
+                    fetchCandidateHistory(),
+                    fetchLogs()
+                ]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sonuçları Kontrol Et";
+            }
+        }
+
+        function downloadSignalExport(format) {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const link = document.createElement("a");
+            link.href = `${BACKEND_URL}/api/signal-history${suffix}${historyExportQuery(signalHistoryDate)}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function testLabNumber(value) {
+            if (value === null || value === undefined || String(value).trim() === "") return NaN;
+            return Number(value);
+        }
+
+        function setTestLabSummary(prefix, summary) {
+            const values = summary?.overall || summary || {};
+            const total = values.total ?? values.signalCount ?? values.signals ?? values.count ?? 0;
+            const wins = values.wins ?? values.won ?? 0;
+            const losses = values.losses ?? values.lost ?? 0;
+            const averageOdds = values.averageOdds ?? values.avgOdds ?? values.meanOdds;
+            document.getElementById(`${prefix}-total`).textContent = total;
+            document.getElementById(`${prefix}-win-loss`).textContent = `${wins} / ${losses}`;
+            document.getElementById(`${prefix}-hit-rate`).textContent = formatPercent(values.hitRate ?? values.successRate);
+            document.getElementById(`${prefix}-roi`).textContent = formatPercent(values.roi ?? values.roiPercent);
+            document.getElementById(`${prefix}-average-odds`).textContent = Number.isFinite(testLabNumber(averageOdds))
+                ? Number(averageOdds).toFixed(3)
+                : "-";
+        }
+
+        function testLabProbability(signal) {
+            return signal?.v20Probability
+                ?? signal?.probability
+                ?? signal?.decisionProbability
+                ?? signal?.selectorV18Probability
+                ?? signal?.v18Probability
+                ?? signal?.selectorV2Probability
+                ?? signal?.v16Probability
+                ?? signal?.dinoProbability;
+        }
+
+        function testLabEdge(signal, v20Only = false) {
+            const value = v20Only
+                ? signal?.v20Edge ?? signal?.decisionEdge
+                : signal?.v20Edge ?? signal?.edgeRaw ?? signal?.rawEdge ?? signal?.decisionEdge ?? signal?.v18Edge ?? signal?.v16Edge ?? signal?.edge;
+            return Number.isFinite(testLabNumber(value))
+                ? `%${Number(value) >= 0 ? "+" : ""}${Number(value).toFixed(1)}`
+                : "-";
+        }
+
+        function renderTestLabRows(bodyId, signals, options, selectedDate) {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            body.replaceChildren();
+            if (!Array.isArray(signals) || signals.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = options.v22 ? 13 : options.showSignalType ? 11 : 10;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${options.label} sinyali yok.`
+                    : `Henüz ${options.label} sinyali yok.`;
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const signal of signals) {
+                const row = document.createElement("tr");
+                const resultInfo = signalResultInfo(signal?.settlement?.result);
+                if (options.showSignalType) {
+                    const typeInfo = signalTypeInfo(signal.signalType, signal.tariffSlot);
+                    const typeCell = document.createElement("td");
+                    const typeBadge = document.createElement("span");
+                    typeBadge.className = `signal-type-label ${typeInfo.className}`;
+                    typeBadge.textContent = typeInfo.text;
+                    typeCell.appendChild(typeBadge);
+                    row.appendChild(typeCell);
+                }
+                const probability = options.probabilityOnly
+                    ? signal.v20Probability ?? signal.decisionProbability
+                    : testLabProbability(signal);
+                const modelName = String(signal.decisionModel || options.modelName || "MODEL").toUpperCase();
+                const probabilityText = options.consensus
+                    ? `${signal.voteCount ?? "-"}/3 onay\nTemel ${formatPercent(testLabNumber(signal.dinoProbability))} · V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))} · V18 ${formatPercent(testLabNumber(signal.v18Probability))}`
+                    : options.probabilityOnly
+                    ? formatPercent(testLabNumber(probability))
+                    : `${modelName} ${formatPercent(probability)}`;
+                const values = [
+                    formatDateTime(signal.sentAt), signal.match || "-",
+                    signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
+                    marketDisplayName(signal.market),
+                    probabilityText,
+                    testLabEdge(signal, options.probabilityOnly),
+                    formatPercent(testLabNumber(signal.prematchMarketSupport)),
+                    Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                ];
+                if (options.v22) values.splice(3, 0, signal.score || "-",
+                    Array.isArray(signal.matchedFilters) ? signal.matchedFilters.join(" + ") : "-",
+                    signal.goalsNeeded ?? "-");
+                for (const value of values) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    if (options.consensus && value === probabilityText) {
+                        cell.style.whiteSpace = "pre-line";
+                        cell.style.minWidth = "145px";
+                    }
+                    row.appendChild(cell);
+                }
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+                const finalCell = document.createElement("td");
+                finalCell.textContent = signal?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+                body.appendChild(row);
+            }
+        }
+
+        function renderV24Rows(targetId, signals, selectedDate, label = "V24") {
+            const body = document.getElementById(targetId);
+            if (!body) return;
+            body.replaceChildren();
+            if (!Array.isArray(signals) || signals.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 15;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde ${label} kaydı yok.`
+                    : `Henüz ${label} kaydı yok.`;
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const signal of signals) {
+                const row = document.createElement("tr");
+                const isOver = signal.signalType === "strong";
+                const resultInfo = signalResultInfo(signal?.settlement?.result);
+                const eventScore = signal?.analysis?.eventScore || {};
+                const eventText = eventScore.status === "approve"
+                    ? `✅ Tutarlı · ${eventScore.goalCount ?? "-"}/${eventScore.scoreTotal ?? "-"} gol`
+                    : eventScore.status === "reject"
+                        ? "❌ Uyumsuz"
+                        : "⚪ Veri yok";
+                const focusArmLabel = signal?.analysis?.focusArmLabel || null;
+                const reaction = signal?.analysis?.reaction || null;
+                const reactionText = reaction?.status === "approve"
+                    ? ` · Reaksiyon ✅ ${reaction.trailingSide === "home" ? "ev" : "deplasman"}: ${reaction.trailing?.shots ?? "-"} şut / ${reaction.trailing?.shotsOnGoal ?? "-"} isabet`
+                    : signal?.analysis?.focusReactionRequired
+                        ? ` · Reaksiyon ${reaction?.status === "not_applicable" ? "uygulanamaz" : "veri yok"}`
+                        : "";
+                const v25Probability = testLabNumber(signal.v25Probability);
+                const v25Edge = testLabNumber(signal.v25Edge);
+                const probabilityText = isOver
+                    ? `Dino ${formatPercent(testLabNumber(signal.dinoProbability))} · V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))} · V18 ${formatPercent(testLabNumber(signal.v18Probability))}`
+                    : `V16 ${formatPercent(testLabNumber(signal.selectorV2Probability))}`;
+                const probabilityWithV25 = Number.isFinite(v25Probability)
+                    ? `${probabilityText} · V25 ${formatPercent(v25Probability)}`
+                    : probabilityText;
+                const baseEdgeText = isOver
+                    ? `Dino ${testLabEdge({ edge: signal.edge })} · karar filtresi · V16 ${testLabEdge({ v16Edge: signal.v16Edge })} yalnız veri`
+                    : `V16 ${testLabEdge({ v16Edge: signal.v16Edge })}`;
+                const edgeText = Number.isFinite(v25Edge)
+                    ? `${baseEdgeText} · V25 ${v25Edge >= 0 ? "+" : ""}${v25Edge.toFixed(1)} ortak filtre`
+                    : baseEdgeText;
+                const values = [
+                    isOver ? "ÜST" : "MS",
+                    formatDateTime(signal.sentAt),
+                    signal.match || "-",
+                    signal.minute === null || signal.minute === undefined ? "-" : `${signal.minute}'`,
+                    signal.score || "-",
+                    isOver ? focusArmLabel || signal.matchedFilters?.[0] || "-" : "MS",
+                    isOver ? signal.goalsNeeded ?? "-" : "-",
+                    marketDisplayName(signal.market),
+                    probabilityWithV25,
+                    edgeText,
+                    isOver
+                        ? formatPercent(testLabNumber(signal.prematchMarketSupport))
+                        : `${formatPercent(testLabNumber(signal.prematchMarketSupport))} · yalnız veri`,
+                    `${eventText}${reactionText}`,
+                    Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
+                ];
+                for (const value of values) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    if (value === probabilityWithV25 || value === edgeText) {
+                        cell.style.whiteSpace = "normal";
+                        cell.style.minWidth = "170px";
+                    }
+                    row.appendChild(cell);
+                }
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+                const finalCell = document.createElement("td");
+                finalCell.textContent = signal?.settlement?.finalScore || "-";
+                row.appendChild(finalCell);
+                body.appendChild(row);
+            }
+        }
+
+        function setTestLabModeBadge(id, arm, mode = "shadow") {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            const disabled = arm?.enabled === false;
+            const unavailable = !arm || arm.available === false;
+            const labels = { active: "TELEGRAM", fresh: "TAZE DOĞRULAMA", shadow: "GÖLGE", experimental: "DENEYSEL GÖLGE" };
+            badge.textContent = disabled ? "KAPALI" : unavailable ? "HAZIR DEĞİL" : labels[mode] || labels.shadow;
+            badge.className = `mini-badge ${disabled || unavailable ? "bg-danger" : mode === "active" ? "bg-warning" : "bg-info"}`;
+        }
+
+        function renderV20Rules(arm) {
+            const container = document.getElementById("test-lab-v20-rules");
+            if (!container) return;
+            container.replaceChildren();
+            const add = text => {
+                const chip = document.createElement("span");
+                chip.className = "test-lab-rule";
+                chip.textContent = text;
+                container.appendChild(chip);
+            };
+            if (!arm || arm.available === false || arm.enabled === false) {
+                add(arm?.enabled === false ? "V20 deneysel gölge kapalı" : arm?.reason || arm?.message || "V20 model/politika dosyası henüz hazır değil");
+                add("Karara ve Telegram'a etkisi yok");
+                return;
+            }
+            const policy = arm?.policy || {};
+            const rawProbability = policy.minimumProbability ?? policy.minProbability;
+            const rawEdge = policy.minimumEdge ?? policy.minRawEdge;
+            const minimumOdds = policy.minimumOdds ?? policy.minOdds;
+            const maximumOdds = policy.maximumOdds ?? policy.maxOdds ?? 4;
+            const asPercent = value => {
+                const parsed = testLabNumber(value);
+                if (!Number.isFinite(parsed)) return null;
+                return Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+            };
+            const probability = asPercent(rawProbability);
+            const edge = asPercent(rawEdge);
+            const policyParts = [];
+            if (Number.isFinite(probability)) policyParts.push(`olasılık ≥ %${probability.toFixed(0)}`);
+            if (Number.isFinite(edge)) policyParts.push(`ham EDGE ≥ %${edge >= 0 ? "+" : ""}${edge.toFixed(0)}`);
+            if (Number.isFinite(testLabNumber(minimumOdds))) policyParts.push(`oran ${Number(minimumOdds).toFixed(2)}–${Number(maximumOdds).toFixed(2)}`);
+            add(`${arm?.label || "V20 Yeni Model"}${arm?.modelVersion ? ` · ${arm.modelVersion}` : ""}`);
+            add(policyParts.length ? policyParts.join(" · ") : "Kilitli deneysel politika bekleniyor");
+            add("Taze doğrulama zorunlu · maç başına en fazla 1 · Telegram kapalı");
+        }
+
+        function coreRuleLabel(rule) {
+            if (typeof rule === "string") return rule;
+            if (rule?.label) return rule.label;
+            const parts = [marketDisplayName(rule?.market)];
+            const minuteLow = rule?.minuteLow ?? rule?.minute?.min;
+            const minuteHigh = rule?.minuteHigh ?? rule?.minute?.max;
+            if (Number.isFinite(Number(minuteLow)) && Number.isFinite(Number(minuteHigh))) {
+                parts.push(`${minuteLow}–${minuteHigh}. dk`);
+            }
+            const probabilityLow = rule?.probabilityMinimum ?? rule?.probabilityLow ?? rule?.v18Minimum ?? rule?.probability?.min;
+            const probabilityHigh = rule?.probabilityMaximum ?? rule?.probabilityHigh ?? rule?.v18Maximum ?? rule?.probability?.max;
+            if (Number.isFinite(Number(probabilityLow))) {
+                parts.push(Number.isFinite(Number(probabilityHigh))
+                    ? `V18 %${probabilityLow}–${probabilityHigh}`
+                    : `V18 ≥ %${probabilityLow}`);
+            }
+            const edgeLow = rule?.edgeLow ?? rule?.edge?.min;
+            const edgeHigh = rule?.edgeHigh ?? rule?.edge?.max;
+            if (Number.isFinite(Number(edgeLow))) {
+                parts.push(Number.isFinite(Number(edgeHigh))
+                    ? `EDGE ${Number(edgeLow) >= 0 ? "+" : ""}${edgeLow}…${Number(edgeHigh) >= 0 ? "+" : ""}${edgeHigh}`
+                    : `EDGE ≥ ${Number(edgeLow) >= 0 ? "+" : ""}${edgeLow}`);
+            }
+            const minimumOdd = rule?.minimumOdd ?? rule?.odds?.min;
+            const maximumOdd = rule?.maximumOdd ?? rule?.odds?.max;
+            if (Number.isFinite(Number(minimumOdd))) {
+                parts.push(Number.isFinite(Number(maximumOdd))
+                    ? `oran ${Number(minimumOdd).toFixed(2)}–${Number(maximumOdd).toFixed(2)}`
+                    : `oran ≥ ${Number(minimumOdd).toFixed(2)}`);
+            }
+            return parts.filter(value => value && value !== "-").join(" · ");
+        }
+
+        function renderCoreRules(rules) {
+            if (!Array.isArray(rules) || rules.length === 0) return;
+            const container = document.getElementById("test-lab-core-rules");
+            if (!container) return;
+            container.replaceChildren();
+            for (const rule of rules) {
+                const chip = document.createElement("span");
+                chip.className = "test-lab-rule";
+                chip.textContent = coreRuleLabel(rule);
+                container.appendChild(chip);
+            }
+        }
+
+        function setV23Source(value) {
+            v23Source = value || "all";
+            renderV23GoalLab(latestV23Data);
+            filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
+        }
+
+        function renderV23GoalLab(data) {
+            latestV23Data = data;
+            renderEntryFilterLab(data, v23Source);
+        }
+
+        function renderTestLabHistory(data) {
+            renderV23GoalLab(data?.v23Goal);
+            setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
+            setTestLabSummary("testlab-v22", data?.v22Shadow?.summary);
+            setTestLabSummary("testlab-v24", data?.v24Shadow?.summary);
+            setTestLabSummary("testlab-v24-guard", data?.v24WeekendGuard?.summary);
+            setTestLabSummary("testlab-v24-quiet", data?.v24WeekendQuiet?.summary);
+            setTestLabSummary("testlab-v24-gemini", data?.v24GeminiWeekend?.summary);
+            setTestLabSummary("testlab-v24-selective", data?.v24SelectiveWeekend?.summary);
+            setTestLabSummary("testlab-v24-v25", data?.v24V25JointWeekend?.summary);
+            setTestLabSummary("testlab-v24-focus", data?.v24Focus?.summary);
+            setTestLabModeBadge("testlab-v22-mode-badge", data?.v22Shadow, "fresh");
+            const v22Start = document.getElementById("testlab-v22-start-note");
+            if (v22Start) v22Start.textContent = data?.v22Shadow?.startedAt
+                ? `V22 ilk sinyal: ${formatDateTime(data.v22Shadow.startedAt)} · V21 geçmişi ayrı ve korunuyor.`
+                : "İlk uygun canlı V22 sinyali bekleniyor; geçmiş sonuçlar aktarılmaz.";
+            for (const id of ["A", "B", "C"]) {
+                const element = document.getElementById(`testlab-v22-filter-${id}`);
+                const summary = data?.v22Shadow?.filterSummaries?.[id];
+                if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
+            }
+            setTestLabModeBadge("testlab-v24-mode-badge", data?.v24Shadow, "fresh");
+            const v24Start = document.getElementById("testlab-v24-start-note");
+            if (v24Start) v24Start.textContent = data?.v24Shadow?.startedAt
+                ? `V24 ileri test başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Eski kayıt aktarılmaz · Telegram kapalı.`
+                : "İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.";
+            for (const id of ["SNIPER", "A", "B"]) {
+                const element = document.getElementById(`testlab-v24-filter-${id}`);
+                const summary = data?.v24Shadow?.filterSummaries?.[id];
+                if (element) element.textContent = `${id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)}`;
+            }
+            const v24Ms = data?.v24Shadow?.winnerSummary?.overall || {};
+            const v24MsElement = document.getElementById("testlab-v24-filter-MS");
+            if (v24MsElement) v24MsElement.textContent = `MS · ${v24Ms.total || 0} sinyal · ${v24Ms.wins || 0} K / ${v24Ms.losses || 0} Y · ${formatPercent(v24Ms.hitRate)}`;
+
+            setTestLabModeBadge("testlab-v24-guard-mode-badge", data?.v24WeekendGuard, "fresh");
+            setTestLabModeBadge("testlab-v24-quiet-mode-badge", data?.v24WeekendQuiet, "fresh");
+            setTestLabModeBadge("testlab-v24-gemini-mode-badge", data?.v24GeminiWeekend, "fresh");
+            setTestLabModeBadge("testlab-v24-selective-mode-badge", data?.v24SelectiveWeekend, "fresh");
+            setTestLabModeBadge("testlab-v24-v25-mode-badge", data?.v24V25JointWeekend, "fresh");
+            setTestLabModeBadge("testlab-v24-focus-mode-badge", data?.v24Focus, "fresh");
+            for (const id of ["SNIPER_15", "B15", "B15_REACTION", "B25", "B25_REACTION", "A25"]) {
+                const element = document.getElementById(`testlab-v24-focus-arm-${id}`);
+                const arm = data?.v24Focus?.armSummaries?.[id];
+                const summary = arm?.summary;
+                if (element) element.textContent = `${arm?.label || id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)} · ROI ${formatPercent(summary?.roi)}`;
+            }
+            setTestLabModeBadge("testlab-v21-mode-badge", data?.v21Shadow, "fresh");
+            const v21CohortNote = document.getElementById("testlab-v21-cohort-note");
+            if (v21CohortNote) {
+                const start = data?.v21Shadow?.startedAt;
+                const archiveCount = Number(data?.v21Shadow?.archivedRecords) || 0;
+                v21CohortNote.textContent = `Yeni 3/3 ÜST dönemi · ${start ? "İlk sinyal: " + formatDateTime(start) : "İlk uygun canlı sinyal bekleniyor"} · ${archiveCount} eski kayıt ayrı arşivde; aşağıdaki sayılara dahil değil.`;
+            }
+
+            const selectedDate = data?.date || data?.filter?.date || "";
+            const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Ortak Test Dönemi";
+            const updatedCandidates = [
+                data?.v21Shadow?.summary?.updatedAt,
+                data?.v22Shadow?.summary?.updatedAt,
+                data?.v23Goal?.summary?.updatedAt,
+                data?.v24Shadow?.summary?.updatedAt,
+                data?.v24WeekendGuard?.summary?.updatedAt,
+                data?.v24WeekendQuiet?.summary?.updatedAt,
+                data?.v24GeminiWeekend?.summary?.updatedAt,
+                data?.v24SelectiveWeekend?.summary?.updatedAt,
+                data?.v24V25JointWeekend?.summary?.updatedAt,
+                data?.v24Focus?.summary?.updatedAt,
+            ]
+                .filter(Boolean)
+                .sort();
+            const lastUpdated = updatedCandidates.at(-1);
+            document.getElementById("test-lab-updated").textContent = lastUpdated
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(lastUpdated)} · lab kayıtları ve Telegram gönderimleri ayrı izlenir`
+                : `Görünüm: ${viewLabel} · Test Lab ilk uygun adayı bekliyor`;
+            const availableDates = Array.isArray(data?.dateOptions)
+                ? data.dateOptions
+                : data?.filter?.availableDates;
+            syncHistoryDateOptions("test-lab-date", { availableDates }, selectedDate);
+            const dateSelect = document.getElementById("test-lab-date");
+            if (dateSelect?.options?.[0]) dateSelect.options[0].textContent = "🗂️ Tüm Ortak Test Dönemi";
+
+            renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
+            renderTestLabRows("testlab-v22-rows", data?.v22Shadow?.signals, { label: "V22", modelName: "V22", consensus: true, v22: true }, selectedDate);
+            renderV24Rows("testlab-v24-rows", data?.v24Shadow?.signals, selectedDate, "V24 Ana");
+            renderV24Rows("testlab-v24-guard-rows", data?.v24WeekendGuard?.signals, selectedDate, "Weekend Guard");
+            renderV24Rows("testlab-v24-quiet-rows", data?.v24WeekendQuiet?.signals, selectedDate, "Weekend Quiet");
+            renderV24Rows("testlab-v24-gemini-rows", data?.v24GeminiWeekend?.signals, selectedDate, "Gemini Weekend");
+            renderV24Rows("testlab-v24-selective-rows", data?.v24SelectiveWeekend?.signals, selectedDate, "Seçici Weekend");
+            renderV24Rows("testlab-v24-v25-rows", data?.v24V25JointWeekend?.signals, selectedDate, "V24 + V25 Ortak Weekend");
+            renderV24Rows("testlab-v24-focus-rows", data?.v24Focus?.signals, selectedDate, "V24 Odak LAB");
+        }
+
+        function filterTestLabTables(value) {
+            filterTableRows(value, "testlab-v21-rows");
+            filterTableRows(value, "testlab-v22-rows");
+            filterTableRows(value, "testlab-v23-rows");
+            filterTableRows(value, "testlab-v24-rows");
+            filterTableRows(value, "testlab-v24-guard-rows");
+            filterTableRows(value, "testlab-v24-quiet-rows");
+            filterTableRows(value, "testlab-v24-gemini-rows");
+            filterTableRows(value, "testlab-v24-selective-rows");
+            filterTableRows(value, "testlab-v24-focus-rows");
+            filterTableRows(value, "testlab-v24-v25-rows");
+        }
+
+        async function fetchTestLabHistory() {
+            try {
+                const data = await apiFetch(
+                    historyApiPath(TEST_LAB_API.comparison, 100, testLabDate)
+                );
+                renderTestLabHistory(data || {});
+                filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
+            } catch (_) {
+                document.getElementById("test-lab-updated").textContent = "Test Lab verisi alınamadı; görünen kayıtlar son başarılı yanıttan kalmıştır. Tarih filtresi henüz uygulanmamış olabilir.";
+                for (const id of ["testlab-v24-mode-badge", "testlab-v24-focus-mode-badge", "testlab-v24-guard-mode-badge", "testlab-v24-quiet-mode-badge", "testlab-v24-gemini-mode-badge", "testlab-v24-selective-mode-badge", "testlab-v24-v25-mode-badge"]) {
+                    const badge = document.getElementById(id);
+                    if (badge) {
+                        badge.textContent = "BAĞLANTI YOK";
+                        badge.className = "mini-badge bg-danger";
+                    }
+                }
+            }
+        }
+
+        async function changeTestLabDate(value) {
+            testLabDate = value || "";
+            await fetchTestLabHistory();
+        }
+
+        async function refreshTestLabResults() {
+            const button = document.getElementById("test-lab-refresh-btn");
+            button.disabled = true;
+            button.textContent = "KONTROL EDİLİYOR…";
+            try {
+                const result = await apiFetch(TEST_LAB_API.refresh, { method: "POST" });
+                if (result.success === false && !result.busy) {
+                    throw new Error(result.message || "Sonuçlar güncellenemedi.");
+                }
+                showToast(result.message || "Test Lab sonuçları güncellendi.");
+                await Promise.allSettled([
+                    fetchTestLabHistory(),
+                    fetchSignalHistory(),
+                    fetchCandidateHistory(),
+                    fetchLogs()
+                ]);
+            } catch (error) {
+                showToast(error.message, true);
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sonuçları Kontrol Et";
+            }
+        }
+
+        function downloadTestLabExport(arm, format, cohort = "current") {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const base = TEST_LAB_API.exports[String(arm).toLowerCase()];
+            if (!base) {
+                showToast("Bu Test Lab kolu için dışa aktarma yolu tanımlı değil.", true);
+                return;
+            }
+            const link = document.createElement("a");
+            const params = new URLSearchParams({ scope: "test-lab" });
+            if (String(arm).toLowerCase() === "v21" && cohort === "previous") {
+                params.delete("scope");
+                params.set("cohort", "previous");
+            } else if (testLabDate) params.set("date", testLabDate);
+            if (String(arm).toLowerCase() === "v23") params.set("source",v23Source);
+            link.href = `${BACKEND_URL}${base}${suffix}?${params.toString()}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function candidateDecisionInfo(decision) {
+            const labels = {
+                sent: ["✅ Gönderildi", "win"],
+                already_sent: ["🔁 Önceden gönderildi", "neutral"],
+                telegram_candidate: ["⏳ Gönderim adayı", "pending"],
+                selected_for_class: ["🧭 Hibrit seçim", "pending"],
+                hybrid_tariff_rejected: ["🧭 Hibrit reddetti", "loss"],
+                v17_tariff_rejected: ["🗺️ V17 reddetti", "loss"],
+                eligible_not_selected: ["↔️ Daha güçlü market seçildi", "neutral"],
+                selector_v2_rejected: ["🧬 V16 reddetti", "loss"],
+                edge_below_minimum: ["📉 EDGE altı", "loss"],
+                odds_below_minimum: ["💸 Oran 1.50 altı", "loss"],
+                shadow_probability: ["👁️ Gölge %60–69", "neutral"],
+                prematch_missing: ["🧭 Pre-match yok", "loss"],
+                prematch_total_missing: ["🧩 Pre toplam yok", "loss"],
+                prematch_total_conflict: ["⚖️ Pre toplam karşı", "loss"],
+                live_odds_missing: ["💭 Canlı oran yok", "neutral"],
+                class_outside: ["⚪ Sınıf dışı", "neutral"],
+                market_already_decided: ["🚫 Bitmiş/hatalı market", "loss"],
+                fallback_security: ["🛡️ Güvenlik filtresi", "loss"],
+                score_only_blocked: ["🛡️ Score-only engeli", "loss"],
+                live_revalidation_failed: ["⏱️ Canlılık değişti", "loss"],
+                signal_minute_waiting: ["⏳ 50. dakika bekleniyor", "neutral"],
+                fresh_recheck_pending: ["🔄 Taze doğrulama bekliyor", "pending"],
+                fresh_recheck_superseded: ["♻️ Taze modelle yenilendi", "neutral"],
+                fresh_stats_validation_failed: ["🛡️ Taze stats reddi", "loss"],
+                telegram_failed: ["❌ Telegram hatası", "loss"],
+                model_error: ["❌ Model hatası", "loss"]
+            };
+            const selected = labels[decision] || [decision || "Bilinmiyor", "neutral"];
+            return { text: selected[0], className: selected[1] };
+        }
+
+        function candidateShadowInfo(record) {
+            const context = record?.shadowContext;
+            if (!context) return "-";
+
+            const strengthLabels = {
+                HOME: "Ev",
+                AWAY: "Dep",
+                BALANCED: "Dengeli"
+            };
+            const strength = strengthLabels[context?.strength?.lean] || "-";
+            const prediction = context?.prediction?.marketLean ||
+                context?.prediction?.underOver ||
+                "-";
+            const verified = context?.validation?.fullyVerified === true
+                ? "✅ Tam"
+                : context?.validation?.identityVerified === true
+                    ? "🟡 Kısmi"
+                    : "⚪ Eksik";
+            return `${verified} · Güç:${strength} · API:${prediction}`;
+        }
+
+        function renderCandidateHistory(data) {
+            const summary = data?.summary || {};
+            const overall = summary.overall || {};
+            document.getElementById("candidate-total").textContent = summary.totalRecords ?? 0;
+            document.getElementById("candidate-fixtures").textContent = summary.uniqueFixtures ?? 0;
+            document.getElementById("candidate-pending").textContent = overall.pending ?? 0;
+            document.getElementById("candidate-sent").textContent = summary.sent ?? 0;
+            document.getElementById("candidate-missed").textContent = summary.unsentWinners ?? 0;
+            document.getElementById("candidate-invalid").textContent = summary.invalidMarket ?? 0;
+            document.getElementById("candidate-shadow").textContent = summary.shadowSignals ?? 0;
+            document.getElementById("candidate-prematch-blocked").textContent = summary.prematchBlocked ?? 0;
+            document.getElementById("candidate-prematch-model").textContent = summary.livePlusPrematch ?? 0;
+            renderDecisionBreakdown(summary.byDecision || {});
+            const shadowPower = summary.shadowPower || {};
+            document.getElementById("candidate-shadow-context").textContent = shadowPower.contextMoments ?? 0;
+            document.getElementById("candidate-shadow-team").textContent = shadowPower.teamStatsComplete ?? 0;
+            document.getElementById("candidate-shadow-standings").textContent = shadowPower.standingsComplete ?? 0;
+            document.getElementById("candidate-shadow-predictions").textContent = shadowPower.predictionsAvailable ?? 0;
+            document.getElementById("candidate-shadow-identity").textContent = shadowPower.identityVerified ?? 0;
+            document.getElementById("candidate-shadow-sample").textContent = shadowPower.sampleAdequate ?? 0;
+            document.getElementById("candidate-shadow-verified").textContent = shadowPower.fullyVerified ?? 0;
+            const selectedDate = data?.filter?.date || "";
+            const viewLabel = selectedDate ? `${formatHistoryDateLabel(selectedDate)} (TSİ)` : "Tüm Veriler";
+            document.getElementById("candidate-history-updated").textContent = summary.updatedAt
+                ? `Görünüm: ${viewLabel} · Son kayıt: ${formatDateTime(summary.updatedAt)}`
+                : `Görünüm: ${viewLabel} · Telegram'a gitmeyenler dahil`;
+            syncHistoryDateOptions("candidate-history-date", data?.filter, selectedDate);
+            renderCandidatePagination(data?.pagination || {});
+
+            const body = document.getElementById("candidate-history-rows");
+            body.replaceChildren();
+            const records = Array.isArray(data?.records) ? data.records : [];
+            if (records.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 13;
+                cell.className = "empty-row";
+                cell.textContent = selectedDate
+                    ? `${formatHistoryDateLabel(selectedDate)} tarihinde tam-stat aday kaydı yok.`
+                    : "Henüz tam-stat aday kaydı yok.";
+                row.appendChild(cell);
+                body.appendChild(row);
+                return;
+            }
+
+            for (const record of records) {
+                const row = document.createElement("tr");
+                const decisionInfo = candidateDecisionInfo(record.decision);
+                const resultInfo = signalResultInfo(record?.settlement?.result);
+                const signalClass = record.signalClass === "strong"
+                    ? "🟢 Güçlü"
+                    : record.signalClass === "surprise"
+                        ? "🟡 Sürpriz"
+                        : record.signalClass === "shadow"
+                            ? "👁️ Gölge"
+                            : "⚪ Dışı";
+                const plainValues = [
+                    formatDateTime(record.capturedAt),
+                    record.match || "-",
+                    record.minute ?? "-",
+                    record.market || "-",
+                    signalClass,
+                    record.dinoProbability !== null && record.dinoProbability !== undefined ? `%${record.dinoProbability}` : "-",
+                    `${record.selectorV2Probability !== null && record.selectorV2Probability !== undefined ? `%${record.selectorV2Probability}` : "-"} / ${record.v18Probability !== null && record.v18Probability !== undefined ? `%${record.v18Probability}` : "-"}`,
+                    record.prematchMarketSupport !== null && record.prematchMarketSupport !== undefined ? `%${record.prematchMarketSupport}` : "-",
+                    candidateShadowInfo(record),
+                    record.edge !== null && record.edge !== undefined ? `%${record.edge}` : "-",
+                    record.odds ?? "-"
+                ];
+
+                for (const value of plainValues) {
+                    const cell = document.createElement("td");
+                    cell.textContent = String(value);
+                    row.appendChild(cell);
+                }
+
+                const decisionCell = document.createElement("td");
+                const decisionBadge = document.createElement("span");
+                decisionBadge.className = `result-label ${decisionInfo.className}`;
+                decisionBadge.textContent = decisionInfo.text;
+                decisionBadge.title = [
+                    record.tariffRuleId || null,
+                    record.decisionModel
+                        ? `${String(record.decisionModel).toUpperCase()} %${record.decisionProbability ?? "-"} · EDGE ${record.decisionEdge ?? "-"}`
+                        : null,
+                    record.decisionDetail || null
+                ].filter(Boolean).join(" · ");
+                decisionCell.appendChild(decisionBadge);
+                row.appendChild(decisionCell);
+
+                const resultCell = document.createElement("td");
+                const resultBadge = document.createElement("span");
+                resultBadge.className = `result-label ${resultInfo.className}`;
+                resultBadge.textContent = record?.settlement?.finalScore
+                    ? `${resultInfo.text} (${record.settlement.finalScore})`
+                    : resultInfo.text;
+                resultCell.appendChild(resultBadge);
+                row.appendChild(resultCell);
+                body.appendChild(row);
+            }
+        }
+
+        function renderCandidatePagination(pagination = {}) {
+            const page = Math.max(1, Number(pagination.page) || 1);
+            const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
+            const totalRecords = Math.max(0, Number(pagination.totalRecords) || 0);
+            const pageSize = Math.max(1, Number(pagination.pageSize) || CANDIDATE_HISTORY_PAGE_SIZE);
+            candidateHistoryPage = page;
+            candidateHistoryTotalPages = totalPages;
+
+            const start = totalRecords === 0 ? 0 : ((page - 1) * pageSize) + 1;
+            const end = Math.min(totalRecords, page * pageSize);
+            document.getElementById("candidate-page-summary").textContent = totalRecords
+                ? `Sayfa ${page} / ${totalPages} · ${start}-${end} / ${totalRecords}`
+                : "Sayfa 1 / 1 · Kayıt yok";
+
+            const select = document.getElementById("candidate-page-select");
+            select.replaceChildren();
+            for (let index = 1; index <= totalPages; index += 1) {
+                const option = document.createElement("option");
+                option.value = String(index);
+                option.textContent = `Sayfa ${index} / ${totalPages}`;
+                select.appendChild(option);
+            }
+            select.value = String(page);
+            document.getElementById("candidate-page-first").disabled = page <= 1;
+            document.getElementById("candidate-page-prev").disabled = page <= 1;
+            document.getElementById("candidate-page-next").disabled = page >= totalPages;
+            document.getElementById("candidate-page-last").disabled = page >= totalPages;
+        }
+
+        async function goCandidateHistoryPage(value) {
+            const requested = Math.floor(Number(value) || 1);
+            const nextPage = Math.max(1, Math.min(requested, candidateHistoryTotalPages));
+            if (nextPage === candidateHistoryPage) return;
+            candidateHistoryPage = nextPage;
+            await fetchCandidateHistory();
+            document.getElementById("section-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        async function fetchCandidateHistory() {
+            try {
+                const data = await apiFetch(
+                    historyApiPath(
+                        "/api/candidate-history",
+                        CANDIDATE_HISTORY_PAGE_SIZE,
+                        candidateHistoryDate,
+                        candidateHistoryPage
+                    )
+                );
+                renderCandidateHistory(data || {});
+                applyTableSearch("candidate-search", "candidate-history-rows");
+            } catch (_) {
+                // Aday geçmişi geçici olarak okunamazsa ana panel çalışmaya devam eder.
+            }
+        }
+
+        async function changeCandidateHistoryDate(value) {
+            candidateHistoryDate = value || "";
+            candidateHistoryPage = 1;
+            await fetchCandidateHistory();
+        }
+
+        function downloadCandidateExport(format) {
+            const suffix = format === "csv" ? "/export.csv" : "/export";
+            const link = document.createElement("a");
+            link.href = `${BACKEND_URL}/api/candidate-history${suffix}${historyExportQuery(candidateHistoryDate)}`;
+            link.target = "_blank";
+            link.rel = "noopener";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
         function renderCoverageSummary(data) {
             document.getElementById("coverage-total").textContent = data.totalCandidates ?? 0;
             document.getElementById("coverage-supported").textContent = data.supportedCount ?? 0;
             document.getElementById("coverage-unsupported").textContent = data.unsupportedCount ?? 0;
             document.getElementById("coverage-complete").textContent = data.completeStatsCount ?? 0;
             document.getElementById("coverage-incomplete").textContent = data.incompleteStatsCount ?? 0;
+            document.getElementById("overview-full-stats").textContent = data.completeStatsCount ?? 0;
             document.getElementById("coverage-updated").textContent = data.updatedAt
                 ? `Son güncelleme: ${formatDateTime(data.updatedAt)}`
                 : "Henüz tarama yapılmadı.";
@@ -1098,6 +3947,7 @@
                 renderCoverageSummary(data || {});
                 coverageMatches = Array.isArray(data?.matches) ? data.matches : [];
                 renderCoverageRows();
+                applyTableSearch("coverage-search", "coverage-rows");
             } catch (error) {
                 // Eski backend çalışıyorsa ana kontroller çalışmaya devam etsin.
             }
@@ -1137,7 +3987,7 @@
             if (rows.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
-                cell.colSpan = 6;
+                cell.colSpan = 7;
                 cell.className = "empty-row";
                 cell.textContent = coverageMatches.length === 0
                     ? "Henüz tarama sonucu yok."
@@ -1157,6 +4007,11 @@
                     match.minute === null || match.minute === undefined ? "-" : `${match.minute}'`,
                     coverage.text,
                     actual.text,
+                    match.prematchAvailable === true
+                        ? "🧭 Hazır"
+                        : match.prematchAvailable === false
+                            ? "❌ Yok"
+                            : "⏳ Bekliyor",
                     match.statsTeamCount ?? "-"
                 ];
 
@@ -1165,11 +4020,27 @@
                     cell.textContent = String(value);
                     if (index === 3) cell.className = coverage.className;
                     if (index === 4) cell.className = actual.className;
+                    if (index === 5) {
+                        cell.className = match.prematchAvailable === true
+                            ? "positive"
+                            : match.prematchAvailable === false
+                                ? "warning-text"
+                                : "muted";
+                        cell.title = match.prematchSource || "";
+                    }
                     row.appendChild(cell);
                 });
                 body.appendChild(row);
             }
+            applyTableSearch("coverage-search", "coverage-rows");
         }
+
+        updateIstanbulClock();
+        updateNextRunCountdown();
+        orderDashboardSections();
+        setupNavigationObserver();
+        setInterval(updateIstanbulClock, 1000);
+        setInterval(updateNextRunCountdown, 1000);
     </script>
 </body>
 </html>
