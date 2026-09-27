@@ -46,6 +46,9 @@ const { FilterLab, v22Gate: evaluateV23V22Gate, selectSource: selectV23Source, r
 const { streamJson: streamV23Json } = require('./v23_export');
 const v24Tariff = require('./v24_tariff');
 const { createV24Lab } = require('./v24_lab');
+const v24Focus = require('./v24_focus_lab');
+const { createV24FocusLab } = v24Focus;
+const v25Runtime = require('./v25_runtime');
 const { AdaptiveScan, providerTrouble } = require('./adaptive_scan');
 const { CouponLab } = require('./coupon_lab');
 const { createIndependentLab, importV19History } = require('./independent_lab');
@@ -60,7 +63,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-main-weekend-labs-2026-09-26';
+const BUILD_VERSION = 'mac-yakala-v24-focus-lab-six-arms-2026-09-28';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -259,6 +262,15 @@ const V24_WEEKEND_QUIET_HISTORY_FILE = process.env.DINO_V24_WEEKEND_QUIET_HISTOR
 const V24_GEMINI_WEEKEND_HISTORY_FILE = process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE
     ? path.resolve(process.env.DINO_V24_GEMINI_WEEKEND_HISTORY_FILE)
     : path.join(__dirname, 'dino_v24_gemini_weekend_history.json');
+const V24_SELECTIVE_WEEKEND_HISTORY_FILE = process.env.DINO_V24_SELECTIVE_WEEKEND_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_SELECTIVE_WEEKEND_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_selective_weekend_history.json');
+const V24_V25_JOINT_WEEKEND_HISTORY_FILE = process.env.DINO_V24_V25_JOINT_WEEKEND_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_V25_JOINT_WEEKEND_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_v25_joint_weekend_history.json');
+const V24_FOCUS_HISTORY_FILE = process.env.DINO_V24_FOCUS_HISTORY_FILE
+    ? path.resolve(process.env.DINO_V24_FOCUS_HISTORY_FILE)
+    : path.join(__dirname, 'dino_v24_focus_history.json');
 // V2 starts a clean prospective period because the V22 quality rule changed.
 // The V1 file is deliberately left untouched beside it.
 const V23_GOAL_HISTORY_FILE = path.join(__dirname, 'dino_v23_filter_history_v2.json');
@@ -281,7 +293,10 @@ const V24_HISTORY_FILES = [
     V24_SHADOW_HISTORY_FILE,
     V24_WEEKEND_GUARD_HISTORY_FILE,
     V24_WEEKEND_QUIET_HISTORY_FILE,
-    V24_GEMINI_WEEKEND_HISTORY_FILE
+    V24_GEMINI_WEEKEND_HISTORY_FILE,
+    V24_SELECTIVE_WEEKEND_HISTORY_FILE,
+    V24_V25_JOINT_WEEKEND_HISTORY_FILE,
+    V24_FOCUS_HISTORY_FILE
 ].map(file => path.resolve(file));
 if (new Set(V24_HISTORY_FILES).size !== V24_HISTORY_FILES.length) {
     throw new Error('V24 ana ve hafta sonu LAB geçmiş yolları birbirinden ayrı olmalıdır.');
@@ -518,6 +533,12 @@ const v24WeekendQuietTracker = new SignalTracker({ filePath: V24_WEEKEND_QUIET_H
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Weekend Quiet sinyali')) });
 const v24GeminiWeekendTracker = new SignalTracker({ filePath: V24_GEMINI_WEEKEND_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Gemini Weekend sinyali')) });
+const v24SelectiveWeekendTracker = new SignalTracker({ filePath: V24_SELECTIVE_WEEKEND_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Seçici Weekend sinyali')) });
+const v24V25JointWeekendTracker = new SignalTracker({ filePath: V24_V25_JOINT_WEEKEND_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 + V25 Ortak Weekend sinyali')) });
+const v24FocusTracker = new SignalTracker({ filePath: V24_FOCUS_HISTORY_FILE,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Odak LAB sinyali')) });
 const v22Lab = createV22Lab({ tracker: v22ShadowTracker, enabled: DINO_V22_SHADOW_ENABLED,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
@@ -542,6 +563,21 @@ const v24GeminiWeekendLab = createV24Lab({ tracker: v24GeminiWeekendTracker, ena
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
     liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
     policy: v24Tariff.POLICIES.geminiWeekend, source: 'V24-GEMINI-WEEKEND' });
+const v24SelectiveWeekendLab = createV24Lab({ tracker: v24SelectiveWeekendTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.selectiveWeekend, source: 'V24-SELECTIVE-WEEKEND' });
+const v24V25JointWeekendLab = createV24Lab({ tracker: v24V25JointWeekendTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18, v25Scorer: v25Runtime,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.v25JointWeekend, source: 'V24-V25-JOINT-WEEKEND' });
+const v24FocusLab = createV24FocusLab({ tracker: v24FocusTracker, enabled: DINO_V24_SHADOW_ENABLED,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
+    policy: v24Tariff.POLICIES.main, source: 'V24-FOCUS' });
 const independentLab = createIndependentLab({
     v19Tracker: v19ShadowTracker, v21Tracker: v21ShadowTracker,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
@@ -5146,7 +5182,8 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
         independentLab.select('v21', { mac, dino, liveOnlyDino }) ||
         telegramRouter.select({ mac, dino, liveOnlyDino }).length > 0 ||
         v22Lab.select({ mac, dino, liveOnlyDino }) ||
-        v24Selection.selected
+        v24Selection.selected ||
+        v24FocusLab.preselect(mac, dino, liveOnlyDino)
     );
 }
 
@@ -5154,7 +5191,9 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
     const results = { core: null, v19: null, v21: null, v22: null,
         v23: {v21:null,v22:null}, v24: {record:null,over:null,winner:null,eventScore:null},
-        v24WeekendGuard: null, v24WeekendQuiet: null, v24GeminiWeekend: null };
+        v24WeekendGuard: null, v24WeekendQuiet: null, v24GeminiWeekend: null,
+        v24SelectiveWeekend: null, v24V25JointWeekend: null,
+        v24Focus: {records:[],eventScore:null} };
     for (const kind of ['v21']) {
         try {
             results[kind] = independentLab.record(kind, { mac, dino, liveOnlyDino, capturedAt });
@@ -5178,7 +5217,9 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
     for (const [key, lab, label] of [
         ['v24WeekendGuard', v24WeekendGuardLab, 'Weekend Guard'],
         ['v24WeekendQuiet', v24WeekendQuietLab, 'Weekend Quiet'],
-        ['v24GeminiWeekend', v24GeminiWeekendLab, 'Gemini Weekend']
+        ['v24GeminiWeekend', v24GeminiWeekendLab, 'Gemini Weekend'],
+        ['v24SelectiveWeekend', v24SelectiveWeekendLab, 'Seçici Weekend'],
+        ['v24V25JointWeekend', v24V25JointWeekendLab, 'V24 + V25 Ortak Weekend']
     ]) {
         try {
             results[key] = lab.record({ mac, dino, liveOnlyDino, capturedAt });
@@ -5186,6 +5227,14 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         } catch (error) {
             addSystemLog(`> ⚠️ V24 ${label} kaydı atlandı: ${error.message}`);
         }
+    }
+    try {
+        results.v24Focus = v24FocusLab.record({ mac, dino, liveOnlyDino, capturedAt });
+        if (results.v24Focus.records.length) {
+            addSystemLog(`> 🎯 V24 ODAK LAB: ${mac.mac_isim} | ${results.v24Focus.records.map(item => item.analysis.focusArm).join(' + ')} | bağımsız kol kilitleri | Telegram yok.`);
+        }
+    } catch (error) {
+        addSystemLog(`> ⚠️ V24 Odak LAB kaydı atlandı: ${error.message}`);
     }
     for (const source of ['v21','v22']) {
         try {
@@ -5822,7 +5871,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     const independentFixtureIDs = [...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(),
         ...v23GoalLab.unresolvedFixtureIds(), ...v24ShadowTracker.unresolvedFixtureIds(),
         ...v24WeekendGuardTracker.unresolvedFixtureIds(), ...v24WeekendQuietTracker.unresolvedFixtureIds(),
-        ...v24GeminiWeekendTracker.unresolvedFixtureIds()];
+        ...v24GeminiWeekendTracker.unresolvedFixtureIds(), ...v24SelectiveWeekendTracker.unresolvedFixtureIds(),
+        ...v24V25JointWeekendTracker.unresolvedFixtureIds(), ...v24FocusTracker.unresolvedFixtureIds()];
     const fixtureIDs = [...new Set([
         ...signalFixtureIDs,
         ...candidateFixtureIDs,
@@ -5879,7 +5929,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 resolvedIndependentLab += v21ShadowTracker.settleFixture(fixture) +
                     v22ShadowTracker.settleFixture(fixture) + v24ShadowTracker.settleFixture(fixture) +
                     v24WeekendGuardTracker.settleFixture(fixture) + v24WeekendQuietTracker.settleFixture(fixture) +
-                    v24GeminiWeekendTracker.settleFixture(fixture);
+                    v24GeminiWeekendTracker.settleFixture(fixture) + v24SelectiveWeekendTracker.settleFixture(fixture) +
+                    v24V25JointWeekendTracker.settleFixture(fixture) + v24FocusTracker.settleFixture(fixture);
                 try { resolvedIndependentLab += v23GoalLab.settleFixture(fixture); }
                 catch { addSystemLog('> ⚠️ V23 sonuç kaydı yazılamadı; diğer sonuç takipleri devam ediyor.'); }
             }
@@ -6316,7 +6367,11 @@ function v18GolgeCsvOlustur(signals, includeRouting = false, includeV24Audit = f
         'stats_validation_status', 'stats_verified_at',
         'result', 'profit', 'final_score', 'fixture_status', 'resolved_at',
         ...(includeRouting ? ['matched_filters', 'goals_needed'] : []),
-        ...(includeV24Audit ? ['event_score_required', 'event_score_status', 'event_goal_count', 'entry_score_total'] : [])
+        ...(includeV24Audit ? ['event_score_required', 'event_score_status', 'event_goal_count', 'entry_score_total',
+            'v25_model_version', 'v25_trained_through', 'v25_probability', 'v25_raw_probability',
+            'v25_edge', 'v25_joint_eligible', 'v25_joint_rule',
+            'focus_arm', 'focus_arm_label', 'reaction_required', 'reaction_status',
+            'reaction_trailing_side', 'reaction_shots', 'reaction_shots_on_goal'] : [])
     ];
     const rows = signals.map(signal => {
         const settlement = signal?.settlement || {};
@@ -6336,7 +6391,14 @@ function v18GolgeCsvOlustur(signals, includeRouting = false, includeV24Audit = f
             settlement.resolvedAt,
             ...(includeRouting ? [(signal.matchedFilters || []).join('+'), signal.goalsNeeded] : []),
             ...(includeV24Audit ? [signal?.analysis?.eventScoreRequired, signal?.analysis?.eventScore?.status,
-                signal?.analysis?.eventScore?.goalCount, signal?.analysis?.eventScore?.scoreTotal] : [])
+                signal?.analysis?.eventScore?.goalCount, signal?.analysis?.eventScore?.scoreTotal,
+                signal.v25ModelVersion, signal.v25TrainedThrough, signal.v25Probability,
+                signal.v25RawProbability, signal.v25Edge, signal.v25JointEligible,
+                signal.v25JointRule ? JSON.stringify(signal.v25JointRule) : null,
+                signal?.analysis?.focusArm, signal?.analysis?.focusArmLabel,
+                signal?.analysis?.focusReactionRequired, signal?.analysis?.reaction?.status,
+                signal?.analysis?.reaction?.trailingSide, signal?.analysis?.reaction?.trailing?.shots,
+                signal?.analysis?.reaction?.trailing?.shotsOnGoal] : [])
         ].map(csvHucre).join(',');
     });
     return [headers.map(csvHucre).join(','), ...rows].join('\n');
@@ -6347,7 +6409,7 @@ function testLabOrtakKarsilastirmaBaslangici() {
     // Yeni V24 ana ve hafta sonu kollarını aynı ileri-test başlangıcında tut.
     // Emekli V17/V20 geçmişleri bu dönemi artık belirlemez.
     const starts = [v24ShadowTracker, v24WeekendGuardTracker, v24WeekendQuietTracker,
-        v24GeminiWeekendTracker]
+        v24GeminiWeekendTracker, v24SelectiveWeekendTracker, v24V25JointWeekendTracker]
         .map(tracker => tracker.data?.startedAt || tracker.data?.signals?.[0]?.sentAt)
         .filter(value => value && Number.isFinite(new Date(value).getTime()))
         .map(value => new Date(value));
@@ -6386,6 +6448,9 @@ function testLabKarsilastirmaSecimi(req, res) {
             ...testLabDonemineGoreSec(v24WeekendGuardTracker, null),
             ...testLabDonemineGoreSec(v24WeekendQuietTracker, null),
             ...testLabDonemineGoreSec(v24GeminiWeekendTracker, null),
+            ...testLabDonemineGoreSec(v24SelectiveWeekendTracker, null),
+            ...testLabDonemineGoreSec(v24V25JointWeekendTracker, null),
+            ...testLabDonemineGoreSec(v24FocusTracker, null),
             ...aktifV19SinyalleriniSec(null)
         ],
         'sentAt'
@@ -6454,6 +6519,18 @@ app.get(
                 ...v24GeminiWeekendLab.metadata(testLabDonemineGoreSec(v24GeminiWeekendTracker, selection.date)),
                 signals: v24GeminiWeekendTracker.list(req.query.limit, testLabDonemineGoreSec(v24GeminiWeekendTracker, selection.date))
             },
+            v24SelectiveWeekend: {
+                ...v24SelectiveWeekendLab.metadata(testLabDonemineGoreSec(v24SelectiveWeekendTracker, selection.date)),
+                signals: v24SelectiveWeekendTracker.list(req.query.limit, testLabDonemineGoreSec(v24SelectiveWeekendTracker, selection.date))
+            },
+            v24V25JointWeekend: {
+                ...v24V25JointWeekendLab.metadata(testLabDonemineGoreSec(v24V25JointWeekendTracker, selection.date)),
+                signals: v24V25JointWeekendTracker.list(req.query.limit, testLabDonemineGoreSec(v24V25JointWeekendTracker, selection.date))
+            },
+            v24Focus: {
+                ...v24FocusLab.metadata(testLabDonemineGoreSec(v24FocusTracker, selection.date)),
+                signals: v24FocusTracker.list(req.query.limit, testLabDonemineGoreSec(v24FocusTracker, selection.date))
+            },
             // Geçici istemci uyumluluğu: yeni panel activeV19 anahtarını kullanır.
             currentSystemSummary: activeV19.summary,
             coreShadow: {
@@ -6493,7 +6570,10 @@ function v24LabForTracker(tracker) {
         [v24ShadowTracker, v24Lab],
         [v24WeekendGuardTracker, v24WeekendGuardLab],
         [v24WeekendQuietTracker, v24WeekendQuietLab],
-        [v24GeminiWeekendTracker, v24GeminiWeekendLab]
+        [v24GeminiWeekendTracker, v24GeminiWeekendLab],
+        [v24SelectiveWeekendTracker, v24SelectiveWeekendLab],
+        [v24V25JointWeekendTracker, v24V25JointWeekendLab],
+        [v24FocusTracker, v24FocusLab]
     ]).get(tracker) || null;
 }
 
@@ -6670,6 +6750,15 @@ for (const [slug, tracker, tariff, enabled] of [
         DINO_V24_SHADOW_ENABLED],
     ['v24-gemini-weekend', v24GeminiWeekendTracker,
         { VERSION: v24Tariff.POLICIES.geminiWeekend.version, POLICY: v24Tariff.POLICIES.geminiWeekend },
+        DINO_V24_SHADOW_ENABLED],
+    ['v24-selective-weekend', v24SelectiveWeekendTracker,
+        { VERSION: v24Tariff.POLICIES.selectiveWeekend.version, POLICY: v24Tariff.POLICIES.selectiveWeekend },
+        DINO_V24_SHADOW_ENABLED],
+    ['v24-v25-joint-weekend', v24V25JointWeekendTracker,
+        { VERSION: v24Tariff.POLICIES.v25JointWeekend.version, POLICY: v24Tariff.POLICIES.v25JointWeekend },
+        DINO_V24_SHADOW_ENABLED],
+    ['v24-focus', v24FocusTracker,
+        { VERSION: v24Focus.VERSION, POLICY: v24Tariff.POLICIES.main },
         DINO_V24_SHADOW_ENABLED]
 ]) {
     const metadata = { enabled, tariffVersion: tariff.VERSION,
@@ -7493,6 +7582,9 @@ app.get(
                 v24WeekendGuard: v24WeekendGuardLab.metadata(),
                 v24WeekendQuiet: v24WeekendQuietLab.metadata(),
                 v24GeminiWeekend: v24GeminiWeekendLab.metadata(),
+                v24SelectiveWeekend: v24SelectiveWeekendLab.metadata(),
+                v24V25JointWeekend: v24V25JointWeekendLab.metadata(),
+                v24Focus: v24FocusLab.metadata(),
                 coreShadow: {
                     enabled: DINO_CORE_SHADOW_ENABLED,
                     validationMode: 'fresh-required',
@@ -7538,12 +7630,16 @@ v24ShadowTracker.load();
 v24WeekendGuardTracker.load();
 v24WeekendQuietTracker.load();
 v24GeminiWeekendTracker.load();
+v24SelectiveWeekendTracker.load();
+v24V25JointWeekendTracker.load();
+v24FocusTracker.load();
 couponLab.load();
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
 addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
 addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST | B tam 1 gol | A tam 2 gol | MS 25–44 | maç başına tek kayıt | Telegram YOK.`);
-addSystemLog('> 🛡️ V24 HAFTA SONU LAB: Guard + Quiet + Gemini Weekend aynı taze veriden ayrı geçmiş toplar; V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.');
+addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Guard + Quiet + Gemini + Seçici + V24/V25 Ortak aynı taze veriden ayrı geçmiş toplar; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
+addSystemLog(`> 🎯 V24 ODAK LAB: Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + A 2.5 | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
 addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
