@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v24-main-sniper-ab-ms-five-weekend-labs-2026-09-27';
+const VERSION = 'v24-main-sniper-ab-ms-b16-65-pre75-2026-10-01';
 
 function freezePolicy(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -42,12 +42,12 @@ const MAIN_POLICY = freezePolicy({
                 dinoMinimum: 50,
                 v16Minimum: 72,
                 v18Minimum: 50,
-                prematchByMarket: { '1.5_UST': 72 }
+                prematchByMarket: { '1.5_UST': 75 }
             },
             B: {
                 zeroZeroAllowed: false,
                 goalsNeeded: 1,
-                v16Minimum: 60,
+                v16Minimum: 65,
                 prematchByMarket: {
                     '1.5_UST': 70,
                     '2.5_UST': 32,

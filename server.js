@@ -63,7 +63,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-focus-lab-six-arms-2026-09-28';
+const BUILD_VERSION = 'mac-yakala-v24-main-focus-b65-sniper75-pre52-2026-10-01';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -7637,9 +7637,9 @@ couponLab.load();
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
 addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
-addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST | B tam 1 gol | A tam 2 gol | MS 25–44 | maç başına tek kayıt | Telegram YOK.`);
+addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 aynı | maç başına tek kayıt | Telegram YOK.`);
 addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Guard + Quiet + Gemini + Seçici + V24/V25 Ortak aynı taze veriden ayrı geçmiş toplar; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
-addSystemLog(`> 🎯 V24 ODAK LAB: Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + A 2.5 | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
+addSystemLog(`> 🎯 V24 ODAK LAB: 7 kol | Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + B 2.5 pre>=52 + A 2.5 | yeni dönem B 2.5 pre32/pre52 kıyası | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
 addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();

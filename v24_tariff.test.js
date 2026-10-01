@@ -22,17 +22,17 @@ assert.equal(a.branch, 'A');
 assert.equal(a.goalsNeeded, 2);
 assert.equal(a.thresholds.prematch, 52);
 
-const b = check({ market: '1.5_UST', prematchSupport: 70, v16Probability: 60 });
+const b = check({ market: '1.5_UST', prematchSupport: 70, v16Probability: 65 });
 assert.equal(b.eligible, true);
 assert.equal(b.branch, 'B');
 assert.equal(b.goalsNeeded, 1);
-assert.equal(check({ market: '1.5_UST', prematchSupport: 69.9, v16Probability: 60 }).eligible, false);
-assert.equal(check({ market: '1.5_UST', prematchSupport: 70, v16Probability: 59.9 }).eligible, false);
+assert.equal(check({ market: '1.5_UST', prematchSupport: 69.9, v16Probability: 65 }).eligible, false);
+assert.equal(check({ market: '1.5_UST', prematchSupport: 70, v16Probability: 64.9 }).eligible, false);
 
 const sniper = check({
     market: '1.5_UST',
     score: '0-0',
-    prematchSupport: 72,
+    prematchSupport: 75,
     dinoProbability: 50,
     v16Probability: 72,
     v18Probability: 50
@@ -41,7 +41,7 @@ assert.equal(sniper.eligible, true);
 assert.equal(sniper.branch, 'SNIPER');
 assert.equal(sniper.goalsNeeded, 2);
 assert.equal(check({
-    market: '1.5_UST', score: '0-0', prematchSupport: 71.9,
+    market: '1.5_UST', score: '0-0', prematchSupport: 74.9,
     dinoProbability: 50, v16Probability: 72, v18Probability: 50
 }).eligible, false);
 assert.equal(check({ market: '2.5_UST', score: '0-0', prematchSupport: 99, v16Probability: 99 }).eligible, false);
@@ -57,18 +57,18 @@ assert.equal(check({ odds: 2, dinoProbability: 50.1 }).eligible, false, 'Pozitif
 assert.equal(check({ odds: 1.5, dinoProbability: 45 }).eligible, true, 'Ana kolda negatif edge alt sınırı yok.');
 
 const guardB = check({
-    market: '1.5_UST', prematchSupport: 70, v16Probability: 60, v18Probability: 54.9
+    market: '1.5_UST', prematchSupport: 70, v16Probability: 65, v18Probability: 54.9
 }, tariff.POLICIES.weekendGuard);
 assert.equal(guardB.eligible, false);
 assert.equal(check({
-    market: '1.5_UST', prematchSupport: 70, v16Probability: 60, v18Probability: 55
+    market: '1.5_UST', prematchSupport: 70, v16Probability: 65, v18Probability: 55
 }, tariff.POLICIES.weekendGuard).eligible, true);
 
 assert.equal(check({
-    market: '1.5_UST', prematchSupport: 70, v16Probability: 60, v18Probability: 65, minute: 68
+    market: '1.5_UST', prematchSupport: 70, v16Probability: 65, v18Probability: 65, minute: 68
 }, tariff.POLICIES.weekendQuiet).eligible, true);
 assert.equal(check({
-    market: '1.5_UST', prematchSupport: 70, v16Probability: 60, v18Probability: 65, minute: 69
+    market: '1.5_UST', prematchSupport: 70, v16Probability: 65, v18Probability: 65, minute: 69
 }, tariff.POLICIES.weekendQuiet).eligible, false);
 
 assert.equal(check({ odds: 1.8, dinoProbability: 43 }, tariff.POLICIES.geminiWeekend).eligible, false,

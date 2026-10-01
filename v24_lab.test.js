@@ -54,7 +54,7 @@ function mac(fixtureId, capturedAt = saturday, extra = {}) {
 const v16 = {
     MODEL: { version: 'v16-test' },
     scoreMarket: (_mac, market) => ({
-        selectorProbability: market === '1.5_UST' ? (_mac.skor === '0-0' ? 72 : 60) :
+        selectorProbability: market === '1.5_UST' ? (_mac.skor === '0-0' ? 72 : 65) :
             market === '2.5_UST' ? 65 : 65,
         selectorRawProbability: 64
     })
@@ -104,7 +104,7 @@ try {
     const sniperMac = mac(3, saturday, {
         skor: '0-0',
         _v23Events: [],
-        preByMarket: { '1.5_UST': 72 },
+        preByMarket: { '1.5_UST': 75 },
         canli_oranlar: { '1.5_UST': { oran: 1.8, bookmaker: 'Test' } }
     });
     const sniper = main.lab.record({ mac: sniperMac, dino, capturedAt: saturday });

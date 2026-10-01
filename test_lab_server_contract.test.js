@@ -154,12 +154,12 @@ try {
     assert.equal(comparison?.v21Shadow?.policy.minimumVotes, 3);
     assert.deepEqual(comparison?.v21Shadow?.policy.markets, ['UST']);
     assert.equal(comparison?.v24Shadow?.telegram, false);
-    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.SNIPER?.prematchByMarket?.['1.5_UST'], 72);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.SNIPER?.prematchByMarket?.['1.5_UST'], 75);
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeField, 'dino');
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeHigh, 0);
     assert.equal(comparison?.v24Shadow?.policy?.over?.edgeLow, null);
     assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.A?.v16Minimum, 65);
-    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.B?.v16Minimum, 60);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.B?.v16Minimum, 65);
     assert.equal(comparison?.v24Shadow?.policy?.leadingWinner?.v16EdgeHigh, 5);
     assert.equal(comparison?.v24Shadow?.maximumSignalsPerFixture, 1);
     assert.equal(comparison?.v24WeekendGuard?.policy?.over?.branches?.B?.v18Minimum, 55);
@@ -180,7 +180,11 @@ try {
     assert.equal(comparison?.v24Focus?.label, 'V24 Odak LAB');
     assert.equal(comparison?.v24Focus?.telegram, false);
     assert.equal(comparison?.v24Focus?.maximumSignalsPerFixturePerArm, 1);
-    assert.equal(comparison?.v24Focus?.arms?.length, 6);
+    assert.equal(comparison?.v24Focus?.arms?.length, 7);
+    assert.equal(comparison?.v24Focus?.prematchComparison?.candidate?.minimumPrematch, 52);
+    assert.equal(comparison?.v24Focus?.prematchComparison?.baseline?.minimumPrematch, 32);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.B?.v16Minimum, 65);
+    assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.SNIPER?.prematchByMarket?.['1.5_UST'], 75);
     assert.equal(comparison?.v24Focus?.armSummaries?.B15_REACTION?.reaction, true);
     assert.equal(comparison?.v24Focus?.armSummaries?.A25?.market, '2.5_UST');
     assert.deepEqual(

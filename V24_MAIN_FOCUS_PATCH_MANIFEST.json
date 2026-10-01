@@ -1,0 +1,228 @@
+{
+  "generatedAt": "2026-10-01T14:10:59.012Z",
+  "build": "mac-yakala-v24-main-focus-b65-sniper75-pre52-2026-10-01",
+  "packageType": "patch",
+  "baseBuild": "mac-yakala-v24-focus-lab-six-arms-2026-09-28",
+  "approvedMainPolicy": {
+    "key": "main",
+    "label": "V24 Ana",
+    "version": "v24-main-sniper-ab-ms-b16-65-pre75-2026-10-01",
+    "telegram": false,
+    "weekendOnly": false,
+    "validationMode": "fresh-required",
+    "womenExcluded": true,
+    "maximumSignalsPerFixture": 1,
+    "priority": [
+      "SNIPER",
+      "B",
+      "A",
+      "MS"
+    ],
+    "allowedOverMarketsByBranch": null,
+    "excludedNationalCompetitions": false,
+    "v25Joint": null,
+    "over": {
+      "minuteLow": 25,
+      "minuteHigh": 70,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4,
+      "dinoMinimum": 45,
+      "v18Minimum": 50,
+      "eventScoreRequired": true,
+      "edgeField": "dino",
+      "edgeLow": null,
+      "edgeHigh": 0,
+      "edgeInclusive": true,
+      "goalsNeededMaximum": 2,
+      "branches": {
+        "SNIPER": {
+          "score": "0-0",
+          "markets": [
+            "1.5_UST"
+          ],
+          "goalsNeeded": 2,
+          "dinoMinimum": 50,
+          "v16Minimum": 72,
+          "v18Minimum": 50,
+          "prematchByMarket": {
+            "1.5_UST": 75
+          }
+        },
+        "B": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 1,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "1.5_UST": 70,
+            "2.5_UST": 32,
+            "3.5_UST": 30,
+            "4.5_UST": 25
+          }
+        },
+        "A": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 2,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "2.5_UST": 52,
+            "3.5_UST": 25,
+            "4.5_UST": 25
+          }
+        }
+      }
+    },
+    "leadingWinner": {
+      "enabled": true,
+      "minuteLow": 25,
+      "minuteHigh": 44,
+      "minimumOdd": 1.5,
+      "maximumOdd": 2.5,
+      "v16Minimum": 60,
+      "v16EdgeLow": 0,
+      "v16EdgeHigh": 5,
+      "eventScoreRequired": true
+    },
+    "quietLeagueDailyLimit": null,
+    "excludedLeagues": []
+  },
+  "focusArms": [
+    {
+      "key": "SNIPER_15",
+      "label": "Sniper 0-0 · 1.5 ÜST",
+      "branch": "SNIPER",
+      "market": "1.5_UST",
+      "reaction": false
+    },
+    {
+      "key": "B15",
+      "label": "B · 1.5 ÜST",
+      "branch": "B",
+      "market": "1.5_UST",
+      "reaction": false
+    },
+    {
+      "key": "B15_REACTION",
+      "label": "B · 1.5 ÜST · reaksiyon",
+      "branch": "B",
+      "market": "1.5_UST",
+      "reaction": true
+    },
+    {
+      "key": "B25",
+      "label": "B · 2.5 ÜST",
+      "branch": "B",
+      "market": "2.5_UST",
+      "reaction": false
+    },
+    {
+      "key": "B25_PRE52",
+      "label": "B · 2.5 ÜST · pre ≥ %52",
+      "branch": "B",
+      "market": "2.5_UST",
+      "reaction": false,
+      "prematchMinimum": 52
+    },
+    {
+      "key": "B25_REACTION",
+      "label": "B · 2.5 ÜST · reaksiyon",
+      "branch": "B",
+      "market": "2.5_UST",
+      "reaction": true
+    },
+    {
+      "key": "A25",
+      "label": "A · 2.5 ÜST",
+      "branch": "A",
+      "market": "2.5_UST",
+      "reaction": false
+    }
+  ],
+  "exclusions": [
+    ".env",
+    "live histories",
+    "database",
+    "model JSONs",
+    "node_modules"
+  ],
+  "checks": [
+    "40-script npm test suite offline",
+    "new B65/Sniper75 gate boundaries",
+    "focus pre52 first/restart locks and settlement",
+    "new-cohort comparison excludes old baseline fixtures",
+    "market-level V16/V18 score cache",
+    "panel rendered-DOM labels/cohort/exports",
+    "source/public panels identical"
+  ],
+  "files": [
+    {
+      "path": "v24_tariff.js",
+      "sha256": "d4c5343ac8f6f80ddf6c09f5fbc1d2a0238b25b62b686e4f332f984e0467d14a",
+      "baseSha256": "b4d10643eaeb0cdf0929bda1493a2963a7b126cacb2a630f5d21febd2a9da7c3"
+    },
+    {
+      "path": "v24_focus_lab.js",
+      "sha256": "4823ff26abac5dd4f440defecc84b9cd7daca442a352091dfd5bfc6e06f92664",
+      "baseSha256": "2cf41dcabebdd251de8712284091297e366cf62fd573704d9955df30b2e905a8"
+    },
+    {
+      "path": "server.js",
+      "sha256": "dd0adc553ab08a60c1b5679bca90fbf028ccf4e2dc59dca8124d3bf717967c00",
+      "baseSha256": "0e2390a2e842e9299fafd05f8019f92ab6a4960ad7db8114151b139d6555edf6"
+    },
+    {
+      "path": "index.html",
+      "sha256": "3fe4ae7e920a735788656ef67c9111a253b93c99ba3232ad97893c6ef18de628",
+      "baseSha256": "4ccc0343b36927ccd9cea69dc52eb96338bfbcfa8598359b0b4e866981f80119"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "3fe4ae7e920a735788656ef67c9111a253b93c99ba3232ad97893c6ef18de628",
+      "baseSha256": "4ccc0343b36927ccd9cea69dc52eb96338bfbcfa8598359b0b4e866981f80119"
+    },
+    {
+      "path": "v24_tariff.test.js",
+      "sha256": "1a55175e8cab13ab6a15a7ce9eef3cb5650f2e86a91d83121aae404f47c6e2fe",
+      "baseSha256": "18cfbce3039e7145fffd22982a52f37796ef721af14ccb01c6a0c6300b0bb61e"
+    },
+    {
+      "path": "v24_lab.test.js",
+      "sha256": "eeb23216bc698fb49ba5fa7a70c89ddb6ba3d1e6c0603e1e7de118cdba928422",
+      "baseSha256": "e103632746600126a4e7f04bcdf78847fcff1615306a020437bd370a72ec3d9c"
+    },
+    {
+      "path": "v24_focus_lab.test.js",
+      "sha256": "51338bac5f0689e176fe535e200fbc81ca100d256a5a9393067a9fc142928c62",
+      "baseSha256": "46c49f1e5622230c29a46ee11dae98e2e995b7d77ee7ffc8c72254816f042229"
+    },
+    {
+      "path": "v24_focus_panel.test.js",
+      "sha256": "81eb02e9d387ac9b634e6301f4b71fbdfcb06aa72d298aeb96e995d3ae203b8f",
+      "baseSha256": null
+    },
+    {
+      "path": "v24_b65_sniper75.test.js",
+      "sha256": "92407730dd71cb82b316c4373c08e15a515295a61677461883b0094abb25e94a",
+      "baseSha256": null
+    },
+    {
+      "path": "test_lab_server_contract.test.js",
+      "sha256": "d35bd86a043f94efba7179bfc96608f1c011b8f5d0a1ab64a097711e893f5f4b",
+      "baseSha256": "4cef16799fc8845f12f57b239a05e946ede0521274488ec6b117356b4b1b90d7"
+    },
+    {
+      "path": "test_lab_panel_contract.test.js",
+      "sha256": "170ab7c50287ae39338915cfb629b8768b990ad83a3e5d991d32270e179fa763",
+      "baseSha256": "6d77b439f0e189128b83552173f5f280cab0e528f0cdc42ca7817b8159ae0679"
+    },
+    {
+      "path": "package.json",
+      "sha256": "986afc15dc10d04cb0c73b9f6f0ee8ffa2a7bf3ae978ad4b0890472c0a915a19",
+      "baseSha256": "c5b01b48fc4355017778e41a2f916b3c0c3ecebf13e6ccea13e3cf48b8870f8d"
+    },
+    {
+      "path": "README_UPDATE.md",
+      "sha256": "906d4d25b9b9fc216088d1ed611da76460344a7ded8797947543ce70c109fd06",
+      "baseSha256": null
+    }
+  ]
+}
