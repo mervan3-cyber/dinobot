@@ -1812,14 +1812,14 @@
             </div>
             <div class="test-lab-rules" id="test-lab-v24-rules" aria-label="V24 kuralları">
                 <span class="test-lab-rule">Ortak · kadın maçları hariç · olay/skor tutarlı · maç başına 1 · Dino EDGE ≤ %0</span>
-                <span class="test-lab-rule">Sniper · 0-0 · 1.5 ÜST · Pre/V16 ≥ %72 · Dino/V18 ≥ %50</span>
-                <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %60 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
+                <span class="test-lab-rule">Sniper · 0-0 · 1.5 ÜST · Pre ≥ %75 · V16 ≥ %72 · Dino/V18 ≥ %50</span>
+                <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %65 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
                 <span class="test-lab-rule">A · tam 2 gol · V16 ≥ %65 · Pre: 2.5 %52 · 3.5/4.5 %25</span>
                 <span class="test-lab-rule">ÜST · 25–70 · oran 1.50–4.00 · Dino ≥ %45 · V18 ≥ %50 · gereken gol en fazla 2</span>
                 <span class="test-lab-rule">MS · 25–44 · öndeki taraf · oran 1.50–2.50 · V16 ≥ %60 · V16 EDGE %0…+5</span>
             </div>
             <div class="v18-arm-card v24" style="margin:14px 0;border-color:#7e57c2;">
-                <div class="v18-arm-title"><span>🎯 V24 Odak LAB · 6 bağımsız kol</span><span class="mini-badge bg-info" id="testlab-v24-focus-mode-badge">YALNIZ LAB</span></div>
+                <div class="v18-arm-title"><span>🎯 V24 Odak LAB · 7 bağımsız kol</span><span class="mini-badge bg-info" id="testlab-v24-focus-mode-badge">YALNIZ LAB</span></div>
                 <div class="v18-arm-metrics">
                     <div class="v18-arm-metric"><span>Toplam kayıt</span><strong id="testlab-v24-focus-total">0</strong></div>
                     <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-focus-win-loss">0 / 0</strong></div>
@@ -1832,10 +1832,16 @@
                     <span class="test-lab-rule" id="testlab-v24-focus-arm-B15">B 1.5 · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-focus-arm-B15_REACTION">B 1.5 reaksiyon · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-focus-arm-B25">B 2.5 · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-arm-B25_PRE52">B 2.5 pre ≥ %52 · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-focus-arm-B25_REACTION">B 2.5 reaksiyon · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-focus-arm-A25">A 2.5 · 0 sinyal</span>
                 </div>
                 <p class="muted">Sniper yalnız 0-0/1.5 ÜST · B 1.5 ve B 2.5 mevcut/reaksiyon yan yana · A yalnız 2.5 ÜST. Reaksiyon: gerideki takım ≥4 şut ve ≥1 isabet; 1-1 ve eksik veri reaksiyon onayı değildir. Her kol maçtaki kendi ilk uygun anını bağımsız kilitler.</p>
+                <div class="test-lab-rules" id="testlab-v24-focus-pre-comparison" aria-label="B 2.5 ÜST pre %32 ve %52 yeni dönem karşılaştırması">
+                    <span class="test-lab-rule" id="testlab-v24-focus-pre-baseline">B 2.5 pre %32 · yeni dönem · 0 sinyal</span>
+                    <span class="test-lab-rule" id="testlab-v24-focus-pre-candidate">B 2.5 pre %52 · yeni dönem · 0 sinyal</span>
+                </div>
+                <p class="muted" id="testlab-v24-focus-pre-note">Yeni deney yalnız B 2.5 pre minimumunu %32 → %52 değiştirir; V16 ≥ %65 ve diğer şartlar aynıdır. Yeni dönem karşılaştırmasına eski sürüm kayıtları katılmaz. V24 Ana etkilenmez.</p>
             </div>
             <div class="v18-comparison-grid" style="margin:14px 0;">
                 <div class="v18-arm-card">
@@ -1950,7 +1956,7 @@
                 </div>
                 <div class="v18-table-panel v24">
                     <div class="test-lab-table-title">
-                        <h4>🎯 V24 Odak LAB · 6 bağımsız kol · taze doğrulama</h4>
+                        <h4>🎯 V24 Odak LAB · 7 bağımsız kol · taze doğrulama</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Focus','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Focus','csv')">CSV</button></div>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Odak kolu</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / reaksiyon</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-focus-rows"><tr><td colspan="15" class="empty-row">Henüz V24 Odak LAB kaydı yok.</td></tr></tbody></table></div>
@@ -3566,11 +3572,26 @@
             setTestLabModeBadge("testlab-v24-selective-mode-badge", data?.v24SelectiveWeekend, "fresh");
             setTestLabModeBadge("testlab-v24-v25-mode-badge", data?.v24V25JointWeekend, "fresh");
             setTestLabModeBadge("testlab-v24-focus-mode-badge", data?.v24Focus, "fresh");
-            for (const id of ["SNIPER_15", "B15", "B15_REACTION", "B25", "B25_REACTION", "A25"]) {
+            for (const id of ["SNIPER_15", "B15", "B15_REACTION", "B25", "B25_PRE52", "B25_REACTION", "A25"]) {
                 const element = document.getElementById(`testlab-v24-focus-arm-${id}`);
                 const arm = data?.v24Focus?.armSummaries?.[id];
                 const summary = arm?.summary;
                 if (element) element.textContent = `${arm?.label || id} · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)} · ROI ${formatPercent(summary?.roi)}`;
+            }
+            const preComparison = data?.v24Focus?.prematchComparison;
+            for (const kind of ["baseline", "candidate"]) {
+                const element = document.getElementById(`testlab-v24-focus-pre-${kind}`);
+                const arm = preComparison?.[kind];
+                const summary = arm?.summary;
+                if (element) element.textContent = arm
+                    ? `B 2.5 pre %${arm.minimumPrematch} · yeni dönem · ${summary?.total || 0} sinyal · ${summary?.wins || 0} K / ${summary?.losses || 0} Y · ${formatPercent(summary?.hitRate)} · ROI ${formatPercent(summary?.roi)}`
+                    : "Yeni pre karşılaştırması için güncel backend bekleniyor.";
+            }
+            const preNote = document.getElementById("testlab-v24-focus-pre-note");
+            if (preNote && preComparison) {
+                preNote.textContent = `Yalnız yeni sürüm kayıtları · ${preComparison.startedAt ? "İlk kayıt: " + formatDateTime(preComparison.startedAt) : "İlk uygun kayıt bekleniyor"} · ${preComparison.legacyRecordsExcluded || 0} eski kayıt kıyasa katılmadı. Pre %32 / %52; diğer şartlar aynı. Kollar kendi ilk uygun anını kilitler; V24 Ana etkilenmez.`;
+            } else if (preNote) {
+                preNote.textContent = "Yeni B 2.5 pre %32 / %52 karşılaştırması için güncel backend verisi bekleniyor.";
             }
             setTestLabModeBadge("testlab-v21-mode-badge", data?.v21Shadow, "fresh");
             const v21CohortNote = document.getElementById("testlab-v21-cohort-note");
