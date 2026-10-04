@@ -1321,8 +1321,6 @@
         .filterlab-positive { color:#79dbad; font-weight:600; }
         .filterlab-negative { color:#f3a294; font-weight:600; }
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
-        #testlab-v23-rows details { min-width:240px; }
-        #testlab-v23-rows details p { white-space:normal; max-width:550px; }
     </style>
 </head>
 <body>
@@ -1707,7 +1705,7 @@
                 </div>
             </div>
 
-            <p class="muted" style="margin-bottom:10px;">Telegram: V22 ve V21 bağımsızdır. Aynı giriş tek mesajda iki model; farklı dakika veya market ayrı mesaj. Eski kayıtlar korunur.</p>
+            <p class="muted" style="margin-bottom:10px;">Telegram: V24 Ana · maç başına ilk uygun tek sinyal. Kadınlar açık. Eski V21/V22 paylaşımları korunur; Eski Telegram yalnız LAB olarak izlenir.</p>
 
             <div class="table-wrap">
                 <table>
@@ -1736,7 +1734,7 @@
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
-                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24 Ana, V24 Odak, hafta sonu deneyleri, V22, V21 ve V23 aynı Türkiye tarihinde izlenir.</p>
+                    <p class="muted" id="test-lab-updated" style="margin-top:4px;">V24 Ana, Gemini, Odak, kalan hafta sonu LAB’ları ve Eski Telegram aynı Türkiye tarihinde izlenir.</p>
                 </div>
                 <div class="tracker-actions">
                     <input class="table-search" id="test-lab-search" type="search" placeholder="Maç, market veya tür ara…" aria-label="Test Lab tablolarında ara" oninput="filterTestLabTables(this.value)">
@@ -1747,7 +1745,7 @@
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
-                    <span class="muted">V24 Ana hafta sonunda da çalışır; Guard, Quiet ve Gemini Weekend yalnız cumartesi/pazar karşılaştırmasıdır.</span>
+                    <span class="muted">V24 Ana ve Gemini her gün; Quiet, Seçici ve V24/V25 Ortak yalnız cumartesi/pazar çalışır.</span>
                 </div>
                 <select id="test-lab-date" class="history-date-select" aria-label="Test Lab tarihi" onchange="changeTestLabDate(this.value)">
                     <option value="">🗂️ Tüm Ortak Test Dönemi</option>
@@ -1792,6 +1790,19 @@
                 <span class="test-lab-rule">A VEYA B VEYA C · Temel/V16/V18: üçü de &gt; %50</span>
                 <span class="test-lab-rule">25–80. dk · Oran 1.50–4.00 · EDGE uçları dahil · İlk uygun an · Model başına maçta 1 · Telegram ayrı izlenir</span>
             </div>
+            <div class="v18-arm-card" style="margin:14px 0;">
+                <div class="v18-arm-title"><span>📦 Eski Telegram LAB</span><span class="mini-badge bg-info" id="testlab-old-telegram-mode-badge">YALNIZ LAB</span></div>
+                <div class="v18-arm-metrics">
+                    <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-old-telegram-total">0</strong></div>
+                    <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-old-telegram-win-loss">0 / 0</strong></div>
+                    <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-old-telegram-hit-rate">-</strong></div>
+                    <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-old-telegram-roi">-</strong></div>
+                    <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-old-telegram-average-odds">-</strong></div>
+                </div>
+                <p class="muted">Önceki Telegram karar kuralları ve V22’nin açık-ret kapısı korunur. Yeni, bağımsız ilk kayıt kilidi; Telegram gönderimi ve ayrı API taraması yok. Eski filtre deneylerine ayrıca veri toplanmaz.</p>
+                <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('oldtelegram','json')">JSON</button><button type="button" onclick="downloadTestLabExport('oldtelegram','csv')">CSV</button></div>
+                <div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Market</th><th>Model</th><th>EDGE</th><th>Pre destek</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-old-telegram-rows"><tr><td colspan="10" class="empty-row">İlk taze Eski Telegram LAB kaydı bekleniyor.</td></tr></tbody></table></div>
+            </div>
             <div class="v18-arm-card v24" style="margin:14px 0;">
                 <div class="v18-arm-title"><span>🔵 V24 Ana · Sniper/B/A/MS</span><span class="mini-badge bg-info" id="testlab-v24-mode-badge">TAZE DOĞRULAMA · YALNIZ LAB</span></div>
                 <div class="v18-arm-metrics">
@@ -1808,10 +1819,10 @@
                     <span class="test-lab-rule" id="testlab-v24-filter-B">B · 0 sinyal</span>
                     <span class="test-lab-rule" id="testlab-v24-filter-MS">MS · 0 sinyal</span>
                 </div>
-                <p class="muted">Sniper → B → A → MS önceliğiyle maçın yalnız ilk uygun kaydı alınır. Dört kol aynı tek maç kilidini paylaşır. Telegram’a gönderilmez.</p>
+                <p class="muted">Sniper → B → A → MS önceliğiyle maçın yalnız ilk uygun kaydı alınır. Dört kol aynı tek maç kilidini paylaşır. Bu tablo LAB kaydıdır; gerçek gönderimler Paylaşılan Sinyaller’de izlenir.</p>
             </div>
             <div class="test-lab-rules" id="test-lab-v24-rules" aria-label="V24 kuralları">
-                <span class="test-lab-rule">Ortak · kadın maçları hariç · olay/skor tutarlı · maç başına 1 · Dino EDGE ≤ %0</span>
+                <span class="test-lab-rule">Ortak · kadın maçları açık · olay/skor tutarlı · maç başına 1 · Dino EDGE ≤ %0</span>
                 <span class="test-lab-rule">Sniper · 0-0 · 1.5 ÜST · Pre ≥ %75 · V16 ≥ %72 · Dino/V18 ≥ %50</span>
                 <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %65 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
                 <span class="test-lab-rule">A · tam 2 gol · V16 ≥ %65 · Pre: 2.5 %52 · 3.5/4.5 %25</span>
@@ -1845,17 +1856,6 @@
             </div>
             <div class="v18-comparison-grid" style="margin:14px 0;">
                 <div class="v18-arm-card">
-                    <div class="v18-arm-title"><span>🛡️ Weekend Guard</span><span class="mini-badge bg-info" id="testlab-v24-guard-mode-badge">HAFTA SONU LAB</span></div>
-                    <div class="v18-arm-metrics">
-                        <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-guard-total">0</strong></div>
-                        <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-guard-win-loss">0 / 0</strong></div>
-                        <div class="v18-arm-metric"><span>Başarı</span><strong id="testlab-v24-guard-hit-rate">-</strong></div>
-                        <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-guard-roi">-</strong></div>
-                        <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-guard-average-odds">-</strong></div>
-                    </div>
-                    <p class="muted">Ana kurallar + B kolu V18 ≥ %55 + MS V16 ≥ %65.</p>
-                </div>
-                <div class="v18-arm-card">
                     <div class="v18-arm-title"><span>🤫 Weekend Quiet</span><span class="mini-badge bg-info" id="testlab-v24-quiet-mode-badge">HAFTA SONU LAB</span></div>
                     <div class="v18-arm-metrics">
                         <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-quiet-total">0</strong></div>
@@ -1867,7 +1867,7 @@
                     <p class="muted">25–68 + B V18 ≥ %65 + MS V16 ≥ %65 + lig ID başına günde ilk 1 sinyal.</p>
                 </div>
                 <div class="v18-arm-card">
-                    <div class="v18-arm-title"><span>💎 Gemini Weekend</span><span class="mini-badge bg-info" id="testlab-v24-gemini-mode-badge">HAFTA SONU LAB</span></div>
+                    <div class="v18-arm-title"><span>💎 Gemini V24 · her gün</span><span class="mini-badge bg-info" id="testlab-v24-gemini-mode-badge">HER GÜN LAB</span></div>
                     <div class="v18-arm-metrics">
                         <div class="v18-arm-metric"><span>Sinyal</span><strong id="testlab-v24-gemini-total">0</strong></div>
                         <div class="v18-arm-metric"><span>K / Y</span><strong id="testlab-v24-gemini-win-loss">0 / 0</strong></div>
@@ -1875,7 +1875,7 @@
                         <div class="v18-arm-metric"><span>ROI</span><strong id="testlab-v24-gemini-roi">-</strong></div>
                         <div class="v18-arm-metric"><span>Ort. oran</span><strong id="testlab-v24-gemini-average-odds">-</strong></div>
                     </div>
-                    <p class="muted">25–68 + İngiltere League One/Two hariç + ÜST Dino EDGE −12…0.</p>
+                    <p class="muted">Her gün · kadınlar açık · 25–68 + İngiltere League One/Two hariç + ÜST Dino EDGE −12…0.</p>
                 </div>
                 <div class="v18-arm-card">
                     <div class="v18-arm-title"><span>🧭 Seçici Weekend</span><span class="mini-badge bg-info" id="testlab-v24-selective-mode-badge">HAFTA SONU LAB</span></div>
@@ -1909,33 +1909,8 @@
             </div>
 
             <div class="section-title" style="margin:14px 0 9px;">
-                <p class="muted">V24 Ana ve V24 Odak her gün; beş ek guard yalnız hafta sonu ileri test kaydı toplar. Aynı taze doğrulama paylaşılır; Odak için yeni bir kol adayı ortak doğrulamayı tetikleyebilir fakat ayrı endpoint çağırmaz. Telegram kararı değişmez. V17/V20 emekli edilmiştir.</p>
-                <span class="mini-badge bg-info">BAĞIMSIZ LAB + EŞLEŞTİRİLMİŞ V23</span>
-            </div>
-
-            <div class="v18-arm-card" id="testlab-v23-card" style="margin:14px 0;border-color:#4db6ac;">
-                <div class="v18-arm-title"><span>🧪 V21 / V22 · Yeni filtre deneyleri</span><span class="mini-badge bg-info" id="testlab-v23-mode">YALNIZ LAB</span></div>
-                <p class="filterlab-notice">V21 yalnız LAB’dır. V22’de yalnız açık V23 retleri canlı sinyal kaynağını çıkarır; yetersiz ölçüm korunur. İsabet oranı ve ceza içi/dışı şut yalnız veridir.</p>
-                <div class="table-wrap"><table><thead><tr><th>Kontrol grubu</th><th>Sinyal</th><th>Kazanç / Kayıp</th><th>Bekleyen</th><th>İsabet</th><th>Net birim</th><th>ROI</th></tr></thead><tbody id="testlab-v23-summary-rows"></tbody></table></div>
-                <p class="muted" id="testlab-v23-impact">İlk yeni kaynak sinyali bekleniyor.</p>
-                <p class="muted" id="testlab-v23-storage">Eski deneyler kapalı. Yeni testler mevcut giriş verisini kullanır.</p>
-                <p class="muted" id="testlab-v23-cohort"></p>
-                <div class="test-lab-table-title">
-                    <label for="testlab-v23-source">Kaynak / deney grubu</label>
-                    <select id="testlab-v23-source" onchange="setV23Source(this.value)" aria-label="V23 kaynak filtresi">
-                        <option value="all">V21 + V22 · ayrı karşılaştırma</option><option value="v21">V21</option><option value="v22">V22</option>
-                        <option value="v22:A">V22 · A dahil</option><option value="v22:B">V22 · B dahil</option><option value="v22:C">V22 · C dahil</option>
-                    </select>
-                </div>
-                <p class="muted">Kural ve gerekçeleri açmak için deney adına tıkla. Dar ekranda tabloları yana kaydırabilirsin.</p>
-                <div id="testlab-v23-controls"></div>
-                <div class="test-lab-table-title">
-                    <h4>Sinyaller · gerekçeler ve ölçümler satırda açılır</h4>
-                    <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v23','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v23','csv')">CSV</button></div>
-                </div>
-                <div class="table-wrap"><table><thead><tr><th>Tarih / Kaynak</th><th>Maç</th><th>Dk. / Skor</th><th>Market / Oran</th><th>Deney kararları / Gerekçeler</th><th>Sonuç / Final</th></tr></thead><tbody id="testlab-v23-rows"></tbody></table></div>
-                <p class="muted">K/Y = kazanç / kayıp. Kararlar sinyal anında görünür; kazanç/kayıp sonuç geldikçe güncellenir. Filtre sonrası: yalnız “elenirdi” kayıtları çıkarılır; yetersiz ve kapsam dışı kayıtlar korunur. Δ birim, mevcut modele göre farktır. Her sinyal 1 birim, giriş oranı sabittir. Bekleyenler ROI’ye girmez; iptal/iade ayrı saklanır. Şutlar girişe kadar biriken toplamdır, son 10 dakika değildir. Özetler tüm seçili döneme, satırlar son kayıtlara aittir; JSON/CSV tamdır.</p>
-                <details><summary>Eski deney arşivi · durduruldu</summary><p class="muted">Eski sonuçlar son saklandıkları haliyle korunur; yeniden hesaplanmaz ve yeni testlere katılmaz. Geçmiş toplama / pencere hazırlığı kapalıdır.</p><button type="button" onclick="downloadRetiredV23('json')">Eski LAB · tüm JSON</button><button type="button" onclick="downloadRetiredV23('csv')">Eski LAB · tüm CSV</button></details>
+                <p class="muted">Telegram kaynağı V24 Ana; kadınlar açık. Gemini her gün LAB olarak çalışır; Quiet, Seçici ve V24/V25 Ortak yalnız hafta sonu devam eder. Eski Telegram ayrı LAB’dır. Aynı taze veri paylaşılır; yeni filtre deneyleri ve Weekend Guard arkada da durdurulmuştur.</p>
+                <span class="mini-badge bg-info">V24 CANLI + BAĞIMSIZ LAB</span>
             </div>
 
             <div class="v18-table-grid">
@@ -1963,13 +1938,6 @@
                 </div>
                 <div class="v18-table-panel v24">
                     <div class="test-lab-table-title">
-                        <h4>🛡️ V24 Weekend Guard · yalnız hafta sonu</h4>
-                        <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Guard','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Guard','csv')">CSV</button></div>
-                    </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-guard-rows"><tr><td colspan="15" class="empty-row">Henüz Weekend Guard kaydı yok.</td></tr></tbody></table></div>
-                </div>
-                <div class="v18-table-panel v24">
-                    <div class="test-lab-table-title">
                         <h4>🤫 V24 Weekend Quiet · yalnız hafta sonu</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Quiet','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Quiet','csv')">CSV</button></div>
                     </div>
@@ -1977,10 +1945,10 @@
                 </div>
                 <div class="v18-table-panel v24">
                     <div class="test-lab-table-title">
-                        <h4>💎 V24 Gemini Weekend · yalnız hafta sonu</h4>
+                        <h4>💎 V24 Gemini LAB · her gün · kadınlar açık</h4>
                         <div class="test-lab-table-actions"><button type="button" onclick="downloadTestLabExport('v24Gemini','json')">JSON</button><button type="button" onclick="downloadTestLabExport('v24Gemini','csv')">CSV</button></div>
                     </div>
-                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-gemini-rows"><tr><td colspan="15" class="empty-row">Henüz Gemini Weekend kaydı yok.</td></tr></tbody></table></div>
+                    <div class="table-wrap"><table><thead><tr><th>Tür</th><th>Tarih</th><th>Maç</th><th>Dk.</th><th>Giriş skoru</th><th>Kol</th><th>Gereken gol</th><th>Market</th><th>Model olasılıkları</th><th>EDGE kaydı</th><th>Pre destek</th><th>Olay / skor</th><th>Oran</th><th>Sonuç</th><th>Final</th></tr></thead><tbody id="testlab-v24-gemini-rows"><tr><td colspan="15" class="empty-row">Henüz Gemini V24 · her gün kaydı yok.</td></tr></tbody></table></div>
                 </div>
                 <div class="v18-table-panel v24">
                     <div class="test-lab-table-title">
@@ -2018,7 +1986,7 @@
                     <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
                 </div>
             </div>
-            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Çifte şans API ile marjsız MS1/X/MS2 piyasa desteğini; İY/MS ayrıca en az 5 maçlık gol profili ve İY/2Y üretim-yeme dağılımını kullanır. Sonuçlar LAB’dır; Telegram’a ve canlı V22 kararına katkı yapmaz.</p>
+            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Çifte şans API ile marjsız MS1/X/MS2 piyasa desteğini; İY/MS ayrıca en az 5 maçlık gol profili ve İY/2Y üretim-yeme dağılımını kullanır. Sonuçlar LAB’dır; Telegram’a ve canlı V24 kararına katkı yapmaz.</p>
             <div class="control-card" style="min-height:auto;margin:14px 0 16px;">
                 <div class="control-card__top">
                     <div><h3>Kupon tarama ayarları</h3><p>Değişiklikler sunucuda kalıcı tutulur ve yalnız Kupon LAB’ı etkiler.</p></div>
@@ -2115,7 +2083,7 @@
         <div class="card" id="section-tariff">
             <div class="section-title">
                 <div>
-                    <h3>🗺️ Telegram · V22 + V21 · bağımsız</h3>
+                    <h3>🗺️ Telegram · V24 Ana</h3>
                     <p class="muted" style="margin-top:4px;">Kör test boyunca kurallar salt okunurdur; panelden yanlışlıkla değiştirilemez.</p>
                 </div>
                 <span class="mini-badge bg-success">🔒 KİLİTLİ</span>
@@ -2200,7 +2168,6 @@
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-    <script src="/v23_filter_panel.js?v=20260921"></script>
 <script src="/coupon_lab_panel.js?v=20260924a"></script>
     <script>
         const BACKEND_URL = window.location.origin;
@@ -2214,9 +2181,8 @@
             exports: Object.freeze({
                 v21: "/api/v21-consensus-shadow-history",
                 v22: "/api/v22-union-shadow-history",
-                v23: "/api/v23-goal-history",
+                oldtelegram: "/api/old-telegram-lab-history",
                 v24: "/api/v24-shadow-history",
-                v24guard: "/api/v24-weekend-guard-history",
                 v24quiet: "/api/v24-weekend-quiet-history",
                 v24gemini: "/api/v24-gemini-weekend-history",
                 v24selective: "/api/v24-selective-weekend-history",
@@ -2237,8 +2203,6 @@
         let coverageFilter = "all";
         let signalHistoryDate = "";
         let testLabDate = "";
-        let v23Source = "all";
-        let latestV23Data = null;
         const CANDIDATE_HISTORY_PAGE_SIZE = 200;
         let candidateHistoryDate = "";
         let candidateHistoryPage = 1;
@@ -2423,14 +2387,14 @@
         }
 
         function renderMarketTariff(tariff) {
-            const enabledModels = tariff?.telegramSources || ["V22", "V21"];
+            const enabledModels = tariff?.telegramSources || ["V24"];
             document.getElementById("tariff-status").textContent = tariff?.deliveryDisabled ? "Gönderim günlüğü hatalı · Telegram kapalı" : (enabledModels.join(" + ") || "Telegram kapalı") + " · bağımsız";
-            document.getElementById("tariff-version-label").textContent = "Maç Yakala · 16.09.2026";
+            document.getElementById("tariff-version-label").textContent = "Maç Yakala · V24 · 05.10.2026";
             document.getElementById("tariff-minimum-odd").textContent = "1.50";
             document.getElementById("tariff-primary-count").textContent = String(enabledModels.length);
-            document.getElementById("tariff-follow-count").textContent = "Model başına ayrı";
-            document.getElementById("tariff-primary-rules").textContent = "V22: A/B/C kuralları korunur. V21: 3/3 model >%50, pre >%50, EDGE −5…0. Modeller birbirinin onayını beklemez.";
-            document.getElementById("tariff-follow-rules").textContent = "V21 35′te 1.5 ÜST verdiyse V22 60′ta aynı marketi ayrıca gönderebilir. Her modelin kendi maç başına bir sinyal sınırı korunur. V17 ve V20 emeklidir.";
+            document.getElementById("tariff-follow-count").textContent = "Maç başına tek";
+            document.getElementById("tariff-primary-rules").textContent = "V24 Ana: Sniper / B / A / MS. Güncel eşikler korunur; kadınlar açık. ÜST 25–70, MS 25–44; olay/skor ve taze doğrulama zorunlu.";
+            document.getElementById("tariff-follow-rules").textContent = "Maçın ilk uygun V24 sinyali paylaşılır; kollar aynı maç kilidini kullanır. Eski Telegram yalnız LAB. Geçmiş kayıtlar yeniden gönderilmez; V17/V20 emekli.";
         }
 
         function renderDecisionBreakdown(byDecision) {
@@ -2712,7 +2676,7 @@
             badge.textContent = autoScanEnabled ? "AÇIK" : "KAPALI";
             badge.className = `mini-badge ${autoScanEnabled ? "bg-success" : "bg-danger"}`;
             description.textContent = autoScanEnabled
-                ? "25–80. dakikadaki maçları tarar. V21/V22 kuralları ve taze veri doğrulaması değişmez."
+                ? "25–80. dakikadaki maçları tarar. V24 kuralları ve taze veri doğrulaması korunur; diğer modeller yalnız LAB’dır."
                 : "Otomatik tarama kapalı. İstersen Şimdi Tara düğmesini kullanabilirsin.";
         }
 
@@ -3520,23 +3484,12 @@
             }
         }
 
-        function setV23Source(value) {
-            v23Source = value || "all";
-            renderV23GoalLab(latestV23Data);
-            filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
-        }
-
-        function renderV23GoalLab(data) {
-            latestV23Data = data;
-            renderEntryFilterLab(data, v23Source);
-        }
-
         function renderTestLabHistory(data) {
-            renderV23GoalLab(data?.v23Goal);
+            setTestLabSummary("testlab-old-telegram", data?.oldTelegram?.summary);
+            setTestLabModeBadge("testlab-old-telegram-mode-badge", data?.oldTelegram, "fresh");
             setTestLabSummary("testlab-v21", data?.v21Shadow?.summary);
             setTestLabSummary("testlab-v22", data?.v22Shadow?.summary);
             setTestLabSummary("testlab-v24", data?.v24Shadow?.summary);
-            setTestLabSummary("testlab-v24-guard", data?.v24WeekendGuard?.summary);
             setTestLabSummary("testlab-v24-quiet", data?.v24WeekendQuiet?.summary);
             setTestLabSummary("testlab-v24-gemini", data?.v24GeminiWeekend?.summary);
             setTestLabSummary("testlab-v24-selective", data?.v24SelectiveWeekend?.summary);
@@ -3555,7 +3508,7 @@
             setTestLabModeBadge("testlab-v24-mode-badge", data?.v24Shadow, "fresh");
             const v24Start = document.getElementById("testlab-v24-start-note");
             if (v24Start) v24Start.textContent = data?.v24Shadow?.startedAt
-                ? `V24 ileri test başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Eski kayıt aktarılmaz · Telegram kapalı.`
+                ? `V24 Ana Telegram’da aktif · LAB başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Geçmiş LAB kayıtları mesaj olarak gönderilmez.`
                 : "İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.";
             for (const id of ["SNIPER", "A", "B"]) {
                 const element = document.getElementById(`testlab-v24-filter-${id}`);
@@ -3566,7 +3519,6 @@
             const v24MsElement = document.getElementById("testlab-v24-filter-MS");
             if (v24MsElement) v24MsElement.textContent = `MS · ${v24Ms.total || 0} sinyal · ${v24Ms.wins || 0} K / ${v24Ms.losses || 0} Y · ${formatPercent(v24Ms.hitRate)}`;
 
-            setTestLabModeBadge("testlab-v24-guard-mode-badge", data?.v24WeekendGuard, "fresh");
             setTestLabModeBadge("testlab-v24-quiet-mode-badge", data?.v24WeekendQuiet, "fresh");
             setTestLabModeBadge("testlab-v24-gemini-mode-badge", data?.v24GeminiWeekend, "fresh");
             setTestLabModeBadge("testlab-v24-selective-mode-badge", data?.v24SelectiveWeekend, "fresh");
@@ -3606,9 +3558,8 @@
             const updatedCandidates = [
                 data?.v21Shadow?.summary?.updatedAt,
                 data?.v22Shadow?.summary?.updatedAt,
-                data?.v23Goal?.summary?.updatedAt,
+                data?.oldTelegram?.summary?.updatedAt,
                 data?.v24Shadow?.summary?.updatedAt,
-                data?.v24WeekendGuard?.summary?.updatedAt,
                 data?.v24WeekendQuiet?.summary?.updatedAt,
                 data?.v24GeminiWeekend?.summary?.updatedAt,
                 data?.v24SelectiveWeekend?.summary?.updatedAt,
@@ -3631,9 +3582,9 @@
             renderTestLabRows("testlab-v21-rows", data?.v21Shadow?.signals, { label: "V21", modelName: "V21", consensus: true }, selectedDate);
             renderTestLabRows("testlab-v22-rows", data?.v22Shadow?.signals, { label: "V22", modelName: "V22", consensus: true, v22: true }, selectedDate);
             renderV24Rows("testlab-v24-rows", data?.v24Shadow?.signals, selectedDate, "V24 Ana");
-            renderV24Rows("testlab-v24-guard-rows", data?.v24WeekendGuard?.signals, selectedDate, "Weekend Guard");
+            renderTestLabRows("testlab-old-telegram-rows", data?.oldTelegram?.signals, {label:"Eski Telegram",modelName:"V22",consensus:true}, selectedDate);
             renderV24Rows("testlab-v24-quiet-rows", data?.v24WeekendQuiet?.signals, selectedDate, "Weekend Quiet");
-            renderV24Rows("testlab-v24-gemini-rows", data?.v24GeminiWeekend?.signals, selectedDate, "Gemini Weekend");
+            renderV24Rows("testlab-v24-gemini-rows", data?.v24GeminiWeekend?.signals, selectedDate, "Gemini V24 · her gün");
             renderV24Rows("testlab-v24-selective-rows", data?.v24SelectiveWeekend?.signals, selectedDate, "Seçici Weekend");
             renderV24Rows("testlab-v24-v25-rows", data?.v24V25JointWeekend?.signals, selectedDate, "V24 + V25 Ortak Weekend");
             renderV24Rows("testlab-v24-focus-rows", data?.v24Focus?.signals, selectedDate, "V24 Odak LAB");
@@ -3642,9 +3593,8 @@
         function filterTestLabTables(value) {
             filterTableRows(value, "testlab-v21-rows");
             filterTableRows(value, "testlab-v22-rows");
-            filterTableRows(value, "testlab-v23-rows");
+            filterTableRows(value, "testlab-old-telegram-rows");
             filterTableRows(value, "testlab-v24-rows");
-            filterTableRows(value, "testlab-v24-guard-rows");
             filterTableRows(value, "testlab-v24-quiet-rows");
             filterTableRows(value, "testlab-v24-gemini-rows");
             filterTableRows(value, "testlab-v24-selective-rows");
@@ -3661,7 +3611,7 @@
                 filterTestLabTables(document.getElementById("test-lab-search")?.value || "");
             } catch (_) {
                 document.getElementById("test-lab-updated").textContent = "Test Lab verisi alınamadı; görünen kayıtlar son başarılı yanıttan kalmıştır. Tarih filtresi henüz uygulanmamış olabilir.";
-                for (const id of ["testlab-v24-mode-badge", "testlab-v24-focus-mode-badge", "testlab-v24-guard-mode-badge", "testlab-v24-quiet-mode-badge", "testlab-v24-gemini-mode-badge", "testlab-v24-selective-mode-badge", "testlab-v24-v25-mode-badge"]) {
+                for (const id of ["testlab-v24-mode-badge", "testlab-v24-focus-mode-badge", "testlab-old-telegram-mode-badge", "testlab-v24-quiet-mode-badge", "testlab-v24-gemini-mode-badge", "testlab-v24-selective-mode-badge", "testlab-v24-v25-mode-badge"]) {
                     const badge = document.getElementById(id);
                     if (badge) {
                         badge.textContent = "BAĞLANTI YOK";
@@ -3713,7 +3663,6 @@
                 params.delete("scope");
                 params.set("cohort", "previous");
             } else if (testLabDate) params.set("date", testLabDate);
-            if (String(arm).toLowerCase() === "v23") params.set("source",v23Source);
             link.href = `${BACKEND_URL}${base}${suffix}?${params.toString()}`;
             link.target = "_blank";
             link.rel = "noopener";
