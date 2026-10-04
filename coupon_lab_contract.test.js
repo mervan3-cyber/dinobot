@@ -10,7 +10,7 @@ const panel=fs.readFileSync('public/coupon_lab_panel.js','utf8');
 
 assert.ok(server.includes("app.get('/api/coupon-lab'"));
 assert.ok(server.includes("process.env.MAC_YAKALA_V21_TELEGRAM_ENABLED || 'false'"));
-assert.ok(server.includes("Telegram: üretim kaynağı yalnız V22'dir"));
+assert.ok(server.includes("Telegram: V24 Ana aktif"));
 assert.ok(server.includes("app.post('/api/coupon-lab/scan'"));
 assert.ok(server.includes("app.post('/api/coupon-lab/settings'"));
 assert.ok(server.includes("app.post('/api/coupon-lab/settle'"));

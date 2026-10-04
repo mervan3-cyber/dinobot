@@ -1,45 +1,72 @@
-# V24 Ana + Odak LAB B 2.5 pre %52 — 1 Ekim 2026
+# V24 Ana canlı geçiş — 5 Ekim 2026
 
-Bu, mevcut 27 Eylül hafta sonu tarifeleri + 28 Eylül Odak LAB sürümü için güncelleme paketidir; TAM BOT değildir. Kaynak tabanı: `mac-yakala-v24-focus-lab-six-arms-2026-09-28`. Önceki B65/Sniper75 küçük ZIP'i uygulanmışsa da kullanılabilir.
+Bu ZIP mevcut **1 Ekim V24 Ana + Odak pre52** sürümü için güncellemedir; tam bot değildir.
+Sürüm: `mac-yakala-v24-live-transition-2026-10-05`.
 
-## V24 Ana: kabul edilen kural
+## Onaylanan değişiklikler
+
+- Telegram yalnız V24 Ana: Sniper → B → A → MS, maç başına ilk uygun tek sinyal.
+- Kadın maçları V24 Ana ve Gemini'de açık. Diğer lig seçimleri değişmedi.
+- Gemini her gün LAB olarak çalışır; ÜST 25–68, Dino edge −12…0 ve İngiltere League One/Two hariç koşulları korunur.
+- Eski Telegram LAB, önceki Telegram kaynak/karar kuralları ve V22'nin açık-ret kapısıyla bağımsız ilk kayıt toplar; mesaj göndermez.
+- V21/V22 Yeni Filtre Deneyleri paneli ve özel kayıt/rapor/sonuç/arşiv bakım işleri durduruldu.
+- Yalnız Weekend Guard paneli ve motoru durduruldu. Quiet, Seçici, V24+V25 Ortak, Odak, V21 ve V22 LAB'ları devam eder.
+- Mesajdan yalnız “Öncelikli modelimiz V22” satırı kaldırıldı. Diğer alanlar, analiz biçimi, oran yazımı ve kazandı yanıtı korunur; model V24 olarak görünür.
+
+## V24 Ana eşikleri değişmedi
 
 | Kol | V16 minimum | Pre minimumları |
 |---|---|---|
-| Sniper: 0-0 → 1.5 ÜST | %72 | 1.5: %75 |
-| B: tam 1 gol gereken | %65 | 1.5/2.5/3.5/4.5: %70/%32/%30/%25 |
-| A: tam 2 gol gereken | %65 | 2.5/3.5/4.5: %52/%25/%25 |
-| MS: skorda öndeki taraf | %60 | Pre karar şartı değil; mevcut kural korunur |
+| Sniper: 0-0, 1.5 ÜST | %72 | 1.5: %75 |
+| B: tam 1 gol gerekli | %65 | 1.5/2.5/3.5/4.5: %70/%32/%30/%25 |
+| A: tam 2 gol gerekli | %65 | 2.5/3.5/4.5: %52/%25/%25 |
+| MS: öndeki taraf | %60 | Pre karar şartı değil |
 
-ÜST dakika25–70, oran1.50–4.00, Dino≥45 (Sniper≥50), V18≥50 ve Dino EDGE≤0 korunur. Ana tarifede negatif Dino edge alt sınırı yok. Gereken gol en fazla2; yalnız Sniper0-0'a girebilir. MS dakika25–44, oran1.50–2.50, V16 edge0…+5 korunur. Kadınlar kapalı; mevcut olay/skor ve taze fixture/stats/oran doğrulaması zorunlu. Ana Sniper→B→A→MS önceliği ve ortak ilk-fixture kilidi aynı.
+ÜST: dakika25–70 dahil, oran1.50–4.00, Dino≥45 (Sniper≥50), V18≥50, Dino edge≤0, gereken gol en fazla2.
+MS: dakika25–44 dahil, oran1.50–2.50, V16 edge0…+5 dahil.
+Olay/skor tutarlılığı ve ortak taze fixture/stats/oran/model doğrulaması zorunlu.
+Son Telegram kontrolünde güncel dakika, oran ve edge tekrar sınanır; değişen skor veya başarısız doğrulama mesajı engeller.
+A3.5/A4.5 veya B2.5/B3.5/B4.5 için yeni yasak eklenmedi.
 
-Ana tarifeden türeyen hafta sonu ve Odak kolları B V16 %65 / Sniper pre %75'i devralır. Diğer özel hafta sonu şartları korunur. V17/V20 açılmaz. Bu paket V24'ü Telegram'a taşımaz: mevcut Telegram yönlendirmesi V22 olarak kalır.
+## Geçmiş ve kilitler
 
-## V24 Odak LAB: yalnız yeni deney
+Eski paylaşımlar, teslim günlüğü ve LAB arşivleri silinmez.
+`mac_yakala_telegram_delivery.json` içinde ilk geçişte `v24ActivatedAt` kaydedilir; yeniden başlatmada değişmez.
+Geçişten önce alınmış V24 LAB kayıtları Telegram'a taşınmaz. Önceden paylaşılmış veya gönderimi belirsiz fixture da tekrar gönderilmez.
+Geçişten sonraki yeni LAB kaydı canlı gönderim kilidini tüketmez; LAB ve gerçek Telegram sayıları ayrı izlenir.
+Kesin Telegram reddinde yeni taze aday tekrar denenebilir; belirsiz gönderim otomatik tekrarlanmaz.
 
-Mevcut6 kol korunur. Yedinci kol `B25_PRE52`: **B 2.5 ÜST · pre ≥ %52**, reaksiyon şartı yok. Mevcut B25 pre %32 ve B25 reaksiyon kolları değişmez. Yeni kol V16≥65, Dino/V18/dakika/oran/edge/taze doğrulama koşullarını aynen paylaşır. A pre %55, B3.5 pre %40 ve B4.5 pre %20 bu pakete EKLENMEDİ.
+Yeni `dino_old_telegram_lab_history.json` yalnız Eski Telegram LAB'a aittir.
+Eski kaynak bayrakları (`MAC_YAKALA_V21_TELEGRAM_ENABLED`, `MAC_YAKALA_V22_TELEGRAM_ENABLED` ve `DINO_V23_V22_GATE_ENABLED`) artık yalnız bu LAB'ı yapılandırır; canlı V24'ü eski modele döndürmez.
+Mevcut `DINO_V24_SHADOW_ENABLED` LAB kayıtlarını yönetmeye devam eder; canlı V24 bu LAB bayrağına bağlı değildir.
+Quiet/Seçici/Ortak hafta sonu koşulları ve önceki kadın kapsamları korunur; Odak V24 Ana'nın kapsamını izler.
+Arşiv dosyalarının üzerine aktif geçmiş yolu verilirse başlangıç güvenlik kontrolü durur.
 
-Her Odak kolu maçın kendi ilk uygun anını ayrı kilitler. %32 kolu daha önce seçilmişken %52 kolu ilk kez uygun hale gelebilir. Bu, V24 Ana'nın tek-fixture kilidini değiştirmez; LAB kol sayıları toplanıp Ana sinyal sayısı diye okunmaz.
+## API / RAM
 
-Panelde Test LAB → V24 Odak LAB altında yeni `%52` etiketi ve **“yeni dönem pre %32 / %52”** karşılaştırması vardır. Yeni dönem kıyası yalnız bu güncellemeyle alınan iki kolun kayıtlarını içerir. Eski kayıtlar silinmez veya yeniden oynatılmaz. Güncellemeden önce mevcut B25 girişi olan fixture yeni kıyasa sokulmaz; eski kilit korunur. Genel Odak geçmişi eski kayıtları göstermeyi sürdürür. JSON/CSV dışa aktarma ve maç sonucu kapatma mevcut akışla devam eder.
+Kapatılan deneylerin tracker'ı yüklenmez, raporu hesaplanmaz, sonuç sorgularına eklenmez ve bakım zamanlayıcısı kurulmaz.
+Eski Telegram LAB için sadece hafif, depolamasız karar hesabı korunur. Ortak V24 olay/skor ve taze doğrulama kaldırılmaz.
+Yeni bağımsız tarama veya API endpoint'i eklenmedi. Yeni bir uygun aday mevcut ortak doğrulamayı tetikleyebilir; toplam API sayısının hiç artmayacağı garanti edilmez.
+RSS/RAM tasarrufu sunucuda ölçülmedi.
 
-Yeni kayıtlar Odak sürümü ve `analysis.sourcePolicyVersion` ile işaretlenir; eşikler `analysis.thresholds` içinde yer alır. Yeniden başlatma kilitleri ve yeni dönem kıyası korunur.
+## Kurulum
 
-V16/V18 hesaplamaları market başına ortak önbellekten paylaşılır; sırf yedinci kol var diye model7kez hesaplanmaz. Yeni endpoint yoktur. Ancak yalnız yeni kolun henüz kaydı olmayan uygun adayı, mevcut ortak taze doğrulamayı tetikleyebilir; “her koşulda sıfır ek API” garantisi değildir.
-
-## Uygulama
-
-1. Mevcut botun listedeki dosyalarını tarihli bir yedeğe al. Mevcut sürümde `v24_focus_lab.js` ve Odak API entegrasyonu olmalı; daha eski bot sürümüne doğrudan uygulanmamalı.
-2. ZIP içeriğini mevcut bot köküne, klasör yapısını koruyarak uygula. `public/index.html` ve kökteki `index.html` birlikte güncellenmeli.
-3. `.env`, history/cache JSON'ları, veritabanı, model JSON'ları ve `node_modules` bu pakette yoktur; bunlara dokunma.
-4. Bot kökünde kontrol et:
+1. Botu mevcut servis yöneticinle durdur; değişecek kaynak dosyalarını yedekle.
+2. ZIP içeriğini bot köküne klasör yapısını koruyarak uygula. Hem kökteki `index.html` hem `public/index.html` değişmeli.
+3. `.env`, model JSON'ları, history/cache JSON'ları, veritabanı ve `node_modules` bu ZIP'te yoktur; bunları değiştirme. Özellikle teslim günlüğünü silme.
+4. Bot kökünde kontrolleri çalıştır:
 
 ```sh
 node --check server.js
-node --check v24_focus_lab.js
+node --check v24_telegram_router.js
 npm test
 ```
 
-5. Testler geçince mevcut hizmetini kullandığın yöntemle yeniden başlat; tarayıcıda Ctrl+F5 ile paneli yenile. Sürüm: `mac-yakala-v24-main-focus-b65-sniper75-pre52-2026-10-01`.
+5. Testler geçince mevcut yöntemle botu yeniden başlat ve paneli Ctrl+F5 ile yenile.
+6. Sürümün yukarıdaki değer olduğunu; Telegram kaynaklarının yalnız V24 olduğunu; Gemini'nin “her gün”, Eski Telegram'ın “LAB” olduğunu kontrol et. Weekend Guard ve Yeni Filtre Deneyleri görünmemeli.
 
-Bu çalışma sunucuya otomatik yüklenmedi. Geri almak için yedek kaynak dosyalarını geri koyup hizmeti yeniden başlat; history dosyalarını eski yedeklerle ezme. Yeni LAB kayıtları diskte kalabilir, eski kaynak yeni armı değerlendirmez.
+Yerel doğrulama: 37 güncel test betiği; dört canlı kol, kadınlar, son dakika/oran/edge kontrolü, kalıcı fixture kilidi, belirsiz gönderim, geçmişi yeniden göndermeme, eski kapı eşdeğerliği, LAB sonuç kapatma ve panel DOM/dışa aktarma.
+Emekli V21/V22 canlı gönderim ve V23 panel/bakım akış testlerinin yerini V24 geçiş testleri aldı; ilgili saf karar/arşiv testleri korunur.
+Testler çevrimdışı yürütüldü; gerçek Telegram/API isteği yapılmadı.
+
+Bu paket sunucuya otomatik yüklenmedi. Sunucuda etkinleşmesi dosyaları uygulayıp botu yeniden başlatmana bağlıdır.

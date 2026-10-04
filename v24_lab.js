@@ -273,12 +273,19 @@ function createV24Lab({
 
         const choice = select({ mac, dino, liveOnlyDino, capturedAt, requireEventScore: true });
         if (!choice.selected) return { record: null, over: null, winner: null, eventScore: choice.eventScore };
+        const record = tracker.recordSent(payloadForChoice({ mac, dino, liveOnlyDino, capturedAt, choice }));
+        const isOver = choice.selected.kind === 'over';
+        return { record, over: isOver ? record : null, winner: isOver ? null : record, eventScore: choice.eventScore };
+    }
+
+    // Also used by live delivery, without writing/consuming a LAB fixture lock.
+    function payloadForChoice({ mac, dino, liveOnlyDino, capturedAt, choice }) {
         const selected = choice.selected;
         const branch = selected.policy.branch;
         const isOver = selected.kind === 'over';
         const score16 = selected.score16;
         const score18 = selected.score18;
-        const record = tracker.recordSent({
+        return {
             ...commonPayload(mac, dino, liveOnlyDino, capturedAt, selected.market, selected.policy.odds),
             signalType: isOver ? 'strong' : 'surprise',
             tariffSlot: 'primary',
@@ -315,12 +322,6 @@ function createV24Lab({
             v25Edge: selected.v25?.score?.edge ?? null,
             v25JointEligible: selected.v25?.eligible ?? null,
             v25JointRule: selected.v25?.rule || null
-        });
-        return {
-            record,
-            over: isOver ? record : null,
-            winner: isOver ? null : record,
-            eventScore: choice.eventScore
         };
     }
 
@@ -349,7 +350,7 @@ function createV24Lab({
         };
     }
 
-    return { preselect, select, record, metadata, eventScoreAudit, policy };
+    return { preselect, select, record, payloadForChoice, metadata, eventScoreAudit, policy };
 }
 
 module.exports = {

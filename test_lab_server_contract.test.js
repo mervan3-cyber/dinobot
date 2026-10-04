@@ -107,7 +107,9 @@ try {
         '/api/v24-shadow-history',
         '/api/v24-shadow-history/export',
         '/api/v24-shadow-history/export.csv',
-        '/api/v24-weekend-guard-history',
+        '/api/old-telegram-lab-history',
+        '/api/old-telegram-lab-history/export',
+        '/api/old-telegram-lab-history/export.csv',
         '/api/v24-weekend-quiet-history',
         '/api/v24-gemini-weekend-history',
         '/api/v24-selective-weekend-history',
@@ -162,7 +164,14 @@ try {
     assert.equal(comparison?.v24Shadow?.policy?.over?.branches?.B?.v16Minimum, 65);
     assert.equal(comparison?.v24Shadow?.policy?.leadingWinner?.v16EdgeHigh, 5);
     assert.equal(comparison?.v24Shadow?.maximumSignalsPerFixture, 1);
-    assert.equal(comparison?.v24WeekendGuard?.policy?.over?.branches?.B?.v18Minimum, 55);
+    assert.equal(comparison?.v24WeekendGuard, undefined);
+    assert.equal(comparison?.v23Goal, undefined);
+    assert.equal(routes.get.has('/api/v24-weekend-guard-history'), false);
+    assert.equal(routes.get.has('/api/v23-goal-history'), false);
+    assert.equal(comparison?.oldTelegram?.telegram, false);
+    assert.equal(comparison?.v24Shadow?.policy?.womenExcluded, false);
+    assert.equal(comparison?.v24GeminiWeekend?.weekendOnly, false);
+    assert.equal(comparison?.v24GeminiWeekend?.policy?.womenExcluded, false);
     assert.equal(comparison?.v24WeekendQuiet?.policy?.quietLeagueDailyLimit, 1);
     assert.equal(comparison?.v24GeminiWeekend?.policy?.over?.edgeLow, -12);
     assert.deepEqual(comparison?.v24SelectiveWeekend?.policy?.priority, ['SNIPER', 'A', 'B']);
@@ -200,7 +209,10 @@ try {
     assert.ok(status?.testLabTracking?.v19Shadow);
     assert.ok(status?.testLabTracking?.v21Shadow);
     assert.ok(status?.testLabTracking?.v24Shadow);
-    assert.ok(status?.testLabTracking?.v24WeekendGuard);
+    assert.equal(status?.testLabTracking?.v24WeekendGuard, undefined);
+    assert.equal(status?.testLabTracking?.v23Goal, undefined);
+    assert.ok(status?.testLabTracking?.oldTelegram);
+    assert.deepEqual(status?.marketTariff?.telegramSources, ['V24']);
     assert.ok(status?.testLabTracking?.v24WeekendQuiet);
     assert.ok(status?.testLabTracking?.v24GeminiWeekend);
     assert.ok(status?.testLabTracking?.v24SelectiveWeekend);
@@ -211,7 +223,7 @@ try {
     assert.equal(status.testLabTracking.v19Shadow.enabled, false);
     assert.equal(fs.readFileSync(process.env.DINO_CORE_SHADOW_HISTORY_FILE,'utf8'),'retired-core-preserve');
     assert.equal(fs.readFileSync(process.env.DINO_V19_SHADOW_HISTORY_FILE,'utf8'),'retired-v19-preserve');
-    assert.deepEqual(status.marketTariff.telegramSources,['V22']);
+    assert.deepEqual(status.marketTariff.telegramSources,['V24']);
     assert.equal(status.marketTariff.maximumSignalsPerSourcePerFixture,1);
 
     console.log('Test Lab server contract tests passed.');

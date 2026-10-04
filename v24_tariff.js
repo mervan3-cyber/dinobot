@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v24-main-sniper-ab-ms-b16-65-pre75-2026-10-01';
+const VERSION = 'v24-main-live-women-2026-10-05';
 
 function freezePolicy(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -12,10 +12,10 @@ const MAIN_POLICY = freezePolicy({
     key: 'main',
     label: 'V24 Ana',
     version: VERSION,
-    telegram: false,
+    telegram: true,
     weekendOnly: false,
     validationMode: 'fresh-required',
-    womenExcluded: true,
+    womenExcluded: false,
     maximumSignalsPerFixture: 1,
     priority: ['SNIPER', 'B', 'A', 'MS'],
     allowedOverMarketsByBranch: null,
@@ -92,6 +92,9 @@ function variant(key, label, mutate) {
     policy.label = label;
     policy.version = `${VERSION}-${key}`;
     policy.weekendOnly = true;
+    // Other weekend experiments retain their previous competition scope.
+    policy.telegram = false;
+    policy.womenExcluded = true;
     mutate(policy);
     return freezePolicy(policy);
 }
@@ -109,6 +112,8 @@ const POLICIES = freezePolicy({
         policy.quietLeagueDailyLimit = 1;
     }),
     geminiWeekend: variant('gemini-weekend', 'V24 Gemini Weekend', policy => {
+        policy.weekendOnly = false;
+        policy.womenExcluded = false;
         policy.over.minuteHigh = 68;
         policy.over.edgeLow = -12;
         policy.excludedLeagues = ['League One', 'League Two'];

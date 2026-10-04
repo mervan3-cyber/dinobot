@@ -28,10 +28,10 @@ for (const requiredText of [
     'B · tam 1 gol',
     'A · tam 2 gol',
     'V16 EDGE %0…+5',
-    'Weekend Guard',
+    'Eski Telegram LAB',
     'Weekend Quiet',
-    'Gemini Weekend',
-    '/api/v24-weekend-guard-history',
+    'Gemini V24 · her gün',
+    '/api/old-telegram-lab-history',
     '/api/v24-weekend-quiet-history',
     '/api/v24-gemini-weekend-history',
     'Seçici Weekend',
@@ -59,6 +59,7 @@ for (const requiredText of [
 }
 
 const scripts = [...publicPanel.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+assert.doesNotMatch(publicPanel,/id="testlab-v23-card"|id="testlab-v24-guard-|v23_filter_panel\.js|\/api\/v24-weekend-guard-history/);
 assert.doesNotMatch(publicPanel, /id="testlab-(core|v19)-(rows|total|mode-badge)"|Dino Operations|Yeni [Çç]ekirdek/);
 assert.doesNotMatch(publicPanel, /id="testlab-(v17|v20)-(rows|total|mode-badge)"|\/api\/v17-legacy-shadow-history|\/api\/v20-shadow-history/);
 assert.match(publicPanel, /Maç Yakala/);

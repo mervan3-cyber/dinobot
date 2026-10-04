@@ -37,7 +37,16 @@ const data={date:'2026-10-01',filter:{date:'2026-10-01',availableDates:['2026-10
             baseline:{minimumPrematch:32,summary:{total:5,wins:3,losses:2,hitRate:60,roi:5}},
             candidate:{minimumPrematch:52,summary}}}};
 const el=id=>elements.get(id);
+assert(!elements.has('testlab-v23-card'));
+assert(!elements.has('testlab-v24-guard-rows'));
+data.oldTelegram={enabled:true,summary:{overall:summary},signals:[{...signal,decisionModel:'V22',signalSources:['V22'],voteCount:3}]};
 context.renderTestLabHistory(data);
+assert.equal(el('testlab-old-telegram-total').textContent,'2');
+assert.equal(el('testlab-old-telegram-rows').children[0].children.length,10);
+for(const format of ['json','csv']){
+    context.downloadTestLabExport('oldtelegram',format);
+    assert.match(anchors.at(-1).href,/\/api\/old-telegram-lab-history\/export/);
+}
 assert.match(el('testlab-v24-focus-arm-B25_PRE52').textContent,/pre ≥ %52.*2 sinyal.*1 K \/ 1 Y/);
 assert.match(el('testlab-v24-focus-pre-baseline').textContent,/pre %32.*yeni dönem.*5 sinyal.*3 K \/ 2 Y/);
 assert.match(el('testlab-v24-focus-pre-candidate').textContent,/pre %52.*yeni dönem.*2 sinyal.*1 K \/ 1 Y/);

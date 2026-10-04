@@ -25,12 +25,12 @@ assert.equal(over({odds:1.5,dinoProbability:45}).eligible,true,'Dino edge has no
 for(const policy of Object.values(tariff.POLICIES)){
     assert.equal(policy.over.branches.B.v16Minimum,65,'Policies inheriting main share B65');
     assert.equal(policy.over.branches.SNIPER.prematchByMarket['1.5_UST'],75);
-    assert.equal(policy.telegram,false);
+    assert.equal(policy.telegram,policy.key==='main');
     assert.equal(over({v16Probability:64.99},policy).eligible,false);
     assert.equal(over({},policy).eligible,true);
 }
 assert.equal(over({minute:25}).eligible,true);assert.equal(over({minute:70}).eligible,true);assert.equal(over({minute:71}).eligible,false);
-assert.equal(tariff.POLICY.maximumSignalsPerFixture,1);assert.equal(tariff.POLICY.womenExcluded,true);
+assert.equal(tariff.POLICY.maximumSignalsPerFixture,1);assert.equal(tariff.POLICY.womenExcluded,false);
 assert.deepEqual(tariff.POLICY.priority,['SNIPER','B','A','MS']);
 assert.equal(tariff.winnerCheck({market:'MS2',score:'0-1',minute:25,odds:1.75,v16Probability:60,eventScoreStatus:'approve'}).eligible,true,'MS minimum60 unchanged');
 console.log('PASS: B V16 minimum65 and Sniper pre75 boundaries; B pre/A/MS/edge/events/priority and inherited LAB policies preserved.');

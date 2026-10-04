@@ -224,6 +224,7 @@ class SignalTracker {
             v25JointEligible: typeof payload.v25JointEligible === 'boolean' ? payload.v25JointEligible : null,
             v25JointRule: payload.v25JointRule || null,
             decisionModel: payload.decisionModel || null,
+            entryAudit: payload.entryAudit || null,
             decisionProbability: numberOrNull(payload.decisionProbability),
             decisionEdge: numberOrNull(payload.decisionEdge),
             tariffVersion: payload.tariffVersion || null,

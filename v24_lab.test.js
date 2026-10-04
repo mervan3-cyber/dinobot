@@ -112,7 +112,7 @@ try {
     assert.equal(sniper.record.goalsNeeded, 2);
 
     const women = mac(4, saturday, { lig: 'UEFA Europa Cup - Women' });
-    assert.equal(main.lab.preselect(women, dino, saturday), false);
+    assert.equal(main.lab.preselect(women, dino, saturday), true, 'Approved: women open in V24 main.');
 
     const guard = makeLab('guard', tariff.POLICIES.weekendGuard);
     assert.equal(guard.lab.record({ mac: mac(10), dino, capturedAt: saturday }).record.matchedFilters[0], 'B');

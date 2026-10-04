@@ -3,9 +3,9 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {createIndependentLab}=require('./independent_lab');
 const {createV22Lab}=require('./v22_lab');
 const v21=require('./v21_tariff'),v22=require('./v22_tariff');
-const VERSION='mac-yakala-v21-v22-independent-2026-09-16';
+const VERSION='mac-yakala-v24-live-2026-10-05';
 const WIN_TEXT='✅✅✅ YAKALADIK!';
-const FOOTER='Öncelikli modelimiz V22';
+const FOOTER='';
 const html=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const clone=v=>JSON.parse(JSON.stringify(v));
 function shortAnalysis(value,market) {
@@ -29,7 +29,7 @@ function shortAnalysis(value,market) {
 }
 function formatSignal(record) {
     const models=[...new Set(record.signalSources)].sort((a,b)=>a==='V22'?-1:b==='V22'?1:a.localeCompare(b));
-    return `<b>🟢 MAÇ YAKALA</b>\n\n⚽ <b>Maç:</b> ${html(record.match)}\n🏆 <b>Lig:</b> ${html(record.league)}\n⏱ <b>Dakika:</b> ${html(record.minute)}′\n📊 <b>Skor:</b> ${html(record.score)}\n${models.map(m=>`🧠 <b>Model:</b> ${html(m)}`).join('\n')}\n\n<b>🎯 ${html(record.market.replace('_UST',' ÜST'))} • 💰 ORAN: ${Number(record.odds).toFixed(3)}</b>\n\n<b>📝 Maç Yakala Analiz</b>\n${html(shortAnalysis(record.analysis,record.market))}\n\n${FOOTER}`;
+    return `<b>🟢 MAÇ YAKALA</b>\n\n⚽ <b>Maç:</b> ${html(record.match)}\n🏆 <b>Lig:</b> ${html(record.league)}\n⏱ <b>Dakika:</b> ${html(record.minute)}′\n📊 <b>Skor:</b> ${html(record.score)}\n${models.map(m=>`🧠 <b>Model:</b> ${html(m)}`).join('\n')}\n\n<b>🎯 ${html(record.market.replace('_UST',' ÜST'))} • 💰 ORAN: ${Number(record.odds).toFixed(3)}</b>\n\n<b>📝 Maç Yakala Analiz</b>\n${html(shortAnalysis(record.analysis,record.market))}`;
 }
 function createRouter({delivery,channel,v16Model,v18Model,prematchSupport,prematchSource,alreadyDecided,liveSnapshot,v21Enabled=true,v22Enabled=true}) {
     const adapter=source=>({hasSignal:fixtureId=>delivery.hasSource(channel,source,fixtureId),findSignal:()=>null});
@@ -66,8 +66,8 @@ function createRouter({delivery,channel,v16Model,v18Model,prematchSupport,premat
     return {preselect,select,record};
 }
 class TelegramDelivery {
-    constructor({filePath,tracker,send,logger=()=>{},now=Date.now}) {
-        Object.assign(this,{filePath,tracker,send,logger,now});this.data={version:1,entries:[]};this.disabled=false;this.busy=false;this.flushing=false;
+    constructor({filePath,tracker,send,logger=()=>{},now=Date.now,liveSource=null}) {
+        Object.assign(this,{filePath,tracker,send,logger,now,liveSource});this.data={version:1,entries:[]};this.disabled=false;this.busy=false;this.flushing=false;
     }
     save(){
         try{fs.mkdirSync(path.dirname(this.filePath),{recursive:true});const tmp=this.filePath+'.tmp';fs.writeFileSync(tmp,JSON.stringify(this.data),'utf8');fs.renameSync(tmp,this.filePath);}
@@ -84,6 +84,10 @@ class TelegramDelivery {
             // A missing/older journal cannot prove whether win replies already went out.
             // Keep the surviving shared history intact and stop rather than resend.
             if(this.tracker.data.signals.some(s=>s.deliveryKey&&!this.data.entries.some(e=>e.key===s.deliveryKey&&e.status==='sent')))throw Error('delivery journal does not cover shared history');
+            if (this.liveSource === 'V24') {
+                if (this.data.v24ActivatedAt && !Number.isFinite(Date.parse(this.data.v24ActivatedAt))) throw Error('invalid V24 activation timestamp');
+                if (!this.data.v24ActivatedAt) this.data.v24ActivatedAt = new Date(this.now()).toISOString();
+            }
             this.reconcile();this.save();
         }catch(error){this.disabled=true;this.logger('> ⛔ Telegram gönderim günlüğü okunamadı/yazılamadı; dosya korunuyor, gönderimler kapalı.');}
     }
@@ -91,14 +95,26 @@ class TelegramDelivery {
         if(this.disabled||!channel)return true;
         return this.data.entries.some(e=>String(e.requestedChannel)===String(channel)&&e.payload.fixtureId===Number(fixtureId)&&e.payload.signalSources.includes(source)&&e.status!=='declined');
     }
+    hasFixture(channel,fixtureId){
+        if(this.disabled||!channel)return true;
+        return this.data.entries.some(e=>String(e.requestedChannel)===String(channel)&&e.payload.fixtureId===Number(fixtureId)&&e.status!=='declined') ||
+            this.tracker.data.signals.some(s=>Number(s.fixtureId)===Number(fixtureId));
+    }
     reconcile(){for(const e of this.data.entries)if(e.status==='sent'&&e.messageId)this.tracker.recordSent({...e.payload,deliveryKey:e.key,telegramMessageId:e.messageId,telegramChatId:e.chatId});}
     findSent(channel,payload){
         const key=crypto.createHash('sha256').update(JSON.stringify([channel,payload.fixtureId,payload.market,payload.minute,payload.score,payload.sentAt,payload.odds,payload.signalSources])).digest('hex');
         return this.data.entries.find(e=>e.key===key&&e.status==='sent');
     }
     async publish(channel,payload){
-        if(this.disabled||this.busy||!channel||!payload||!payload.signalSources?.length||payload.signalSources.some(s=>!['V21','V22'].includes(s)||this.hasSource(channel,s,payload.fixtureId)))return false;
-        if(payload.statsValidation?.status!=='passed'||!/^\d+\.5_UST$/.test(payload.market)||!Number.isFinite(payload.odds)||payload.odds<1.5||payload.odds>4)return false;
+        const isV24=payload?.signalSources?.length===1&&payload.signalSources[0]==='V24';
+        if(this.disabled||this.busy||!channel||!payload||!payload.signalSources?.length)return false;
+        if(this.liveSource==='V24'&&!isV24)return false;
+        if(isV24) {
+            if(this.hasFixture(channel,payload.fixtureId)||!this.data.v24ActivatedAt||Date.parse(payload.sentAt)<Date.parse(this.data.v24ActivatedAt)||!Number.isFinite(Date.parse(payload.sentAt)))return false;
+            if(payload.entryAudit?.eventScore?.status!=='approve')return false;
+        } else if(payload.signalSources.some(s=>!['V21','V22'].includes(s)||this.hasSource(channel,s,payload.fixtureId)))return false;
+        const winner=isV24&&['MS1','MS2'].includes(payload.market);
+        if(payload.statsValidation?.status!=='passed'||(!winner&&!/^\d+\.5_UST$/.test(payload.market))||!Number.isFinite(payload.odds)||payload.odds<1.5||payload.odds>(winner?2.5:4))return false;
         this.busy=true;
         const key=crypto.createHash('sha256').update(JSON.stringify([channel,payload.fixtureId,payload.market,payload.minute,payload.score,payload.sentAt,payload.odds,payload.signalSources])).digest('hex');
         const entry={key,requestedChannel:String(channel),status:'sending',createdAt:new Date(this.now()).toISOString(),payload:clone(payload),win:null};

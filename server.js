@@ -11,7 +11,9 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
-const { createRouter, TelegramDelivery, VERSION: TELEGRAM_VERSION } = require('./mac_yakala_telegram');
+const { TelegramDelivery, VERSION: TELEGRAM_VERSION } = require('./mac_yakala_telegram');
+const { createV24Router } = require('./v24_telegram_router');
+const { createLegacyTelegramLab } = require('./legacy_telegram_lab');
 const { createPanelAuth } = require('./panel_auth');
 const { SharingSettings } = require('./sharing_settings');
 const { SharingDelivery } = require('./sharing_delivery');
@@ -33,16 +35,15 @@ const {
 } = require('./shadow_power');
 const dinoSelectorV2 = require('./dino_selector_v2');
 // Legacy exports remain readable, but their former Telegram rules no longer run.
-const marketTariff = { ...require('./active_tariff'), VERSION: 'mac-yakala-independent-2026-09-16',
+const marketTariff = { ...require('./active_tariff'), VERSION: TELEGRAM_VERSION,
     PRIMARY_RULES: [], FOLLOW_RULES: [],
     canPreselect: () => false,
-    check: () => ({eligible:false,reasons:['Telegram V21/V22 bağımsız yönlendiricisinde değerlendirilir'],slot:'primary',rule:null,priority:-Infinity,signalSources:[]}) };
+    check: () => ({eligible:false,reasons:['Telegram V24 Ana yönlendiricisinde değerlendirilir'],slot:'primary',rule:null,priority:-Infinity,signalSources:[]}) };
 const v19Tariff = require('./hybrid_tariff');
 const v21Tariff = require('./v21_tariff');
 const v21History = require('./v21_history');
 const v22Tariff = require('./v22_tariff');
 const { createV22Lab } = require('./v22_lab');
-const { FilterLab, v22Gate: evaluateV23V22Gate, selectSource: selectV23Source, readRetired: readRetiredV23 } = require('./v23_filter_lab');
 const { streamJson: streamV23Json } = require('./v23_export');
 const v24Tariff = require('./v24_tariff');
 const { createV24Lab } = require('./v24_lab');
@@ -63,7 +64,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-main-focus-b65-sniper75-pre52-2026-10-01';
+const BUILD_VERSION = 'mac-yakala-v24-live-transition-2026-10-05';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -238,8 +239,7 @@ const V21_SHADOW_HISTORY_FILE = process.env.DINO_V21_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V21_SHADOW_HISTORY_FILE)
     : path.join(__dirname, 'dino_v21_consensus_shadow_history.json');
 const DINO_V19_SHADOW_ENABLED = false; // Retired: not even an environment flag can start this lab again.
-// V21 continues to be measured in LAB, but live Telegram is V22-only by default.
-// An explicit true remains as a rollback escape hatch; the production .env omits it.
+// Former Telegram flags only configure Eski Telegram LAB. Live production is V24-only.
 const MY_V21_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V21_TELEGRAM_ENABLED || 'false').toLowerCase() === 'true';
 const MY_V22_TELEGRAM_ENABLED = String(process.env.MAC_YAKALA_V22_TELEGRAM_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V21_SHADOW_ENABLED = String(process.env.DINO_V21_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
@@ -247,15 +247,12 @@ const V22_SHADOW_HISTORY_FILE = process.env.DINO_V22_SHADOW_HISTORY_FILE
     ? path.resolve(process.env.DINO_V22_SHADOW_HISTORY_FILE)
     : path.join(__dirname, 'dino_v22_union_shadow_history.json');
 const DINO_V22_SHADOW_ENABLED = String(process.env.DINO_V22_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
-const DINO_V23_SHADOW_ENABLED = String(process.env.DINO_V23_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V23_V22_GATE_ENABLED = String(process.env.DINO_V23_V22_GATE_ENABLED || 'true').toLowerCase() !== 'false';
 const DINO_V24_SHADOW_ENABLED = String(process.env.DINO_V24_SHADOW_ENABLED || 'true').toLowerCase() !== 'false';
+const OLD_TELEGRAM_HISTORY_FILE = path.join(__dirname, 'dino_old_telegram_lab_history.json');
 const V24_SHADOW_HISTORY_FILE = process.env.DINO_V24_MAIN_V2_HISTORY_FILE
     ? path.resolve(process.env.DINO_V24_MAIN_V2_HISTORY_FILE)
     : path.join(__dirname, 'dino_v24_main_history_v2.json');
-const V24_WEEKEND_GUARD_HISTORY_FILE = process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE
-    ? path.resolve(process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE)
-    : path.join(__dirname, 'dino_v24_weekend_guard_history.json');
 const V24_WEEKEND_QUIET_HISTORY_FILE = process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE
     ? path.resolve(process.env.DINO_V24_WEEKEND_QUIET_HISTORY_FILE)
     : path.join(__dirname, 'dino_v24_weekend_quiet_history.json');
@@ -291,7 +288,7 @@ if ([SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V22_S
 }
 const V24_HISTORY_FILES = [
     V24_SHADOW_HISTORY_FILE,
-    V24_WEEKEND_GUARD_HISTORY_FILE,
+    OLD_TELEGRAM_HISTORY_FILE,
     V24_WEEKEND_QUIET_HISTORY_FILE,
     V24_GEMINI_WEEKEND_HISTORY_FILE,
     V24_SELECTIVE_WEEKEND_HISTORY_FILE,
@@ -300,6 +297,14 @@ const V24_HISTORY_FILES = [
 ].map(file => path.resolve(file));
 if (new Set(V24_HISTORY_FILES).size !== V24_HISTORY_FILES.length) {
     throw new Error('V24 ana ve hafta sonu LAB geçmiş yolları birbirinden ayrı olmalıdır.');
+}
+const protectedRetiredFiles = [V23_GOAL_HISTORY_FILE, V23_RETIRED_HISTORY_FILE,
+    process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE
+        ? path.resolve(process.env.DINO_V24_WEEKEND_GUARD_HISTORY_FILE)
+        : path.join(__dirname, 'dino_v24_weekend_guard_history.json')];
+if (V24_HISTORY_FILES.some(file => protectedRetiredFiles.includes(file)) ||
+    V24_HISTORY_FILES.some(file => [SIGNAL_HISTORY_FILE, CANDIDATE_HISTORY_FILE, V21_SHADOW_HISTORY_FILE, V22_SHADOW_HISTORY_FILE].includes(file))) {
+    throw new Error('Aktif LAB yolları canlı geçmişlerden ve emekli arşivlerden ayrı olmalıdır.');
 }
 
 const PREMATCH_CACHE_FILE =
@@ -525,10 +530,10 @@ const v19ShadowTracker = new SignalTracker({ filePath: V19_SHADOW_HISTORY_FILE, 
 const v21ShadowTracker = new SignalTracker({ filePath: V21_SHADOW_HISTORY_FILE, logger: message => addSystemLog(message) });
 const v22ShadowTracker = new SignalTracker({ filePath: V22_SHADOW_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V22 lab sinyali')) });
+const oldTelegramTracker = new SignalTracker({ filePath: OLD_TELEGRAM_HISTORY_FILE, strict: true,
+    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'Eski Telegram LAB sinyali')) });
 const v24ShadowTracker = new SignalTracker({ filePath: V24_SHADOW_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 lab sinyali')) });
-const v24WeekendGuardTracker = new SignalTracker({ filePath: V24_WEEKEND_GUARD_HISTORY_FILE,
-    logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Weekend Guard sinyali')) });
 const v24WeekendQuietTracker = new SignalTracker({ filePath: V24_WEEKEND_QUIET_HISTORY_FILE,
     logger: message => addSystemLog(String(message).replace('Paylaşılan sinyal', 'V24 Weekend Quiet sinyali')) });
 const v24GeminiWeekendTracker = new SignalTracker({ filePath: V24_GEMINI_WEEKEND_HISTORY_FILE,
@@ -548,11 +553,6 @@ const v24Lab = createV24Lab({ tracker: v24ShadowTracker, enabled: DINO_V24_SHADO
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
     liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
     policy: v24Tariff.POLICIES.main, source: 'V24' });
-const v24WeekendGuardLab = createV24Lab({ tracker: v24WeekendGuardTracker, enabled: DINO_V24_SHADOW_ENABLED,
-    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
-    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
-    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
-    policy: v24Tariff.POLICIES.weekendGuard, source: 'V24-WEEKEND-GUARD' });
 const v24WeekendQuietLab = createV24Lab({ tracker: v24WeekendQuietTracker, enabled: DINO_V24_SHADOW_ENABLED,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
@@ -588,16 +588,19 @@ const independentLab = createIndependentLab({
 });
 
 const telegramDelivery = new TelegramDelivery({
-    filePath: path.join(__dirname, 'mac_yakala_telegram_delivery.json'), tracker: signalTracker,
+filePath: path.join(__dirname, 'mac_yakala_telegram_delivery.json'), tracker: signalTracker, liveSource: 'V24',
     send: (channel, text, options) => { if (!bot) throw Error('Telegram ayarları eksik'); return bot.sendMessage(channel, text, options); },
     logger: message => addSystemLog(message)
 });
-const telegramRouter = createRouter({delivery: telegramDelivery, channel: kanalID,
+const telegramRouter = createV24Router({delivery: telegramDelivery, channel: kanalID, baselineTracker: v24ShadowTracker,
+    v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
+    prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
+    liveSnapshot: paylasilanCanliStatsAnlikGoruntusu });
+const oldTelegramLab = createLegacyTelegramLab({tracker: oldTelegramTracker,
     v16Model: dinoSelectorV2, v18Model: dinoSelectorV18,
     prematchSupport: prematchMarketDestegi, prematchSource: prematchMarketKaynagi,
     alreadyDecided: toplamGolMarketiSkoraGoreSonuclanmisMi, liveSnapshot: paylasilanCanliStatsAnlikGoruntusu,
-    v21Enabled: MY_V21_TELEGRAM_ENABLED, v22Enabled: MY_V22_TELEGRAM_ENABLED
-});
+    v21Enabled: MY_V21_TELEGRAM_ENABLED, v22Enabled: MY_V22_TELEGRAM_ENABLED, gateEnabled: DINO_V23_V22_GATE_ENABLED });
 
 const extraChatId = String(process.env.TELEGRAM_EXTRA_CHAT_ID || '').trim();
 const xCredentials = {apiKey:process.env.X_API_KEY || '',apiSecret:process.env.X_API_SECRET || '',
@@ -618,18 +621,6 @@ app.post('/api/sharing-settings', (req,res)=>{
     try { const status=sharingSettings.update(req.body); addSystemLog(`> 📣 Ek paylaşım ayarları güncellendi: ek Telegram ${status.extraTelegram.active?'açık':'kapalı'}, X ${status.x.active?'açık':'kapalı'}. Ana kanal değişmedi.`); res.json({success:true,...status,delivery:sharingDelivery.status()}); }
     catch(error){res.status(400).json({success:false,error:error.message});}
 });
-
-// Retired profile collectors are not instantiated, loaded, queued or scheduled.
-const v23GoalLab = new FilterLab({ filePath: V23_GOAL_HISTORY_FILE,
-    enabled: DINO_V23_SHADOW_ENABLED && (DINO_V21_SHADOW_ENABLED || DINO_V22_SHADOW_ENABLED),
-    v22GateEnabled: DINO_V23_V22_GATE_ENABLED, logger: message => addSystemLog(message) });
-
-function v23YerelArsivBakimi() {
-    try {
-        // Disk archive retry only. No history fetch and no rolling observations.
-        v23GoalLab.maintain();
-    } catch { /* Lab-only; timer failures never affect Telegram. */ }
-}
 
 // V20 emekli: model motoru artık başlatılmaz ve tarama döngüsüne girmez.
 const v20Engine = null;
@@ -3916,8 +3907,10 @@ function legacyV17GolgeOnSecimi(mac, dino) {
 
 
 function selectorV2OnAdayMi(mac, dino, liveOnlyDino) {
-    if (telegramRouter.preselect(mac, dino)) return true; // Independent of legacy active-selector flags.
-    if (independentLab.preselect(mac, dino) || v22Lab.preselect(mac, dino) || v24Lab.preselect(mac, dino)) {
+    if (telegramRouter.preselect(mac, dino) || oldTelegramLab.preselect(mac, dino)) return true;
+    if (independentLab.preselect(mac, dino) || v22Lab.preselect(mac, dino) ||
+        [v24Lab, v24WeekendQuietLab, v24GeminiWeekendLab, v24SelectiveWeekendLab, v24V25JointWeekendLab]
+            .some(lab => lab.preselect(mac, dino, new Date().toISOString()))) {
         return true;
     }
     if (!DINO_V2_SELECTOR_ENABLED) return true;
@@ -4337,7 +4330,7 @@ async function geminiYorumuYaz(
         const prompt = `
 Sen uzman bir canlı futbol veri analistisin.
 
-V21/V22 kuralları bu marketi seçti. Seçim pozitif EDGE veya kazanç garantisi anlamına gelmez.
+V24 kuralları bu marketi seçti. Seçim pozitif EDGE veya kazanç garantisi anlamına gelmez.
 
 Maç:
 ${mac.mac_isim}
@@ -5182,7 +5175,10 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
         independentLab.select('v21', { mac, dino, liveOnlyDino }) ||
         telegramRouter.select({ mac, dino, liveOnlyDino }).length > 0 ||
         v22Lab.select({ mac, dino, liveOnlyDino }) ||
+        oldTelegramLab.select({ mac, dino, liveOnlyDino }).length > 0 ||
         v24Selection.selected ||
+        [v24WeekendQuietLab, v24GeminiWeekendLab, v24SelectiveWeekendLab, v24V25JointWeekendLab]
+            .some(lab => lab.select({ mac, dino, liveOnlyDino }).selected) ||
         v24FocusLab.preselect(mac, dino, liveOnlyDino)
     );
 }
@@ -5190,8 +5186,8 @@ function labGolgeOnAdayiMi({ mac, dino, liveOnlyDino }) {
 
 function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt }) {
     const results = { core: null, v19: null, v21: null, v22: null,
-        v23: {v21:null,v22:null}, v24: {record:null,over:null,winner:null,eventScore:null},
-        v24WeekendGuard: null, v24WeekendQuiet: null, v24GeminiWeekend: null,
+        oldTelegram: [], v24: {record:null,over:null,winner:null,eventScore:null},
+        v24WeekendQuiet: null, v24GeminiWeekend: null,
         v24SelectiveWeekend: null, v24V25JointWeekend: null,
         v24Focus: {records:[],eventScore:null} };
     for (const kind of ['v21']) {
@@ -5209,13 +5205,16 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         addSystemLog(`> ⚠️ V22 lab kaydı atlandı: ${error.message}`);
     }
     try {
+        results.oldTelegram = oldTelegramLab.record({ mac, dino, liveOnlyDino, capturedAt });
+        for (const record of results.oldTelegram) addSystemLog(`> 🧪 ESKİ TELEGRAM LAB: ${mac.mac_isim} | ${record.market} | eski karar kuralları | Telegram yok.`);
+    } catch (error) { addSystemLog(`> ⚠️ Eski Telegram LAB kaydı atlandı: ${error.message}`); }
+    try {
         results.v24 = v24Lab.record({ mac, dino, liveOnlyDino, capturedAt });
         if (results.v24.record) addSystemLog(`> 🔵 V24 ANA [${results.v24.record.matchedFilters.join('+')}]: ${mac.mac_isim} | ${results.v24.record.market} | maçın ilk uygun kaydı | Telegram yok.`);
     } catch (error) {
         addSystemLog(`> ⚠️ V24 lab kaydı atlandı: ${error.message}`);
     }
     for (const [key, lab, label] of [
-        ['v24WeekendGuard', v24WeekendGuardLab, 'Weekend Guard'],
         ['v24WeekendQuiet', v24WeekendQuietLab, 'Weekend Quiet'],
         ['v24GeminiWeekend', v24GeminiWeekendLab, 'Gemini Weekend'],
         ['v24SelectiveWeekend', v24SelectiveWeekendLab, 'Seçici Weekend'],
@@ -5235,17 +5234,6 @@ function tazeLabGolgeKayitlariniOlustur({ mac, dino, liveOnlyDino, capturedAt })
         }
     } catch (error) {
         addSystemLog(`> ⚠️ V24 Odak LAB kaydı atlandı: ${error.message}`);
-    }
-    for (const source of ['v21','v22']) {
-        try {
-            const observed = v23GoalLab.observe(results[source],mac);
-            results.v23[source]=observed;
-            if (observed) addSystemLog(source==='v22'&&DINO_V23_V22_GATE_ENABLED
-                ? `> 🛡️ V23 V22 KAPISI: ${mac.mac_isim} | ${observed.market} | V22 filtresi canlı gönderimden önce değerlendirildi; LAB kaydı da korundu.`
-                : `> 🧪 YENİ LAB [${source.toUpperCase()}]: ${mac.mac_isim} | ${observed.market} | giriş filtreleri ayrı simülasyon; gerçek sinyal elenmedi.`);
-        } catch {
-            addSystemLog(`> ⚠️ V23 ${source.toUpperCase()} gözlemi atlandı; kaynak sinyali ve diğer modeller değişmedi.`);
-        }
     }
     return results;
 }
@@ -5380,6 +5368,8 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             const events = Array.isArray(eventsResult.value.data?.response)
                 ? eventsResult.value.data.response
                 : [];
+            mac._v23Events = events;
+            mac._v23EventsAt = new Date().toISOString();
             const goalEvents = gecerliGolOlaylariniAyikla(events);
             const officialGoalCount = Number(latestHome) + Number(latestAway);
 
@@ -5434,7 +5424,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
 
 async function telegramSinyaliGonder() {
     // The old V19/Legacy V17 sender is retired. All new Telegram writes go through
-    // the source-specific, persisted V21/V22 delivery path below.
+    // the fixture-wide, persisted V24 delivery path below.
     return false;
 }
 
@@ -5701,43 +5691,22 @@ async function botuCalistir() {
             // Telegram'dan bağımsız iki Test Lab kolu aynı taze fixture,
             // altı temel istatistik, canlı oran ve ikinci Python sonucunu kullanır.
             // Son Telegram canlılık beklemesi bu gölge kayıtlarını etkilemez.
-            const freshLabResults = tazeLabGolgeKayitlariniOlustur({
+            tazeLabGolgeKayitlariniOlustur({
                 mac,
                 dino: freshDino,
                 liveOnlyDino: freshLiveOnlyDino,
                 capturedAt: freshValidation.verifiedAt || new Date().toISOString()
             });
-            const liveV22Gate = DINO_V23_V22_GATE_ENABLED
-                ? evaluateV23V22Gate(freshLabResults?.v23?.v22?.filterAudit)
-                : {eligible:true,reason:'DISABLED',rejected:[],insufficient:[]};
-
-            // Independent source locks, unrelated to lab locks or old fixture-wide locks.
+            // Live V24 fixture locks are independent of the prospective LAB trackers.
             const groups = telegramRouter.select({mac,dino:freshDino,liveOnlyDino:freshLiveOnlyDino});
             for (const group of groups) {
                 group.choices = group.choices.filter(s=>initialTelegramSources.has(s.source));
-                if(DINO_V23_V22_GATE_ENABLED&&group.choices.some(choice=>choice.source==='V22')) {
-                    const sameFrozenEntry=freshLabResults?.v22?.market===group.market&&
-                        Number(freshLabResults?.v22?.fixtureId)===Number(mac.fixture_id)&&
-                        Date.parse(freshLabResults?.v22?.sentAt)===Date.parse(freshValidation.verifiedAt);
-                    if(!sameFrozenEntry||!liveV22Gate.eligible) {
-                        group.choices=group.choices.filter(choice=>choice.source!=='V22');
-                        const rejected=sameFrozenEntry&&liveV22Gate.rejected.length?liveV22Gate.rejected.join('+'):
-                            sameFrozenEntry?liveV22Gate.reason:'ENTRY_MISMATCH';
-                        for(const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
-                            record.decision='v23_v22_gate_rejected';
-                            record.decisionDetail=`V23 V22 canlı kapısı reddetti: ${rejected}. V21 kararı bağımsızdır.`;
-                        }
-                        addSystemLog(`> ⛔ V23 V22 KAPISI: ${mac.mac_isim} | ${group.market} | ${rejected}; yalnız V22 kaynağı çıkarıldı.`);
-                    } else {
-                        addSystemLog(`> ✅ V23 V22 KAPISI: ${mac.mac_isim} | ${group.market} | geçti${liveV22Gate.insufficient.length?` (yetersiz gözlemler veto değildir: ${liveV22Gate.insufficient.join('+')})`:''}.`);
-                    }
-                }
                 if (!group.choices.length) continue;
                 const choice = group.choices[0];
                 const analysisInput = {...group, sinyal_kaynaklari:group.choices.map(s=>s.source),
-                    dino_yuzde:choice.policy.probabilities.dino, prematch_destek_yuzde:choice.args.prematchSupport};
+                    dino_yuzde:choice.policy.probabilities?.dino ?? choice.policy.v16Probability, prematch_destek_yuzde:choice.args?.prematchSupport};
                 const yorum = await geminiYorumuYaz(mac, analysisInput);
-                // Each market is checked separately: a closed V21 market must not veto V22.
+                // The final minute, odds and event/score audit must still satisfy the frozen V24 choice.
                 if (!await sinyalOncesiCanlilikDogrula(mac,[group])) continue;
                 if (!telegramMacHalaUygunMu(mac)) continue;
                 const payload = telegramRouter.record(mac,group,yorum,new Date().toISOString());
@@ -5746,7 +5715,7 @@ async function botuCalistir() {
                 if (sent) void sharingDelivery.publish(telegramDelivery.findSent(kanalID,payload)).catch(()=>addSystemLog('> ⚠️ Ek paylaşım hatası; ana sinyal korundu.'));
                 for (const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
                     record.decision = sent ? 'sent' : 'telegram_failed';
-                    record.decisionDetail = sent ? 'V21/V22 bağımsız Telegram gönderimi başarılı.' : 'Telegram gönderilmedi; lab kaydı korundu.';
+                    record.decisionDetail = sent ? 'V24 Telegram gönderimi başarılı.' : 'Telegram gönderilmedi; lab kaydı korundu.';
                 }
                 if (sent) { onaylanan++; addSystemLog(`> ✅ MAÇ YAKALA: ${payload.signalSources.join(' + ')} | ${payload.match} | ${payload.market} | ${payload.minute}'`); }
             }
@@ -5869,8 +5838,8 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     const candidateFixtureIDs = candidateTracker.unresolvedFixtureIds();
     const coreShadowFixtureIDs = [];
     const independentFixtureIDs = [...v21ShadowTracker.unresolvedFixtureIds(), ...v22ShadowTracker.unresolvedFixtureIds(),
-        ...v23GoalLab.unresolvedFixtureIds(), ...v24ShadowTracker.unresolvedFixtureIds(),
-        ...v24WeekendGuardTracker.unresolvedFixtureIds(), ...v24WeekendQuietTracker.unresolvedFixtureIds(),
+        ...oldTelegramTracker.unresolvedFixtureIds(), ...v24ShadowTracker.unresolvedFixtureIds(),
+        ...v24WeekendQuietTracker.unresolvedFixtureIds(),
         ...v24GeminiWeekendTracker.unresolvedFixtureIds(), ...v24SelectiveWeekendTracker.unresolvedFixtureIds(),
         ...v24V25JointWeekendTracker.unresolvedFixtureIds(), ...v24FocusTracker.unresolvedFixtureIds()];
     const fixtureIDs = [...new Set([
@@ -5928,11 +5897,9 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 // Retired core/V19 history is left untouched.
                 resolvedIndependentLab += v21ShadowTracker.settleFixture(fixture) +
                     v22ShadowTracker.settleFixture(fixture) + v24ShadowTracker.settleFixture(fixture) +
-                    v24WeekendGuardTracker.settleFixture(fixture) + v24WeekendQuietTracker.settleFixture(fixture) +
+                    oldTelegramTracker.settleFixture(fixture) + v24WeekendQuietTracker.settleFixture(fixture) +
                     v24GeminiWeekendTracker.settleFixture(fixture) + v24SelectiveWeekendTracker.settleFixture(fixture) +
                     v24V25JointWeekendTracker.settleFixture(fixture) + v24FocusTracker.settleFixture(fixture);
-                try { resolvedIndependentLab += v23GoalLab.settleFixture(fixture); }
-                catch { addSystemLog('> ⚠️ V23 sonuç kaydı yazılamadı; diğer sonuç takipleri devam ediyor.'); }
             }
         }
 
@@ -5941,7 +5908,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             resolvedCoreShadow > 0 || resolvedIndependentLab > 0 || manuel
         ) {
             addSystemLog(
-                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedIndependentLab} V21/V22/V23/V24 lab sonucu güncellendi.`
+                `> 🧾 Sonuç kontrolü: ${checkedFixtures} maç | ${resolvedSignals} Telegram | ${resolvedCandidates} aday | ${resolvedIndependentLab} V21/V22/V24 ve Eski Telegram LAB sonucu güncellendi.`
             );
         }
 
@@ -5956,7 +5923,7 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
             resolvedV20Shadow,
             message: resolvedSignals > 0 || resolvedCandidates > 0 ||
                 resolvedCoreShadow > 0 || resolvedIndependentLab > 0
-                ? `${resolvedSignals} Telegram, ${resolvedCandidates} aday ve ${resolvedIndependentLab} V21/V22/V23/V24 lab sonucu güncellendi.`
+                ? `${resolvedSignals} Telegram, ${resolvedCandidates} aday ve ${resolvedIndependentLab} V21/V22/V24 ve Eski Telegram LAB sonucu güncellendi.`
                 : 'Henüz sonuçlanan yeni sinyal yok.'
         };
     } catch (error) {
@@ -6291,7 +6258,7 @@ app.get(
         const payload = signalTracker.exportPayload({
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
-            minimumSignalOdd: ACTIVE_MIN_SIGNAL_ODD,
+            minimumSignalOdd: v24Tariff.POLICY.over.minimumOdd,
             currentMinimumEdge: state.globalMinEdge,
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
@@ -6300,9 +6267,11 @@ app.get(
                 edgeDecisionImpact: false
             },
             marketTariff: {
-                enabled: DINO_V17_TARIFF_ENABLED,
+                enabled: true,
                 version: marketTariff.VERSION,
-                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                telegramSources: ['V24'],
+                activatedAt: telegramDelivery.data.v24ActivatedAt,
+                policy: v24Tariff.POLICY,
                 deliveryDisabled: telegramDelivery.disabled,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
@@ -6408,7 +6377,7 @@ function v18GolgeCsvOlustur(signals, includeRouting = false, includeV24Audit = f
 function testLabOrtakKarsilastirmaBaslangici() {
     // Yeni V24 ana ve hafta sonu kollarını aynı ileri-test başlangıcında tut.
     // Emekli V17/V20 geçmişleri bu dönemi artık belirlemez.
-    const starts = [v24ShadowTracker, v24WeekendGuardTracker, v24WeekendQuietTracker,
+    const starts = [v24ShadowTracker, v24WeekendQuietTracker,
         v24GeminiWeekendTracker, v24SelectiveWeekendTracker, v24V25JointWeekendTracker]
         .map(tracker => tracker.data?.startedAt || tracker.data?.signals?.[0]?.sentAt)
         .filter(value => value && Number.isFinite(new Date(value).getTime()))
@@ -6421,7 +6390,7 @@ function testLabOrtakKarsilastirmaBaslangici() {
 function testLabDonemineGoreSec(tracker, date, cohort = 'current') {
     if (tracker === coreShadowTracker || tracker === v19ShadowTracker) return [];
     const comparisonStart = testLabOrtakKarsilastirmaBaslangici();
-    const signals = tracker === v23GoalLab ? v23GoalLab.indexList(100000) : tracker === v21ShadowTracker
+    const signals = tracker === v21ShadowTracker
         ? v21History.select(tracker.list(100000), cohort) : tracker.list(100000);
     return signals.filter(signal => {
         if (comparisonStart && new Date(signal.sentAt) < new Date(comparisonStart)) return false;
@@ -6443,9 +6412,8 @@ function testLabKarsilastirmaSecimi(req, res) {
             ...testLabDonemineGoreSec(coreShadowTracker, null),
             ...testLabDonemineGoreSec(v21ShadowTracker, null),
             ...testLabDonemineGoreSec(v22ShadowTracker, null),
-            ...testLabDonemineGoreSec(v23GoalLab, null),
+            ...testLabDonemineGoreSec(oldTelegramTracker, null),
             ...testLabDonemineGoreSec(v24ShadowTracker, null),
-            ...testLabDonemineGoreSec(v24WeekendGuardTracker, null),
             ...testLabDonemineGoreSec(v24WeekendQuietTracker, null),
             ...testLabDonemineGoreSec(v24GeminiWeekendTracker, null),
             ...testLabDonemineGoreSec(v24SelectiveWeekendTracker, null),
@@ -6499,17 +6467,13 @@ app.get(
                 ...v22Lab.metadata(testLabDonemineGoreSec(v22ShadowTracker, selection.date)),
                 signals: v22ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v22ShadowTracker, selection.date))
             },
-            v23Goal: {
-                ...v23GoalLab.metadata(testLabDonemineGoreSec(v23GoalLab, selection.date)),
-                signals: v23GoalLab.list(req.query.limit, testLabDonemineGoreSec(v23GoalLab, selection.date))
+            oldTelegram: {
+                ...oldTelegramLab.metadata(testLabDonemineGoreSec(oldTelegramTracker, selection.date)),
+                signals: oldTelegramTracker.list(req.query.limit, testLabDonemineGoreSec(oldTelegramTracker, selection.date))
             },
             v24Shadow: {
                 ...v24Lab.metadata(testLabDonemineGoreSec(v24ShadowTracker, selection.date)),
                 signals: v24ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v24ShadowTracker, selection.date))
-            },
-            v24WeekendGuard: {
-                ...v24WeekendGuardLab.metadata(testLabDonemineGoreSec(v24WeekendGuardTracker, selection.date)),
-                signals: v24WeekendGuardTracker.list(req.query.limit, testLabDonemineGoreSec(v24WeekendGuardTracker, selection.date))
             },
             v24WeekendQuiet: {
                 ...v24WeekendQuietLab.metadata(testLabDonemineGoreSec(v24WeekendQuietTracker, selection.date)),
@@ -6568,7 +6532,6 @@ function labHistorySignals(req, tracker) {
 function v24LabForTracker(tracker) {
     return new Map([
         [v24ShadowTracker, v24Lab],
-        [v24WeekendGuardTracker, v24WeekendGuardLab],
         [v24WeekendQuietTracker, v24WeekendQuietLab],
         [v24GeminiWeekendTracker, v24GeminiWeekendLab],
         [v24SelectiveWeekendTracker, v24SelectiveWeekendLab],
@@ -6698,30 +6661,11 @@ function labCsvExport(req, res, tracker, filePrefix) {
     )}`);
 }
 
-for (const suffix of ['', '/export', '/export.csv']) {
-    app.get(`/api/v23-goal-history${suffix}`, async (req, res) => {
-        const source = req.query.source || 'all';
-        const selected = selectV23Source(v23GoalLab.indexList(100000),source);
-        if (!selected) return res.status(400).json({ success:false, message:'Geçersiz V23 kaynak filtresi.' });
-        const selection = gecmisSeciminiHazirla(req, res, selected, 'sentAt');
-        if (!selection) return;
-        selection.filter = { ...selection.filter, source };
-        if (!suffix) return res.json({ ...v23GoalLab.metadata(selection.items), filter: selection.filter,
-            signals: v23GoalLab.list(req.query.limit,selection.items) });
-        const csv = suffix.endsWith('.csv');
-        res.setHeader('Content-Type', csv ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="mac-yakala-yeni-filtre-${source.replace(':','-')}-${gecmisDosyaEtiketi(selection)}.${csv ? 'csv' : 'json'}"`);
-        if (csv) return res.send(v23GoalLab.csv(selection.items));
-        try { await streamV23Json(res, { ...v23GoalLab.exportStream(selection.items), filter: selection.filter, exportedAt: new Date().toISOString() }); }
-        catch { if (!res.destroyed) res.destroy(); }
-    });
-}
-
 // Retired evidence is opened only for an explicit export, never during scans.
 for (const suffix of ['/export', '/export.csv']) {
     app.get(`/api/v23-retired-history${suffix}`, async (req, res) => {
         try {
-            const retired = readRetiredV23(V23_RETIRED_HISTORY_FILE);
+            const retired = require('./v23_filter_lab').readRetired(V23_RETIRED_HISTORY_FILE); // Explicit archive export only.
             const selection = gecmisSeciminiHazirla(req, res, retired.indexList(100000), 'sentAt');
             if (!selection) return;
             const csv = suffix.endsWith('.csv');
@@ -6742,9 +6686,7 @@ for (const [slug, tracker, tariff, enabled] of [
     ['v21-consensus-shadow', v21ShadowTracker, v21Tariff, DINO_V21_SHADOW_ENABLED],
     ['v22-union-shadow', v22ShadowTracker, v22Tariff, DINO_V22_SHADOW_ENABLED],
     ['v24-shadow', v24ShadowTracker, v24Tariff, DINO_V24_SHADOW_ENABLED],
-    ['v24-weekend-guard', v24WeekendGuardTracker,
-        { VERSION: v24Tariff.POLICIES.weekendGuard.version, POLICY: v24Tariff.POLICIES.weekendGuard },
-        DINO_V24_SHADOW_ENABLED],
+    ['old-telegram-lab', oldTelegramTracker, { VERSION: oldTelegramLab.metadata().tariffVersion, POLICY: { telegram: false, v22GateEnabled: DINO_V23_V22_GATE_ENABLED } }, true],
     ['v24-weekend-quiet', v24WeekendQuietTracker,
         { VERSION: v24Tariff.POLICIES.weekendQuiet.version, POLICY: v24Tariff.POLICIES.weekendQuiet },
         DINO_V24_SHADOW_ENABLED],
@@ -6911,7 +6853,7 @@ app.get(
             buildVersion: BUILD_VERSION,
             rules: SIGNAL_RULES,
             currentMinimumEdge: state.globalMinEdge,
-            minimumSignalOdd: ACTIVE_MIN_SIGNAL_ODD,
+            minimumSignalOdd: v24Tariff.POLICY.over.minimumOdd,
             selectorV2: {
                 enabled: DINO_V2_SELECTOR_ENABLED,
                 version: dinoSelectorV2.MODEL.version,
@@ -6919,9 +6861,11 @@ app.get(
                 edgeDecisionImpact: false
             },
             marketTariff: {
-                enabled: DINO_V17_TARIFF_ENABLED,
+                enabled: true,
                 version: marketTariff.VERSION,
-                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                telegramSources: ['V24'],
+                activatedAt: telegramDelivery.data.v24ActivatedAt,
+                policy: v24Tariff.POLICY,
                 deliveryDisabled: telegramDelivery.disabled,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
@@ -7458,29 +7402,22 @@ app.get(
                 state.globalMinEdge,
 
             minimumSignalOdd:
-                ACTIVE_MIN_SIGNAL_ODD,
+                v24Tariff.POLICY.over.minimumOdd,
 
             marketTariff: {
-                enabled: DINO_V17_TARIFF_ENABLED,
+                enabled: true,
                 version: marketTariff.VERSION,
-                telegramSources: [MY_V22_TELEGRAM_ENABLED && 'V22', MY_V21_TELEGRAM_ENABLED && 'V21'].filter(Boolean),
+                telegramSources: ['V24'],
+                activatedAt: telegramDelivery.data.v24ActivatedAt,
+                policy: v24Tariff.POLICY,
                 deliveryDisabled: telegramDelivery.disabled,
                 minimumOdd: marketTariff.MINIMUM_ODD,
                 maximumOdd: marketTariff.MAXIMUM_ODD,
                 primaryRules: marketTariff.PRIMARY_RULES,
                 followRules: marketTariff.FOLLOW_RULES,
-                maximumSignalsPerFixture: 2,
+                maximumSignalsPerFixture: 1,
                 maximumSignalsPerSourcePerFixture: 1,
                 underMarketsDisabled: true
-            },
-            v23V22Gate: {
-                enabled: DINO_V23_V22_GATE_ENABLED,
-                source: 'V22',
-                v21DecisionImpact: false,
-                shotAccuracyDecisionImpact: false,
-                boxShotDecisionImpact: false,
-                historyFile: path.basename(V23_GOAL_HISTORY_FILE),
-                policy: v23GoalLab.metadata().liveGate
             },
             couponLab: {
                 enabled: couponLab.enabled,
@@ -7577,9 +7514,8 @@ app.get(
                     summary: v21History.summary(v21ShadowTracker)
                 },
                 v22Shadow: v22Lab.metadata(),
-                v23Goal: v23GoalLab.metadata(),
+                oldTelegram: oldTelegramLab.metadata(),
                 v24Shadow: v24Lab.metadata(),
-                v24WeekendGuard: v24WeekendGuardLab.metadata(),
                 v24WeekendQuiet: v24WeekendQuietLab.metadata(),
                 v24GeminiWeekend: v24GeminiWeekendLab.metadata(),
                 v24SelectiveWeekend: v24SelectiveWeekendLab.metadata(),
@@ -7625,9 +7561,8 @@ candidateTracker.load();
 // Retired V19 history is not opened or rewritten.
 v21ShadowTracker.load();
 v22ShadowTracker.load();
-v23GoalLab.load();
+oldTelegramTracker.load();
 v24ShadowTracker.load();
-v24WeekendGuardTracker.load();
 v24WeekendQuietTracker.load();
 v24GeminiWeekendTracker.load();
 v24SelectiveWeekendTracker.load();
@@ -7635,10 +7570,8 @@ v24V25JointWeekendTracker.load();
 v24FocusTracker.load();
 couponLab.load();
 const couponLabStartupStatus = couponLab.status();
-addSystemLog(`> 🧪 YENİ FİLTRE LABI: ${v23GoalLab.metadata().enabled ? 'AÇIK' : 'KAPALI'} | V21 yalnız LAB | V22: 3 kontrol + skor tutarlılığı | eski geçmiş toplama KAPALI | ek API: 0.`);
-addSystemLog(`> 🛡️ V23→V22 CANLI KAPI: ${DINO_V23_V22_GATE_ENABLED ? 'AÇIK' : 'KAPALI'} | yalnız açık V22 retleri veto | isabet oranı ve ceza içi/dışı şut karar dışı | V21 yalnız LAB.`);
 addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 aynı | maç başına tek kayıt | Telegram YOK.`);
-addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Guard + Quiet + Gemini + Seçici + V24/V25 Ortak aynı taze veriden ayrı geçmiş toplar; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
+addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Quiet + Seçici + V24/V25 Ortak hafta sonu; Gemini her gün aynı taze veriden ayrı geçmiş toplar; Guard ve yeni filtre deneyleri emekli; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
 addSystemLog(`> 🎯 V24 ODAK LAB: 7 kol | Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + B 2.5 pre>=52 + A 2.5 | yeni dönem B 2.5 pre32/pre52 kıyası | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
 addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
@@ -7670,11 +7603,11 @@ app.listen(
         );
 
         addSystemLog(
-            `> 🧭 TELEGRAM: yalnız V22 ${MY_V22_TELEGRAM_ENABLED ? 'AÇIK' : 'KAPALI'} | V21 ${MY_V21_TELEGRAM_ENABLED ? 'AÇIK (açık override)' : 'yalnız LAB'} | V17/V20 emekli ve çalışmıyor | V19/Çekirdek emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
+            `> 🧭 TELEGRAM: yalnız V24 Ana | kadınlar AÇIK | maç başına tek sinyal | Eski Telegram yalnız LAB | V17/V20 emekli | gönderim günlüğü ${telegramDelivery.disabled ? 'HATALI / GÖNDERİM KAPALI' : 'hazır'}.`
         );
 
         addSystemLog(
-            `> 💵 Minimum canlı oran: ${ACTIVE_MIN_SIGNAL_ODD.toFixed(2)}`
+            `> 💵 V24 minimum canlı oran: ${v24Tariff.POLICY.over.minimumOdd.toFixed(2)}`
         );
 
         addSystemLog(
@@ -7698,9 +7631,9 @@ app.listen(
             "> 🛡️ Sıkı mod: altı temel canlı istatistik yoksa Python ve Telegram sinyali yok."
         );
 
-        addSystemLog(`> 🧠 Telegram: üretim kaynağı yalnız V22'dir; V21 ölçümü LAB'da sürer. V23 canlı kapısı ${DINO_V23_V22_GATE_ENABLED ? 'V22 üzerinde etkindir' : 'kapalıdır'}.`);
+        addSystemLog(`> 🧠 Telegram: V24 Ana aktif; Gemini her gün LAB; Eski Telegram V22 kapısı yalnız eski LAB kararını etkiler.`);
 
-        addSystemLog("> 🗃️ Telegram kilidi V22 kaynak/fixture bazındadır; V21 yalnız LAB kaydı üretir ve Telegram kilidine girmez.");
+        addSystemLog("> 🗃️ V24 Telegram kilidi maç bazındadır; geçmiş LAB kayıtları gönderilmez ve eski paylaşımlar korunur.");
 
         addSystemLog(
             "> 🧪 Tam-stat aday denetimi aktif: Telegram'a gitmeyen marketler ve eleme nedenleri de sonuçlarıyla kaydedilir."
@@ -7732,9 +7665,6 @@ app.listen(
                 SIGNAL_RESULT_REFRESH_MS
             );
         }
-
-        // Local settled-record archive only; retired API collectors never run.
-        setInterval(v23YerelArsivBakimi, 60000);
 
         // Kupon LAB canlı taramadan bağımsızdır: günde tek ana tarama ve yalnız
         // seçilen maçlara başlangıçtan önce tek doğrulama yapar.
