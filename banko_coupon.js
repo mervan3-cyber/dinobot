@@ -2,6 +2,8 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),M=require('./banko_model');
 // Storage schema stays v1 so existing sessions, frozen picks and API usage remain readable.
 const VERSION='banko-coupon-lab-v1-2026-10-05';
+const RUNTIME_VERSION='banko-pause-resume-v1-2026-10-06';
+class LiveDispatchDeferred extends Error {constructor(){super('Banko isteği canlı işlem için gönderilmeden ertelendi.');}}
 const DEFAULTS=Object.freeze({enabled:true,dailyLimit:2000,maxCandidates:30,maxCoupons:1,minLegOdd:1.40,maxLegOdd:2.20,
     minCouponOdd:1.95,maxCouponOdd:2.40,minSingleOdd:1.80,maxSingleOdd:2.20,minModelProbability:65,minEdgePP:0,
     maxOddsAgeHours:6,precheckMinutes:75,autoPrecheck:true,allowedLeagueIds:[],women:true,
@@ -22,10 +24,10 @@ function schemaSettings(input,previous=DEFAULTS){
     return next;
 }
 class BankoCoupon {
-    constructor({directory,apiGet,canRun=()=>true,getQuotaRemaining=()=>null,reserve=1500,now=()=>new Date(),logger=()=>{},priorityLeagues=[]}={}){
+    constructor({directory,apiGet,canRun=()=>true,getQuotaRemaining=()=>null,reserve=1500,now=()=>new Date(),logger=()=>{},priorityLeagues=[],waitForLiveTick=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
         this.directory=directory;this.apiGet=apiGet;this.canRun=canRun;this.getQuotaRemaining=getQuotaRemaining;this.reserve=reserve;this.now=now;this.logger=logger;this.priority=new Set(priorityLeagues.map(M.normalize));
         this.files=directory?{data:path.join(directory,'dino_banko_coupon_v1.json'),usage:path.join(directory,'dino_banko_api_usage.json'),cache:path.join(directory,'dino_banko_cache_v1.json')}:{};this.requestCount=0;
-        this.data={version:VERSION,settings:JSON.parse(JSON.stringify(DEFAULTS)),sessions:[],discoveries:{},latestJob:null};this.usage={};this.cache={};this.busy=false;this.storageError=null;this.task=Promise.resolve();
+        this.data={version:VERSION,settings:JSON.parse(JSON.stringify(DEFAULTS)),sessions:[],discoveries:{},latestJob:null};this.usage={};this.cache={};this.busy=false;this.storageError=null;this.task=Promise.resolve();this.waitForLiveTick=waitForLiveTick;
     }
     load(){try{
         for(const key of ['data','usage','cache'])if(this.files[key]&&fs.existsSync(this.files[key])){
@@ -34,25 +36,44 @@ class BankoCoupon {
             else if(key==='usage'){if(Object.entries(item).some(([day,n])=>!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isInteger(n)||n<0))throw Error('ledger');this.usage=item;}
             else this.cache=item;
         }
-        if(this.data.latestJob?.status==='running'){this.data.latestJob.status='interrupted';this.data.latestJob.message='Sunucu yeniden başladı. Kayıtlar korunuyor; manuel yeniden oluşturun.';}
+        if(['running','waiting-live'].includes(this.data.latestJob?.status)){this.data.latestJob.status='interrupted';this.data.latestJob.message='Sunucu yeniden başladı. Kayıtlar korunuyor; manuel yeniden oluşturun.';}
         for(const s of this.data.sessions)if(s.status==='running'){s.status='interrupted';s.reason='Yeniden başlatma sırasında yarım kaldı; kupon oluşturulmadı.';}
     }catch(_){this.storageError='Banko dosyası okunamadı; geçmiş korunuyor. Dosyayı silmeden yedeği inceleyin.';}return this.status();}
     save(){if(this.storageError)throw Error(this.storageError);try{if(this.files.data)atomic(this.files.data,this.data);}catch(_){this.storageError='Banko geçmişi yazılamadı; güvenli şekilde durduruldu.';throw Error(this.storageError);}}
     saveUsage(){try{if(this.files.usage)atomic(this.files.usage,this.usage);}catch(_){this.storageError='Banko API bütçesi yazılamadı; yeni istek durduruldu.';throw Error(this.storageError);}}
     saveCache(){const time=this.now().getTime();this.cache=Object.fromEntries(Object.entries(this.cache).filter(([,e])=>Number.isFinite(e?.expires)&&e.expires>time).slice(-1200));try{if(this.files.cache)atomic(this.files.cache,this.cache);}catch(_){this.storageError='Banko önbelleği yazılamadı; işlemler durduruldu.';throw Error(this.storageError);}}
     settings(input){if(this.busy)throw Error('Banko işlemi sürerken ayar değiştirilemez.');const next=schemaSettings(input,this.data.settings),old=this.data.settings;this.data.settings=next;try{this.save();}catch(e){this.data.settings=old;throw e;}return this.status();}
-    guard(){if(this.storageError)throw Error(this.storageError);if(!this.data.settings.enabled)throw Error('Banko Kupon kapalı.');if(!this.canRun())throw Error('Canlı/İY-MS taraması başladı. Banko kayıtları korundu; tekrar manuel deneyin.');const day=dayKey(this.now()),used=this.usage[day]||0,remaining=M.finite(this.getQuotaRemaining());if(used>=this.data.settings.dailyLimit)throw Error('Banko günlük API bütçesi doldu.');if(remaining!==null&&remaining<=this.reserve)throw Error('Canlı sistem için genel API rezervi korundu.');}
+    guard({allowLiveBusy=false,api=true}={}){if(this.storageError)throw Error(this.storageError);if(!this.data.settings.enabled)throw Error('Banko Kupon kapalı.');if(api){const day=dayKey(this.now()),used=this.usage[day]||0,remaining=M.finite(this.getQuotaRemaining());if(used>=this.data.settings.dailyLimit)throw Error('Banko günlük API bütçesi doldu.');if(remaining!==null&&remaining<=this.reserve)throw Error('Canlı sistem için genel API rezervi korundu.');}if(!allowLiveBusy&&!this.canRun())throw new LiveDispatchDeferred();}
+    async waitForLive({api=false}={}){
+        this.guard({allowLiveBusy:true,api});if(this.canRun())return;
+        const job=this.data.latestJob,resumeMessage=job?.message||'Banko işlemi sürüyor';
+        if(job){job.status='waiting-live';job.message='Canlı/İY-MS işlemini bekliyor · aynı kayıttan otomatik devam edecek';job.pausedAt=this.now().toISOString();job.pauseCount=(job.pauseCount||0)+1;this.save();}
+        this.logger('> ⏸️ Banko: canlı işlem bekleniyor; kayıt ve ilerleme korunuyor.');
+        // Wait outside the shared queue; otherwise the live job cannot finish its API work.
+        while(!this.canRun()){this.guard({allowLiveBusy:true,api});await this.waitForLiveTick(1000);}
+        this.guard({allowLiveBusy:true,api});
+        if(job){job.status='running';job.message=resumeMessage;job.resumedAt=this.now().toISOString();job.pausedAt=null;this.save();}
+        this.logger('> ▶️ Banko: aynı işlem kaldığı yerden devam ediyor.');
+    }
     consume(){this.guard();const day=dayKey(this.now());this.usage[day]=(this.usage[day]||0)+1;this.saveUsage();this.requestCount++;}
     async call(endpoint,params={}){
-        this.guard();const url=endpoint+'?'+new URLSearchParams(params);let counted=false,response;
-        try{response=await this.apiGet(url,{dinoMaxAttempts:1,dinoBeforeAttempt:()=>{if(counted)throw Error('Banko otomatik tekrar isteği engellendi.');this.consume();counted=true;}});}catch(error){if(this.storageError)throw Error(this.storageError);if(!counted){this.guard();throw Error('Banko isteği API kuyruğunda çalıştırılamadı.');}throw Error('API isteği tamamlanamadı; gizli bağlantı ayrıntıları gösterilmedi.');}
-        if(!counted)throw Error('API bütçe sayacı bağlanmamış; Banko güvenli şekilde durduruldu.');
-        if(!response?.data||Object.keys(response.data.errors||{}).length)throw Error('API eksik/hatalı yanıt verdi; kayıt tamamlandı sayılmadı.');
-        return response.data;
+        const url=endpoint+'?'+new URLSearchParams(params);
+        for(;;){await this.waitForLive({api:true});let counted=false,response;
+            try{response=await this.apiGet(url,{dinoMaxAttempts:1,dinoBeforeAttempt:()=>{if(counted)throw Error('Banko otomatik tekrar isteği engellendi.');this.consume();counted=true;}});}catch(error){
+                if(this.storageError)throw Error(this.storageError);
+                // Retry ONLY a local live guard before dispatch, never a sent/ambiguous/API error.
+                if(!counted&&error instanceof LiveDispatchDeferred)continue;
+                if(!counted){this.guard({allowLiveBusy:true});throw Error('Banko isteği API kuyruğunda çalıştırılamadı.');}
+                throw Error('API isteği tamamlanamadı; gizli bağlantı ayrıntıları gösterilmedi.');
+            }
+            if(!counted)throw Error('API bütçe sayacı bağlanmamış; Banko güvenli şekilde durduruldu.');
+            if(!response?.data||Object.keys(response.data.errors||{}).length)throw Error('API eksik/hatalı yanıt verdi; kayıt tamamlandı sayılmadı.');
+            return response.data;
+        }
     }
     async cached(key,ttl,loader){const old=this.cache[key];if(old&&old.expires>this.now().getTime())return JSON.parse(JSON.stringify(old.value));const value=await loader();this.cache[key]={expires:this.now().getTime()+ttl,value};return value;}
     validateScanDate(date){validDay(date);const today=dayKey(this.now());if(date<today)throw Error('Geçmiş güne yeni maç önü kuponu oluşturulmaz. Arşivden görüntüleyin; kör replay ayrı analizdir.');if(date>dayAdd(today,7))throw Error('En fazla 7 gün ileri tarih seçilebilir; marketler açılmamış olabilir.');}
-    start(kind,date,sessionId){validDay(date);if(this.busy)throw Error('Banko işlemi zaten sürüyor.');this.guard();if(['scan','discover'].includes(kind))this.validateScanDate(date);
+    start(kind,date,sessionId){validDay(date);if(this.busy)throw Error('Banko işlemi zaten sürüyor.');this.guard({allowLiveBusy:true});if(['scan','discover'].includes(kind))this.validateScanDate(date);
         const session=sessionId?this.data.sessions.find(s=>s.id===sessionId&&s.date===date):[...this.data.sessions].reverse().find(s=>s.date===date&&s.status==='complete');
         if(['check','results'].includes(kind)&&!session)throw Error('Bu tarih için tamamlanmış kupon kaydı bulunamadı.');
         this.busy=true;const job={id:crypto.randomUUID(),kind,date,sessionId:session?.id||null,status:'running',startedAt:this.now().toISOString(),message:'Başlatılıyor',processed:0,total:0};this.data.latestJob=job;
@@ -70,11 +91,15 @@ class BankoCoupon {
     async coverage(f){return this.cached(`coverage:${f.leagueId}:${f.season}`,86400000,async()=>{const r=await this.call('/leagues',{id:f.leagueId,season:f.season});return r.response?.[0]?.seasons?.find(s=>s.year===f.season)?.coverage||null;});}
     async odds(fixtureId){let page=1,total=1,rows=[];do{const r=await this.call('/odds',{fixture:fixtureId,bookmaker:8,page});rows.push(...(r.response||[]));total=Number(r.paging?.total)||1;if(total>20)throw Error('Oran yanıtı 20 sayfayı aşıyor; yarım market onaylanmadı.');page++;}while(page<=total);return M.parseMarkets(rows,fixtureId,8);}
     async scan(date,job){
-        const settings=JSON.parse(JSON.stringify(this.data.settings)),fixtures=await this.discover(date,job),cutoffDay=dayAdd(dayKey(this.now()),-1),id='banko-'+crypto.randomUUID();
+        const settings=JSON.parse(JSON.stringify(this.data.settings)),cutoffDay=dayAdd(dayKey(this.now()),-1),id='banko-'+crypto.randomUUID();
         const session={id,date,createdAt:this.now().toISOString(),version:VERSION,settings,inputCutoffDay:cutoffDay,status:'running',candidates:[],coupons:[],reason:null,apiStart:this.requestCount};job.sessionId=id;this.data.sessions.push(session);
+        this.save();
+        try{const fixtures=await this.discover(date,job);
         const wanted=fixtures.filter(f=>['NS','TBD'].includes(f.status)&&Date.parse(f.kickoff)>this.now().getTime()+30*60000&&(!settings.allowedLeagueIds.length||settings.allowedLeagueIds.includes(f.leagueId))&&(settings.women||!(/women|femen|feminin|\bw\b/i.test(f.league+' '+f.home.name+' '+f.away.name)))).sort((a,b)=>Number(this.priority.has(M.normalize(b.league)))-Number(this.priority.has(M.normalize(a.league)))||Date.parse(a.kickoff)-Date.parse(b.kickoff)||a.fixtureId-b.fixtureId).slice(0,settings.maxCandidates);
         job.total=wanted.length;job.processed=0;this.save();
-        try{for(const f of wanted){this.guard();job.message=f.home.name+' - '+f.away.name;const odds=await this.odds(f.fixtureId);
+        for(const f of wanted){await this.waitForLive();job.message=f.home.name+' - '+f.away.name;
+            if(Date.parse(f.kickoff)<=this.now().getTime()+30*60000){job.processed++;this.save();continue;}
+            const odds=await this.odds(f.fixtureId);
             const row={...f,id:id+':'+f.fixtureId,match:f.home.name+' - '+f.away.name,capturedAt:this.now().toISOString(),oddsUpdatedAt:odds.update,bookmaker:odds.bookmaker,markets:[],pick:null,reasons:[],risks:[],profiles:null,coverage:null};
             if(!odds.markets.length)row.reasons.push('Seçili Bet365 marketi açılmamış/yok');
             else{
@@ -85,9 +110,7 @@ class BankoCoupon {
                 const rich=await this.richHistory(statsIds),home=M.teamProfile(history,f.home.id,'home',rich),away=M.teamProfile(history,f.away.id,'away',rich);row.profiles={home,away};
                 const base=history.slice(0,200);row.leagueBaseline={games:base.length,home:M.mean(base.map(r=>r.home)),away:M.mean(base.map(r=>r.away))};row.expectedGoals=M.expectedGoals(home,away,row.leagueBaseline);row.coverage=await this.coverage(f);
                 row.h2h=history.filter(h=>[h.homeId,h.awayId].includes(f.home.id)&&[h.homeId,h.awayId].includes(f.away.id)).slice(0,5);
-                row.markets=M.evaluateMarkets(odds,row.expectedGoals,row.profiles,settings,this.now(),f.kickoff);
-                const eligible=row.markets.filter(m=>m.eligible).sort((a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||a.betId-b.betId||a.selection.localeCompare(b.selection));row.pick=eligible[0]||null;
-                if(!row.pick)row.reasons.push('Sabit veri/oran/model şartlarını geçen market yok; seçim zorlanmadı');
+                row.markets=odds.markets;await this.waitForLive();this.evaluateCandidate(row,settings);
                 row.risks.push('Ham model kalibre edilmedi; yüzde gerçek başarı garantisi değildir','Geçmiş yalnız bu ligdeki maçları kapsar; diğer kupalar/ligler form ve dinlenme hesabına dahil değildir');
                 if(row.coverage?.injuries!==true)row.risks.push('Sakatlık veri kapsamı yok/bilinmiyor; eksik oyuncu yok anlamına gelmez');
                 row.risks.push('Maç önü kadro/sakatlık kontrolü henüz yapılmadı');
@@ -95,25 +118,36 @@ class BankoCoupon {
             }
             session.candidates.push(row);job.processed++;this.save();this.saveCache();
         }
+        // Recheck time/quote freshness after live pauses, without additional API requests.
+        for(const row of session.candidates){await this.waitForLive();this.evaluateCandidate(row,settings);}
         session.coupons=M.optimize(session.candidates,settings,id);session.status='complete';if(!session.coupons.length)session.reason='İstenen güven/veri/oran şartlarında 1–2 ayaklı kupon bulunamadı. Ayak ekleyerek oran zorlanmadı.';session.completedAt=this.now().toISOString();
         session.predictionsSha256=crypto.createHash('sha256').update(JSON.stringify(session.coupons.map(c=>c.legs.map(l=>({fixtureId:l.fixtureId,pick:l.pick}))))).digest('hex');
         this.logger(`> 🎫 Banko LAB: ${date} · ${session.candidates.length} analiz · ${session.coupons.length} kupon · Telegram YOK.`);
         }catch(e){session.status='partial';session.reason=e.message;throw e;}finally{session.apiUsed=this.requestCount-session.apiStart;this.save();}
     }
+    evaluateCandidate(row,settings){
+        if(!row.profiles)return;
+        row.markets=M.evaluateMarkets({update:row.oddsUpdatedAt,markets:row.markets},row.expectedGoals,row.profiles,settings,this.now(),row.kickoff);
+        if(Date.parse(row.kickoff)<=this.now().getTime()+30*60000)for(const m of row.markets){m.eligible=false;m.reasons.push('Maç başlamış veya başlangıca 30 dakikadan az kalmış; yeni kupona alınmadı');}
+        const eligible=row.markets.filter(m=>m.eligible).sort((a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||a.betId-b.betId||a.selection.localeCompare(b.selection));row.pick=eligible[0]||null;
+        const noPick='Sabit veri/oran/model şartlarını geçen market yok; seçim zorlanmadı';row.reasons=row.reasons.filter(r=>r!==noPick);if(!row.pick)row.reasons.push(noPick);
+    }
     async checkSession(session,job,{automatic=false,onlyIds=null}={}){
         const ids=[...new Set(session.coupons.flatMap(c=>c.legs.filter(l=>l.result.status==='pending').map(l=>l.fixtureId)))].filter(id=>!onlyIds||onlyIds.includes(id));
         if(!ids.length){job.message='Kontrol edilecek bekleyen seçim yok';return;}job.total=ids.length;
-        for(const id of ids){this.guard();const row=session.candidates.find(r=>r.fixtureId===id),response=await this.call('/fixtures',{id,timezone:'Europe/Istanbul'}),fresh=response.response?.[0],now=this.now(),reasons=[],warnings=[];
+        for(const id of ids){await this.waitForLive();const row=session.candidates.find(r=>r.fixtureId===id),response=await this.call('/fixtures',{id,timezone:'Europe/Istanbul'}),fresh=response.response?.[0],now=this.now(),reasons=[],warnings=[];
             if(!fresh||!['NS','TBD'].includes(fresh.fixture?.status?.short)||Date.parse(fresh.fixture?.date)<=now.getTime())reasons.push('Maç başlamış/durumu değişmiş; maç önü onayı yok');
             if(fresh&&fresh.fixture?.date&&Date.parse(fresh.fixture.date)!==Date.parse(row.kickoff))reasons.push('Başlangıç saati değişti; yeni kupon sürümü gerekli');
-            let newOdds=null,injuries=null,lineups=null;
-            if(!reasons.length){const odds=await this.odds(id),quote=odds.markets.find(m=>m.key===row.pick.key);newOdds=quote?.odd||null;
-                const evaluated=quote&&M.evaluateMarkets({...odds,markets:[quote]},row.expectedGoals,row.profiles,session.settings,now,row.kickoff)[0];if(!evaluated?.eligible)reasons.push('İlk seçim güncel oran/veri şartlarını artık geçmiyor');
+            let newOdds=null,injuries=null,lineups=null,quoteCheck=null;
+            if(!reasons.length){const odds=await this.odds(id),quote=odds.markets.find(m=>m.key===row.pick.key);newOdds=quote?.odd||null;quoteCheck={odds,quote};
+                const evaluated=quote&&M.evaluateMarkets({...odds,markets:[quote]},row.expectedGoals,row.profiles,session.settings,this.now(),row.kickoff)[0];if(!evaluated?.eligible)reasons.push('İlk seçim güncel oran/veri şartlarını artık geçmiyor');
                 if(row.coverage?.injuries===true){const r=await this.call('/injuries',{fixture:id});injuries=(r.response||[]).map(x=>({team:x.team?.name,player:x.player?.name,reason:x.player?.reason,type:x.player?.type}));if(injuries.length)warnings.push(`${injuries.length} sakat/şüpheli oyuncu kaydı; önemini elle inceleyin`);}else warnings.push('Sakatlık kapsamı yok; eksik oyuncu durumu doğrulanamadı');
                 if(row.coverage?.fixtures?.lineups===true&&Date.parse(row.kickoff)-now.getTime()<=60*60000){const r=await this.call('/fixtures/lineups',{fixture:id});lineups=(r.response||[]).map(t=>({team:t.team?.name,formation:t.formation,startXI:(t.startXI||[]).map(p=>p.player?.name)}));if(lineups.length!==2||lineups.some(t=>t.startXI.length!==11))warnings.push('İki takımın ilk 11 listesi henüz tam değil');}
                 else warnings.push('İlk 11 henüz doğrulanmadı; maçtan 30–45 dakika önce manuel kontrol edin');
             }
-            const check={checkedAt:now.toISOString(),automatic,status:reasons.length?'rejected':warnings.length?'warning':'passed',originalOdd:row.pick.odd,currentOdd:newOdds,reasons,warnings,injuries,lineups};
+            await this.waitForLive();if(Date.parse(row.kickoff)<=this.now().getTime()&&!reasons.length)reasons.push('Kontrol/bekleme sırasında maç başladı; maç önü onayı yok');
+            if(quoteCheck?.quote&&!M.evaluateMarkets({...quoteCheck.odds,markets:[quoteCheck.quote]},row.expectedGoals,row.profiles,session.settings,this.now(),row.kickoff)[0]?.eligible&&!reasons.length)reasons.push('Bekleme sırasında kontrol oranı eskidi; maç önü onayı yok');
+            const check={checkedAt:this.now().toISOString(),automatic,status:reasons.length?'rejected':warnings.length?'warning':'passed',originalOdd:row.pick.odd,currentOdd:newOdds,reasons,warnings,injuries,lineups};
             for(const coupon of session.coupons)for(const leg of coupon.legs)if(leg.fixtureId===id){leg.check=JSON.parse(JSON.stringify(check));if(automatic)leg.autoCheckedAt=now.toISOString();coupon.check.history.push({fixtureId:id,...check});}
             job.processed=(job.processed||0)+1;this.refreshCouponStates(session);this.save();
         }
@@ -136,10 +170,10 @@ class BankoCoupon {
         try{this.save();await this.checkSession(due.s,job,{automatic:true,onlyIds:due.ids});job.status='complete';}catch(e){job.status='error';job.message=e.message;}finally{this.busy=false;job.completedAt=this.now().toISOString();try{this.save();}catch(_){}}
     }
     status(date=dayKey(this.now()),sessionId=null){validDay(date);const sessions=this.data.sessions.filter(s=>s.date===date),session=sessionId?sessions.find(s=>s.id===sessionId):sessions.at(-1)||null,coupons=session?.coupons||[];
-        return {success:true,version:VERSION,date,day:dayKey(this.now()),busy:this.busy,storageError:this.storageError,settings:JSON.parse(JSON.stringify(this.data.settings)),api:{used:this.usage[dayKey(this.now())]||0,limit:this.data.settings.dailyLimit,reserve:this.reserve,remaining:M.finite(this.getQuotaRemaining())},job:this.data.latestJob,
+        return {success:true,version:VERSION,runtimeVersion:RUNTIME_VERSION,date,day:dayKey(this.now()),busy:this.busy,storageError:this.storageError,settings:JSON.parse(JSON.stringify(this.data.settings)),api:{used:this.usage[dayKey(this.now())]||0,limit:this.data.settings.dailyLimit,reserve:this.reserve,remaining:M.finite(this.getQuotaRemaining())},job:this.data.latestJob,
             availableDates:[...new Set(this.data.sessions.map(s=>s.date))].sort().reverse(),sessions:sessions.map(s=>({id:s.id,createdAt:s.createdAt,status:s.status,couponCount:s.coupons.length})),session:session?JSON.parse(JSON.stringify(session)):null,discovery:this.data.discoveries[date]||null,
             summary:{candidates:session?.candidates.length||0,coupons:coupons.length,won:coupons.filter(c=>c.result.status==='won').length,lost:coupons.filter(c=>c.result.status==='lost').length,pending:coupons.filter(c=>c.result.status==='pending').length,profitUnits:coupons.filter(c=>c.result.status!=='pending').reduce((sum,c)=>sum+(c.result.profitUnits||0),0)},
             disclaimer:'Banko bir mod adıdır, garanti değildir. Ham model yüzdeleri kalibrasyonsuz LAB tahminidir. Tarama ve sonuçlar manuel; yalnız seçilen maçların kontrolü isteğe bağlı otomatiktir. Telegram gönderimi yok.'};
     }
 }
-module.exports={BankoCoupon,VERSION,DEFAULTS,dayKey,dayAdd,validDay,schemaSettings};
+module.exports={BankoCoupon,VERSION,RUNTIME_VERSION,DEFAULTS,dayKey,dayAdd,validDay,schemaSettings};
