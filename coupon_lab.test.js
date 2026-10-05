@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const {CouponLab, parseOddsRows, normalizedWinnerProbabilities, normalizedHtftProbabilities,
+const {CouponLab, VERSION, parseOddsRows, normalizedWinnerProbabilities, normalizedHtftProbabilities,
     buildPicks, settlePick, rankCouponRows} = require('./coupon_lab');
 
 function oddsFixture(id=101) {
@@ -20,7 +20,7 @@ function oddsFixture(id=101) {
 {
     const parsed=parseOddsRows([oddsFixture()],8).get(101);
     assert.deepStrictEqual(parsed.winner,{1:1.6,X:3.8,2:5});
-    assert.deepStrictEqual(parsed.doubleChance,{'1X':1.25,'X2':2.1});
+    assert.strictEqual(parsed.doubleChance,undefined);
     assert.strictEqual(parsed.htft['0/1'],4.5);
     assert.strictEqual(parsed.htft['1/1'],2.4);
     const fair=normalizedWinnerProbabilities(parsed.winner);
@@ -40,7 +40,8 @@ function oddsFixture(id=101) {
     const away={played:10,scoredPerGame:1.2,concededPerGame:1.4,scoringMinutes:{total:12,firstShare:50,secondShare:50},concedingMinutes:{total:10,firstShare:40,secondShare:60}};
     const picks=buildPicks(fixture,odds,prediction,home,away);
     assert.strictEqual(picks.filter(item=>item.market==='İY/MS').length,3);
-    assert.strictEqual(picks.filter(item=>item.market==='Çifte Şans').length,1);
+    assert.strictEqual(picks.filter(item=>item.market==='Çifte Şans').length,0);
+    assert.ok(picks.every(item=>item.support.selectionReady===true));
     assert.ok(picks.some(item=>item.selection==='1/1'));
     assert.ok(picks.every(item=>item.labOnly===true));
     assert.ok(picks.every(item=>item.qualityScore>0));
@@ -48,6 +49,7 @@ function oddsFixture(id=101) {
     const incomplete=buildPicks(fixture,odds,prediction,{...home,played:2},away);
     assert.ok(incomplete.some(item=>item.market==='İY/MS'),'Eksik profil İY/MS puanını yok etmemeli; güveni düşürmelidir.');
     assert.ok(incomplete.filter(item=>item.market==='İY/MS').every(item=>item.support.profilesComplete===false));
+    assert.ok(incomplete.every(item=>item.support.selectionReady===false));
 }
 
 {
@@ -55,10 +57,10 @@ function oddsFixture(id=101) {
         {id:'dc-high',kickoff:'2026-09-23T10:00:00Z',candidateScore:95,picks:[{market:'Çifte Şans'}]},
         {id:'dc-low',kickoff:'2026-09-23T11:00:00Z',candidateScore:80,picks:[{market:'Çifte Şans'}]},
         {id:'dc-third',kickoff:'2026-09-23T12:00:00Z',candidateScore:70,picks:[{market:'Çifte Şans'}]},
-        {id:'htft-a',kickoff:'2026-09-23T13:00:00Z',candidateScore:62,picks:[{market:'İY/MS'}]},
-        {id:'htft-b',kickoff:'2026-09-23T14:00:00Z',candidateScore:58,picks:[{market:'İY/MS'}]}
+        {id:'htft-a',fixtureId:1,policyVersion:VERSION,kickoff:'2026-09-23T13:00:00Z',candidateScore:62,picks:[{market:'İY/MS',support:{selectionReady:true}}]},
+        {id:'htft-b',fixtureId:2,policyVersion:VERSION,kickoff:'2026-09-23T14:00:00Z',candidateScore:58,picks:[{market:'İY/MS',support:{selectionReady:true}}]}
     ];
-    assert.deepStrictEqual(rankCouponRows(rows,4,2).map(row=>row.id),['htft-a','htft-b','dc-high','dc-low']);
+    assert.deepStrictEqual(rankCouponRows(rows,4,2).map(row=>row.id),['htft-a','htft-b']);
 }
 
 {
@@ -103,8 +105,9 @@ function oddsFixture(id=101) {
     assert.strictEqual(status.latestScan.marketFixtures,1);
     assert.strictEqual(status.summary.candidates,1);
     assert.strictEqual(status.summary.selected,1);
-    assert.ok(status.candidates[0].picks.slice(0,3).every(item=>item.market==='İY/MS'));
-    assert.strictEqual(status.candidates[0].picks.at(-1).market,'Çifte Şans');
+    assert.strictEqual(status.candidates[0].picks.length,1);
+    assert.ok(status.candidates[0].picks.every(item=>item.market==='İY/MS'));
+    assert.strictEqual(status.candidates[0].alternatives.length,3);
     assert.ok(calls.every(url=>!url.includes('/odds/live')&&!url.includes('/fixtures/statistics')));
     assert.ok(calls.some(url=>url==='/fixtures?date=2026-09-23&timezone=Europe%2FIstanbul'));
     assert.strictEqual(lab.shouldAutoScan(now),false);
@@ -113,7 +116,7 @@ function oddsFixture(id=101) {
     assert.strictEqual(refreshed.apiUsed,1);
     assert.strictEqual(refreshed.status.candidates[0].result.status,'settled');
     const changed=lab.applySettings({enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
-    assert.deepStrictEqual(changed.settings,{enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8,maxDoubleChance:2});
+    assert.deepStrictEqual(changed.settings,{enabled:true,includeTomorrow:true,scanTime:'08:35',finalCheckMinutes:60,dailyLimit:250,maxCandidates:24,maxSelected:8});
     const twoDayStatus=await lab.scanToday({mode:'manual',now:new Date('2026-09-23T06:01:00Z')});
     assert.deepStrictEqual(twoDayStatus.latestScan.days,['2026-09-23','2026-09-24']);
     assert.strictEqual(twoDayStatus.summary.candidates,2);

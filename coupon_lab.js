@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const VERSION = 'coupon-lab-v3-htft-first-scoring-2026-09-24';
+const VERSION = 'coupon-lab-v4-htft-only-2026-10-05';
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN', 'AWD', 'WO']);
 const MIN_PROFILE_MATCHES = 5;
 const MIN_PHASE_EVENTS = 3;
@@ -10,6 +10,7 @@ const HTFT_CODES = Object.freeze(['0/0','0/1','0/2','1/0','1/1','1/2','2/0','2/1
 const HTFT_REVERSALS = new Set(['1/2','2/1']);
 
 function finite(value) {
+    if (value === null || value === undefined || typeof value === 'boolean' || String(value).trim() === '') return null;
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
 }
@@ -73,14 +74,6 @@ function htftCode(value) {
     return /^[012]\/[012]$/.test(direct) ? direct : null;
 }
 
-function doubleChanceCode(value) {
-    const raw = normalize(value);
-    if (['home draw', 'home or draw', '1x', '1 x'].includes(raw)) return '1X';
-    if (['draw away', 'draw or away', 'x2', 'x 2'].includes(raw)) return 'X2';
-    if (['home away', 'home or away', '12', '1 2'].includes(raw)) return '12';
-    return null;
-}
-
 function winnerCode(value) {
     const raw = normalize(value);
     if (['home', '1'].includes(raw)) return '1';
@@ -89,11 +82,14 @@ function winnerCode(value) {
     return null;
 }
 
-function betFamily(name) {
-    const raw = normalize(name);
-    if ((raw.includes('half time') && raw.includes('full time')) || raw.includes('ht ft')) return 'htft';
-    if (raw.includes('double chance')) return 'doubleChance';
-    if (['match winner', '1x2', 'full time result', 'fulltime result'].includes(raw)) return 'winner';
+function betFamily(bet) {
+    const raw = normalize(bet?.name);
+    const id = finite(bet?.id);
+    // Pre-match IDs: 7 = HT/FT, 1 = full-time 1X2 (context only).
+    // First-half double chance / highest-scoring half must never enter these maps.
+    if (id !== null && id !== 1 && id !== 7) return null;
+    if (['half time full time', 'ht ft', 'ht ft double'].includes(raw) && (id === null || id === 7)) return 'htft';
+    if (['match winner', '1x2', 'full time result', 'fulltime result'].includes(raw) && (id === null || id === 1)) return 'winner';
     return null;
 }
 
@@ -105,28 +101,28 @@ function parseOddsRows(items, preferredBookmakerId = null) {
         const bookmakers = (Array.isArray(row?.bookmakers) ? row.bookmakers : [])
             .filter(bookmaker => !preferredBookmakerId || Number(bookmaker?.id) === Number(preferredBookmakerId));
         if (!bookmakers.length) continue;
-        const parsed = {fixtureId, bookmaker:null, bookmakerId:null, winner:{}, doubleChance:{}, htft:{}, updatedAt:row?.update || null};
-        for (const bookmaker of bookmakers) {
+        const parsed = {fixtureId, bookmaker:null, bookmakerId:null, winner:{}, htft:{}, updatedAt:row?.update || null};
+        // Never fabricate a market by combining selections from different bookmakers.
+        for (const bookmaker of bookmakers.slice(0, 1)) {
             parsed.bookmaker ||= bookmaker?.name || null;
             parsed.bookmakerId ||= finite(bookmaker?.id);
             for (const bet of Array.isArray(bookmaker?.bets) ? bookmaker.bets : []) {
-                const family = betFamily(bet?.name);
+                const family = betFamily(bet);
                 if (!family) continue;
                 for (const value of Array.isArray(bet?.values) ? bet.values : []) {
                     const odd = finite(value?.odd);
                     if (!odd || odd <= 1) continue;
                     const code = family === 'htft'
                         ? htftCode(value?.value)
-                        : family === 'doubleChance'
-                            ? doubleChanceCode(value?.value)
-                            : winnerCode(value?.value);
+                        : winnerCode(value?.value);
                     if (!code) continue;
                     if (!parsed[family][code] || odd > parsed[family][code]) parsed[family][code] = odd;
                 }
             }
         }
-        if (Object.keys(parsed.winner).length || Object.keys(parsed.doubleChance).length || Object.keys(parsed.htft).length) {
-            result.set(fixtureId, parsed);
+        if (Object.keys(parsed.htft).length) {
+            const previous = result.get(fixtureId);
+            if (!previous || (Date.parse(parsed.updatedAt) || 0) >= (Date.parse(previous.updatedAt) || 0)) result.set(fixtureId, parsed);
         }
     }
     return result;
@@ -161,7 +157,9 @@ function normalizedHtftProbabilities(htftOdds) {
         return {probabilities:{}, coverage:0, complete:false, overround:null};
     }
     return {
-        probabilities:Object.fromEntries(entries.map(([code,value]) => [code, Number((value * 100 / overround).toFixed(1))])),
+        // Normalizing a partial set would inflate its displayed probabilities.
+        probabilities:entries.length === HTFT_CODES.length
+            ? Object.fromEntries(entries.map(([code,value]) => [code, Number((value * 100 / overround).toFixed(1))])) : {},
         coverage:entries.length,
         complete:entries.length === HTFT_CODES.length,
         overround:Number((overround * 100).toFixed(1))
@@ -216,6 +214,7 @@ function teamSummary(item, venue) {
         concededPerGame: played > 0 && conceded !== null ? Number((conceded / played).toFixed(2)) : finite(item?.goals?.against?.average?.[venue]),
         scoringMinutes: minuteSplit(item?.goals?.for?.minute),
         concedingMinutes: minuteSplit(item?.goals?.against?.minute),
+        phaseScope:'season-all-venues',
         cleanSheets: finite(item?.clean_sheet?.[venue]),
         failedToScore: finite(item?.failed_to_score?.[venue])
     };
@@ -223,12 +222,15 @@ function teamSummary(item, venue) {
 
 function profileReady(profile) {
     return Number(profile?.played) >= MIN_PROFILE_MATCHES &&
-        finite(profile?.scoredPerGame) !== null && finite(profile?.concededPerGame) !== null;
+        finite(profile?.scoredPerGame) !== null && finite(profile?.concededPerGame) !== null &&
+        Number(profile.scoredPerGame) >= 0 && Number(profile.concededPerGame) >= 0;
 }
 
 function phaseReady(split) {
     return Number(split?.total) >= MIN_PHASE_EVENTS &&
-        finite(split?.firstShare) !== null && finite(split?.secondShare) !== null;
+        finite(split?.firstShare) !== null && finite(split?.secondShare) !== null &&
+        split.firstShare >= 0 && split.secondShare >= 0 && split.firstShare <= 100 && split.secondShare <= 100 &&
+        Math.abs(Number(split.firstShare) + Number(split.secondShare) - 100) <= .2;
 }
 
 function boundedScore(value) {
@@ -260,45 +262,19 @@ function profileDataReliability(homeProfile, awayProfile) {
     return boundedScore(profileScore * .7 + phaseCount * 7.5);
 }
 
-function predictedSide(fixture, prediction) {
-    if (prediction?.winnerId && prediction.winnerId === finite(fixture?.teams?.home?.id)) return 'home';
-    if (prediction?.winnerId && prediction.winnerId === finite(fixture?.teams?.away?.id)) return 'away';
-    const p = prediction?.percent || {};
-    if (p.home !== null && p.home >= (p.draw ?? -1) && p.home >= (p.away ?? -1)) return 'home';
-    if (p.away !== null && p.away >= (p.draw ?? -1) && p.away >= (p.home ?? -1)) return 'away';
-    return 'draw';
-}
-
 function buildPicks(fixture, odds, prediction, homeProfile, awayProfile) {
-    const doubleChancePicks = [];
     const htftPicks = [];
-    const side = predictedSide(fixture, prediction);
     const p = prediction?.percent || {};
     const marketProbability = normalizedWinnerProbabilities(odds?.winner);
     const htftMarket = normalizedHtftProbabilities(odds?.htft);
     const profilesComplete = profileReady(homeProfile) && profileReady(awayProfile);
-    const profileBonus = profilesComplete ? 8 : 0;
+    const phasesComplete = [homeProfile?.scoringMinutes, homeProfile?.concedingMinutes,
+        awayProfile?.scoringMinutes, awayProfile?.concedingMinutes].every(phaseReady);
+    const selectionReady = profilesComplete && phasesComplete && htftMarket.complete && marketProbability !== null;
     const add = (target, market, selection, odd, reasons, qualityScore, support = {}) => {
         if (!finite(odd)) return;
         target.push({market, selection, odd:Number(odd), reasons, qualityScore:boundedScore(qualityScore), support, labOnly:true});
     };
-    const api1X = (finite(p.home) ?? 0) + (finite(p.draw) ?? 0);
-    const apiX2 = (finite(p.away) ?? 0) + (finite(p.draw) ?? 0);
-    const market1X = marketProbability ? marketProbability['1'] + marketProbability.X : null;
-    const marketX2 = marketProbability ? marketProbability['2'] + marketProbability.X : null;
-    if (prediction?.winOrDraw && side === 'home' && api1X >= 60 && market1X !== null && market1X >= 60) {
-        add(doubleChancePicks, 'Çifte Şans', '1X', odds?.doubleChance?.['1X'],
-            [`API 1X desteği %${api1X.toFixed(1)}`, `Marjsız piyasa 1X %${market1X.toFixed(1)}`],
-            api1X * .55 + market1X * .37 + profileBonus,
-            {apiProbability:Number(api1X.toFixed(1)),marketProbability:Number(market1X.toFixed(1)),profilesComplete});
-    }
-    if (prediction?.winOrDraw && side === 'away' && apiX2 >= 60 && marketX2 !== null && marketX2 >= 60) {
-        add(doubleChancePicks, 'Çifte Şans', 'X2', odds?.doubleChance?.['X2'],
-            [`API X2 desteği %${apiX2.toFixed(1)}`, `Marjsız piyasa X2 %${marketX2.toFixed(1)}`],
-            apiX2 * .55 + marketX2 * .37 + profileBonus,
-            {apiProbability:Number(apiX2.toFixed(1)),marketProbability:Number(marketX2.toFixed(1)),profilesComplete});
-    }
-
     const apiSide = {'1':metric(p.home), '0':metric(p.draw), '2':metric(p.away)};
     const marketSide = {'1':metric(marketProbability?.['1']), '0':metric(marketProbability?.X), '2':metric(marketProbability?.['2'])};
     const sideSupport = token => average([apiSide[token], marketSide[token]], 33.3);
@@ -360,51 +336,49 @@ function buildPicks(fixture, odds, prediction, homeProfile, awayProfile) {
         ], qualityScore, {
             apiProbability:apiSide[full], marketProbability:marketSide[full],
             htftMarketProbability:htftProbability, htftMarketCoverage:htftMarket.coverage,
-            htftMarketComplete:htftMarket.complete, profilesComplete, reliability, dataLevel, tier,
+            htftMarketComplete:htftMarket.complete, profilesComplete, phasesComplete, selectionReady, reliability, dataLevel, tier,
             scoringAverage, concedingAverage
         });
     }
 
     htftPicks.sort((a,b)=>b.qualityScore-a.qualityScore || a.odd-b.odd || a.selection.localeCompare(b.selection));
-    doubleChancePicks.sort((a,b)=>b.qualityScore-a.qualityScore || a.odd-b.odd);
-    // İY/MS bu modun ana ürünüdür. Aynı maçta en güçlü üç İY/MS adayı
-    // korunur; çifte şans yalnızca ikincil referans olarak en fazla bir adet eklenir.
-    return [...htftPicks.slice(0,3), ...doubleChancePicks.slice(0,1)];
+    // Ranked alternatives are diagnostics, never three simultaneous coupon legs.
+    return htftPicks.slice(0,3);
 }
 
 function settlePick(pick, fixture) {
-    const home = finite(fixture?.goals?.home);
-    const away = finite(fixture?.goals?.away);
+    const status = String(fixture?.fixture?.status?.short || '').toUpperCase();
+    if (!['FT','AET','PEN'].includes(status)) return null;
+    // Regulation-time markets do not include extra-time or penalty goals.
+    const fulltime = fixture?.score?.fulltime;
+    const home = finite(status === 'FT' ? fulltime?.home ?? fixture?.goals?.home : fulltime?.home);
+    const away = finite(status === 'FT' ? fulltime?.away ?? fixture?.goals?.away : fulltime?.away);
     const halfHome = finite(fixture?.score?.halftime?.home);
     const halfAway = finite(fixture?.score?.halftime?.away);
-    if (home === null || away === null) return null;
+    if (![home,away].every(value=>Number.isInteger(value) && value >= 0)) return null;
     const full = home > away ? '1' : home < away ? '2' : '0';
     if (pick.market === 'Çifte Şans') {
+        // Read-only grading of legacy history; this mode cannot create a new DC pick.
+        if (!['1X','X2','12'].includes(pick.selection)) return null;
         const won = pick.selection === '1X' ? full !== '2' : pick.selection === 'X2' ? full !== '1' : full !== '0';
         return {won, score:`${home}-${away}`};
     }
-    if (pick.market === 'İY/MS' && halfHome !== null && halfAway !== null) {
+    if (pick.market === 'İY/MS' && HTFT_CODES.includes(pick.selection) &&
+        [halfHome,halfAway].every(value=>Number.isInteger(value) && value >= 0) && halfHome <= home && halfAway <= away) {
         const half = halfHome > halfAway ? '1' : halfHome < halfAway ? '2' : '0';
         return {won:`${half}/${full}` === pick.selection, score:`${halfHome}-${halfAway} / ${home}-${away}`};
     }
     return null;
 }
 
-function rankCouponRows(rows, maximumSelected, maximumDoubleChance = 2) {
+function rankCouponRows(rows, maximumSelected) {
     const score = row => Number(row?.candidateScore) || 0;
     const kickoff = row => Date.parse(row?.kickoff) || 0;
     const ordered = list => [...list].sort((a,b) => score(b) - score(a) || kickoff(a) - kickoff(b));
-    const htftRows = ordered(rows.filter(row => row.picks?.some(pick => pick.market === 'İY/MS')));
-    const selected = htftRows.slice(0, maximumSelected);
-    const selectedIds = new Set(selected.map(row => row.id));
-    const remaining = Math.max(0, maximumSelected - selected.length);
-    if (remaining > 0 && maximumDoubleChance > 0) {
-        const fallback = ordered(rows.filter(row => !selectedIds.has(row.id) &&
-            row.picks?.some(pick => pick.market === 'Çifte Şans')))
-            .slice(0, Math.min(remaining, maximumDoubleChance));
-        selected.push(...fallback);
-    }
-    return selected;
+    const htftRows = ordered(rows.filter(row => row.policyVersion === VERSION && row.picks?.length === 1 &&
+        row.picks[0].market === 'İY/MS' && row.picks[0].support?.selectionReady === true));
+    const unique = new Set();
+    return htftRows.filter(row=>{if(unique.has(row.fixtureId))return false;unique.add(row.fixtureId);return true;}).slice(0, maximumSelected);
 }
 
 class CouponLab {
@@ -419,7 +393,6 @@ class CouponLab {
         this.reserve = Math.max(0, Number(options.reserve) || 1000);
         this.maxCandidates = Math.max(1, Number(options.maxCandidates) || 30);
         this.maxSelected = Math.max(1, Number(options.maxSelected) || 10);
-        this.maxDoubleChance = Math.max(0, Math.min(this.maxSelected, Number.isFinite(Number(options.maxDoubleChance)) ? Number(options.maxDoubleChance) : 2));
         this.scanHour = Math.min(23, Math.max(0, Number(options.scanHour) || 9));
         this.scanMinute = Math.min(59, Math.max(0, Number(options.scanMinute) || 0));
         this.finalCheckMinutes = Math.max(15, Number(options.finalCheckMinutes) || 75);
@@ -429,6 +402,7 @@ class CouponLab {
         this.autoEnabled = options.autoEnabled !== false;
         this.running = false;
         this.settling = false;
+        this.storageError = null;
         this.data = {version:VERSION, bookmaker:{id:null,name:this.bookmakerName}, settings:null, usage:{}, scans:[], candidates:[], teamCache:{}};
     }
 
@@ -440,8 +414,7 @@ class CouponLab {
             finalCheckMinutes:this.finalCheckMinutes,
             dailyLimit:this.dailyLimit,
             maxCandidates:this.maxCandidates,
-            maxSelected:this.maxSelected,
-            maxDoubleChance:this.maxDoubleChance
+            maxSelected:this.maxSelected
         };
     }
 
@@ -470,9 +443,7 @@ class CouponLab {
         integer('dailyLimit',20,2000,'Günlük API bütçesi');
         integer('maxCandidates',1,100,'Maksimum aday');
         integer('maxSelected',1,30,'Maksimum kupon maçı');
-        integer('maxDoubleChance',0,30,'Maksimum çifte şans');
         if (next.maxSelected > next.maxCandidates) throw new Error('Maksimum kupon maçı, maksimum aday sayısından büyük olamaz.');
-        if (next.maxDoubleChance > next.maxSelected) throw new Error('Maksimum çifte şans, maksimum kupon maçı sayısından büyük olamaz.');
         this.enabled = next.enabled;
         this.includeTomorrow = next.includeTomorrow;
         [this.scanHour,this.scanMinute] = next.scanTime.split(':').map(Number);
@@ -480,7 +451,6 @@ class CouponLab {
         this.dailyLimit = next.dailyLimit;
         this.maxCandidates = next.maxCandidates;
         this.maxSelected = next.maxSelected;
-        this.maxDoubleChance = next.maxDoubleChance;
         this.data.settings = this.settingsSnapshot();
         if (persist) this.save();
         return this.status();
@@ -490,11 +460,23 @@ class CouponLab {
         try {
             if (this.filePath && fs.existsSync(this.filePath)) {
                 const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-                if (parsed && typeof parsed === 'object') this.data = {...this.data, ...parsed, version:VERSION};
+                if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object' ||
+                    !Array.isArray(parsed.candidates) || !Array.isArray(parsed.scans)) throw new Error('Geçmiş dosya yapısı geçersiz');
+                this.data = {...this.data, ...parsed, version:VERSION};
             }
             if (this.data.settings && typeof this.data.settings === 'object') this.applySettings(this.data.settings, false);
             else this.data.settings = this.settingsSnapshot();
+            // Preserve historical predictions/results, but never re-approve old mixed-market rows.
+            for (const row of this.data.candidates || []) {
+                if (row.policyVersion !== VERSION && row.active !== false) {
+                    row.active = false;
+                    row.selected = false;
+                    row.retiredReason = 'Önceki karma kupon sürümü; yalnız İY/MS için yeniden taranmalı';
+                    if (row.finalCheck?.status === 'waiting') row.finalCheck = {status:'superseded',checkedAt:new Date().toISOString(),reasons:[row.retiredReason]};
+                }
+            }
         } catch (error) {
+            this.storageError = 'Kupon geçmişi okunamadı; dosya korunuyor. Yedeği kontrol etmeden yeni tarama yapılmaz.';
             this.logger(`> ⚠️ Kupon LAB geçmişi okunamadı: ${error.message}`);
         }
         this.trim();
@@ -502,6 +484,7 @@ class CouponLab {
     }
 
     save() {
+        if (this.storageError) throw new Error(this.storageError);
         this.trim();
         this.data.settings = this.settingsSnapshot();
         if (this.filePath) atomicWrite(this.filePath, this.data);
@@ -522,6 +505,7 @@ class CouponLab {
     }
 
     consume(now = new Date()) {
+        if (this.storageError) throw new Error(this.storageError);
         if (!this.enabled) throw new Error('Kupon LAB panelden kapatıldı.');
         const key = dateKey(now);
         const used = this.usageToday(now);
@@ -535,7 +519,9 @@ class CouponLab {
 
     async call(url, now = new Date()) {
         this.consume(now);
-        return this.apiGet(url, {dinoMaxAttempts:1});
+        const response = await this.apiGet(url, {dinoMaxAttempts:1});
+        if (!response?.data || Object.keys(response.data.errors || {}).length) throw new Error('Kupon API yanıtı geçersiz veya servis hata bildirdi.');
+        return response;
     }
 
     async bookmakerId(now) {
@@ -557,6 +543,7 @@ class CouponLab {
             const response = await this.call(`/odds?date=${day}&bookmaker=${bookmakerId}&page=${page}`, now);
             rows.push(...(Array.isArray(response?.data?.response) ? response.data.response : []));
             total = Math.max(1, Number(response?.data?.paging?.total) || 1);
+            if (total > 50) throw new Error('Kupon oran listesi 50 sayfayı aşıyor; eksik tarama tamamlandı sayılmadı.');
             page++;
         } while (page <= total && page <= 50);
         return rows;
@@ -578,6 +565,7 @@ class CouponLab {
     }
 
     async scanToday({mode='manual', now=new Date()} = {}) {
+        if (this.storageError) throw new Error(this.storageError);
         if (!this.enabled) throw new Error('Kupon LAB kapalı.');
         if (this.running || this.settling) throw new Error('Kupon LAB işlemi zaten çalışıyor.');
         this.running = true;
@@ -585,10 +573,10 @@ class CouponLab {
         const day = dateKey(now);
         const scanDays = [day];
         if (this.includeTomorrow) scanDays.push(dateKey(new Date(now.getTime() + 24 * 60 * 60 * 1000)));
-        const scan = {id:`coupon-${Date.now()}`, day, days:scanDays, mode, startedAt, completedAt:null, status:'running', apiStart:this.usageToday(now), fixtures:0, marketFixtures:0, candidates:0, selected:0, error:null};
+        const scan = {id:`coupon-${Date.now()}`, policyVersion:VERSION, day, days:scanDays, mode, startedAt, completedAt:null, status:'running', apiStart:this.usageToday(now), fixtures:0, marketFixtures:0, candidates:0, selected:0, error:null};
         this.data.scans.push(scan);
-        this.save();
         try {
+            this.save();
             this.logger(`> 🎟️ Kupon LAB ${mode === 'manual' ? 'manuel' : 'günlük'} taraması başladı: ${scanDays.join(' + ')}.`);
             await this.settlePending(now);
             const bookmakerId = await this.bookmakerId(now);
@@ -625,23 +613,29 @@ class CouponLab {
                     this.teamProfile(fixture, 'away', now)
                 ]);
                 const odds = oddsMap.get(fixtureId);
-                const picks = buildPicks(fixture, odds, prediction, homeProfile, awayProfile);
-                const primaryPicks = picks.filter(pick => pick.market === 'İY/MS');
-                const scoringPicks = primaryPicks.length ? primaryPicks : picks;
-                const candidateScore = scoringPicks.length ? Math.max(...scoringPicks.map(pick => Number(pick.qualityScore) || 0)) : 0;
+                const alternatives = buildPicks(fixture, odds, prediction, homeProfile, awayProfile);
+                const picks = alternatives[0]?.support?.selectionReady ? [alternatives[0]] : [];
+                const candidateScore = alternatives[0]?.qualityScore || 0;
+                const noSelectionReasons = [];
+                if (!alternatives.length) noSelectionReasons.push('İY/MS marketi yok');
+                if (!profileReady(homeProfile) || !profileReady(awayProfile)) noSelectionReasons.push('İki takım için en az 5 maçlık gol profili gerekli');
+                if (![homeProfile?.scoringMinutes,homeProfile?.concedingMinutes,awayProfile?.scoringMinutes,awayProfile?.concedingMinutes].every(phaseReady)) noSelectionReasons.push('Gol atma/yeme İY-2Y dağılımı eksik veya yetersiz');
+                if (!normalizedHtftProbabilities(odds.htft).complete) noSelectionReasons.push('Dokuz İY/MS oranının tamamı yok');
+                if (!normalizedWinnerProbabilities(odds.winner)) noSelectionReasons.push('MS1/X/MS2 bağlam oranları eksik');
                 newRows.push({
+                    policyVersion:VERSION,
                     id:`${scan.id}:${fixtureId}`, scanId:scan.id, capturedAt:new Date().toISOString(), day, fixtureDay:dateKey(new Date(fixture.fixture.date)),
                     fixtureId, kickoff:fixture.fixture.date, leagueId:finite(fixture?.league?.id), league:fixture?.league?.name || '-', country:fixture?.league?.country || null,
                     home:{id:finite(fixture?.teams?.home?.id), name:fixture?.teams?.home?.name || '-'},
                     away:{id:finite(fixture?.teams?.away?.id), name:fixture?.teams?.away?.name || '-'},
                     bookmaker:odds.bookmaker, bookmakerId:odds.bookmakerId, odds,
-                    prediction, profiles:{home:homeProfile,away:awayProfile}, picks, candidateScore,
-                    candidateMarket:primaryPicks.length ? 'İY/MS' : picks.length ? 'Çifte Şans' : null,
+                    prediction, profiles:{home:homeProfile,away:awayProfile}, picks, alternatives, noSelectionReasons, candidateScore,
+                    candidateMarket:picks.length ? 'İY/MS' : null,
                     selected:false, active:true,
-                    finalCheck:{status:'waiting',checkedAt:null,reasons:[]}, result:{status:'pending',score:null,picks:[]}
+                    finalCheck:{status:'waiting',checkedAt:null,reasons:[]}, result:{status:picks.length?'pending':'not-selected',score:null,picks:[]}
                 });
             }
-            const ranked = rankCouponRows(newRows.filter(row => row.picks.length), this.maxSelected, this.maxDoubleChance);
+            const ranked = rankCouponRows(newRows, this.maxSelected);
             const selected = new Set(ranked.map(row => row.id));
             for (const row of newRows) row.selected = selected.has(row.id);
             const refreshedFixtures = new Set(newRows.map(row => Number(row.fixtureId)));
@@ -670,6 +664,11 @@ class CouponLab {
     }
 
     async finalCheck(row, now = new Date()) {
+        if (row.policyVersion !== VERSION || row.picks?.length !== 1 || row.picks[0].market !== 'İY/MS') {
+            row.finalCheck = {status:'rejected',checkedAt:now.toISOString(),reasons:['Eski/karma seçim; güncel İY/MS taraması gerekli']};
+            this.save();
+            return row.finalCheck;
+        }
         const bookmakerId = await this.bookmakerId(now);
         const [fixtureResponse, oddsResponse, predictionResponse] = await Promise.all([
             this.call(`/fixtures?id=${row.fixtureId}`, now),
@@ -684,9 +683,12 @@ class CouponLab {
         const reasons = [];
         if (!fixture || !['NS','TBD'].includes(String(fixture?.fixture?.status?.short || '').toUpperCase())) reasons.push('Maç artık başlamamış durumda değil');
         if (!odds) reasons.push('Bookmaker marketi kapalı veya yok');
+        const freshKickoff = Date.parse(fixture?.fixture?.date);
+        if (!Number.isFinite(freshKickoff) || freshKickoff <= now.getTime()) reasons.push('Maçın güncel başlangıç saati geçersiz veya geçti');
+        else if (freshKickoff !== Date.parse(row.kickoff)) reasons.push('Başlangıç saati değişti; yeni ana tarama gerekli');
         for (const pick of row.picks) {
             const refreshed = freshPicks.find(item => item.market === pick.market && item.selection === pick.selection);
-            if (!refreshed) reasons.push(`${pick.selection} güncel tahmin/piyasa/profil kuralını artık geçmiyor`);
+            if (!refreshed || refreshed.support?.selectionReady !== true) reasons.push(`${pick.selection} güncel piyasa/profil verisi artık yeterli değil`);
             else {
                 pick.finalOdd = Number(refreshed.odd);
                 pick.finalQualityScore = refreshed.qualityScore;
@@ -701,32 +703,44 @@ class CouponLab {
 
     async runDueFinalChecks(now = new Date()) {
         if (!this.enabled || this.running || this.settling || !this.canRun()) return 0;
-        const due = this.data.candidates.filter(row => row.active !== false && row.selected && row.result?.status === 'pending' && row.finalCheck?.status === 'waiting' && Date.parse(row.kickoff) - now.getTime() <= this.finalCheckMinutes * 60000 && Date.parse(row.kickoff) > now.getTime());
+        const due = this.data.candidates.filter(row => row.policyVersion === VERSION && row.active !== false && row.selected && row.result?.status === 'pending' && row.finalCheck?.status === 'waiting' && Date.parse(row.kickoff) - now.getTime() <= this.finalCheckMinutes * 60000 && Date.parse(row.kickoff) > now.getTime());
+        if (!due.length) return 0;
+        this.running = true;
         let checked = 0;
-        for (const row of due) {
-            try { await this.finalCheck(row, now); checked++; }
-            catch (error) { row.finalCheck = {status:'error',checkedAt:now.toISOString(),reasons:[error.message]}; this.save(); }
+        try {
+            for (const row of due) {
+                try { await this.finalCheck(row, now); checked++; }
+                catch (error) { row.finalCheck = {status:'error',checkedAt:now.toISOString(),reasons:[error.message]}; this.save(); }
+            }
+            return checked;
+        } finally {
+            this.running = false;
         }
-        return checked;
     }
 
     async settlePending(now = new Date()) {
         const pending = this.data.candidates.filter(row => row.result?.status === 'pending' && Date.parse(row.kickoff) < now.getTime() - RESULT_CHECK_AFTER_MINUTES * 60 * 1000);
         let settled = 0;
+        let changed = false;
         for (let index = 0; index < pending.length; index += 20) {
             const batch = pending.slice(index, index + 20);
-            const ids = batch.map(row => row.fixtureId).join('-');
+            const ids = [...new Set(batch.map(row => row.fixtureId))].join('-');
             const response = await this.call(`/fixtures?ids=${ids}`, now);
             const fixtures = new Map((response?.data?.response || []).map(fixture => [Number(fixture?.fixture?.id), fixture]));
             for (const row of batch) {
                 const fixture = fixtures.get(Number(row.fixtureId));
                 if (!fixture || !FINAL_STATUSES.has(String(fixture?.fixture?.status?.short || '').toUpperCase())) continue;
-                const results = row.picks.map(pick => ({...pick, ...settlePick(pick, fixture)})).filter(item => item.won !== null && item.won !== undefined);
+                const results = row.picks.map(pick => ({...pick, ...settlePick(pick, fixture)})).filter(item => typeof item.won === 'boolean');
+                if (results.length !== row.picks.length || !results.length) {
+                    row.result.reason = 'Normal süre / ilk yarı skoru eksik veya tutarsız; kesin sonuç bekleniyor';
+                    changed = true;
+                    continue;
+                }
                 row.result = {status:'settled', score:results[0]?.score || `${fixture?.goals?.home ?? '-'}-${fixture?.goals?.away ?? '-'}`, picks:results, settledAt:now.toISOString()};
                 settled++;
             }
         }
-        if (settled) this.save();
+        if (settled || changed) this.save();
         return settled;
     }
 
@@ -745,8 +759,8 @@ class CouponLab {
     }
 
     shouldAutoScan(now = new Date()) {
-        if (!this.enabled || !this.autoEnabled || this.running || this.settling || istanbulClockMinutes(now) < this.scanHour * 60 + this.scanMinute) return false;
-        return !this.data.scans.some(scan => scan.day === dateKey(now) && scan.status === 'complete');
+        if (this.storageError || !this.enabled || !this.autoEnabled || this.running || this.settling || istanbulClockMinutes(now) < this.scanHour * 60 + this.scanMinute) return false;
+        return !this.data.scans.some(scan => scan.policyVersion === VERSION && scan.day === dateKey(now) && scan.status === 'complete');
     }
 
     setAutoEnabled(value) {
@@ -756,20 +770,22 @@ class CouponLab {
 
     status(now = new Date()) {
         const day = dateKey(now);
-        const todayRows = this.data.candidates.filter(row => row.day === day && row.active !== false);
-        const latestScan = [...this.data.scans].reverse().find(scan => scan.day === day) || this.data.scans.at(-1) || null;
+        const todayRows = this.data.candidates.filter(row => row.policyVersion === VERSION && row.day === day && row.active !== false);
+        const scans = this.data.scans.filter(scan=>scan.policyVersion === VERSION);
+        const latestScan = [...scans].reverse().find(scan => scan.day === day) || scans.at(-1) || null;
         return {
-            success:true, version:VERSION, enabled:this.enabled, autoEnabled:this.autoEnabled, running:this.running, settling:this.settling,
+            success:true, version:VERSION, storageError:this.storageError, enabled:this.enabled, autoEnabled:this.autoEnabled, running:this.running, settling:this.settling,
             day, scanHour:this.scanHour, scanMinute:this.scanMinute, scanTime:this.settingsSnapshot().scanTime, includeTomorrow:this.includeTomorrow, finalCheckMinutes:this.finalCheckMinutes,
             bookmaker:this.data.bookmaker, api:{used:this.usageToday(now),limit:this.dailyLimit,reserve:this.reserve,remaining:finite(this.getQuotaRemaining())},
-            limits:{maxCandidates:this.maxCandidates,maxSelected:this.maxSelected,maxDoubleChance:this.maxDoubleChance}, latestScan,
+            mode:'htft-only',
+            limits:{maxCandidates:this.maxCandidates,maxSelected:this.maxSelected}, latestScan,
             settings:this.settingsSnapshot(),
             summary:{candidates:todayRows.length,selected:todayRows.filter(row=>row.selected).length,
                 selectedHtft:todayRows.filter(row=>row.selected && row.picks?.some(pick=>pick.market==='İY/MS')).length,
-                selectedDoubleChance:todayRows.filter(row=>row.selected && !row.picks?.some(pick=>pick.market==='İY/MS') && row.picks?.some(pick=>pick.market==='Çifte Şans')).length,
                 passed:todayRows.filter(row=>row.finalCheck?.status==='passed').length,rejected:todayRows.filter(row=>row.finalCheck?.status==='rejected').length},
             candidates:todayRows.sort((a,b)=>Date.parse(a.kickoff)-Date.parse(b.kickoff)),
-            disclaimer:'Yalnız LAB verisidir; Telegram ve canlı V21/V22 sinyallerini etkilemez.'
+            archivedCandidates:this.data.candidates.filter(row=>row.policyVersion !== VERSION).length,
+            disclaimer:'Yalnız İY/MS LAB verisidir; puan başarı olasılığı değildir. Telegram ve canlı V24 sinyallerini etkilemez.'
         };
     }
 }

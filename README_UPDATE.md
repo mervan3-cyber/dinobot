@@ -1,9 +1,37 @@
-# V24 Ana + Live grup + erken ÜST “YAKALADIK!” — 5 Ekim 2026
+# İY/MS Kupon LAB — yalnız İY/MS güncellemesi — 5 Ekim 2026
 
 Bu ZIP mevcut **1 Ekim V24 Ana + Odak pre52** sürümü için birikimli güncellemedir; tam bot değildir.
-Önceki 5 Ekim V24 canlı geçiş ve Live grup paketlerindeki değişiklikleri de içerir; eski ZIP'leri ayrıca yüklemek gerekmez.
+Önceki 5 Ekim V24 canlı geçiş, Live grup ve erken ÜST paketlerindeki değişiklikleri de içerir; eski ZIP'leri ayrıca yüklemek gerekmez.
 Önceki paketleri zaten yüklediysen bu paketi de aynı şekilde uygulayabilirsin.
-Sürüm: `mac-yakala-v24-early-win-2026-10-05`.
+Sürüm: `mac-yakala-coupon-htft-only-2026-10-05`.
+
+## Bu sürüm: mevcut kupon modu yalnız İY/MS
+
+- Yeni çifte şans tahmini, yedek seçimi, ayarı, panel oran alanı ve canlı karar yolu bu kupon modundan kaldırıldı. MS1/X/MS2 oranları yalnız İY/MS analizi için bağlamdır.
+- Dokuz İY/MS kombinasyonu puanlanır; en iyi üç analiz görüntülenir. Maç başına en fazla **tek ana seçim** ayrılır; alternatifler kupona dahil değildir, onların sonuçları ana seçimin başarısına katılmaz.
+- Ana seçim için iki takımda en az 5 saha maçı, dört gol atma/yeme zaman profilinde en az 3 gol ve geçerli İY/2Y dağılımı, tam 9 İY/MS oranı ve MS1/X/MS2 bağlamı gerekir. Eksik veriler yalnız analiz olarak görünür; onay verilmez. Bunlar veri yeterliliği kontrolleridir, yeni bir başarı yüzdesi eşiği değildir.
+- Puan bir başarı olasılığı değildir. Piyasa yüzdesi tam dokuz orandan marj ayıklanarak hesaplanır; eksik markette yüzde gösterilmez. Skor ağırlıkları korunmuştur; yeni model eğitilmedi veya performans garantisi eklenmedi.
+- API takım profilinin gol ortalamaları ev/deplasman sahasına göredir. API dakika dağılımı sezonun **tüm sahaları** içindir; panel bunu açıkça belirtir. Gol dağılımı, ilk yarı kazanma sıklığı değildir.
+- Pre-match ID 7 yalnız İY/MS, ID 1 yalnız maç sonu bağlamıdır. ID 12/20 çifte şansları ve ID 11 en çok gol olan yarı karışamaz. Farklı bookmaker fiyatları tek tabloda birleştirilmez; daha yeni eksik market eski oranlarla doldurulmaz.
+- Maç önü kontrol yalnız ana seçimi tekrar değerlendirir; eksik market, başlamış/saati değişmiş maç veya yetersiz veri onay almaz. Yeşil ana seçim için son kontrolün geçmesi gerekir; bekleyen aday farklı renktedir.
+- Eksik skor 0-0 sayılmaz. Eksik/tutarsız ilk yarı veya normal süre skoru kesin kazandı/kaybetti olarak kapanmaz. AET/PEN maçlarında normal süre `score.fulltime` kullanılır, uzatma/penaltı golleri kullanılmaz. Hükmen maçlar normal İY/MS sonucu olarak otomatik derecelendirilmez.
+- Eski adaylar ve sonuçlar geçmiş dosyasında korunur; karma sürümün seçimleri aktif listeye/maç önü onayına yeniden alınmaz. Eski `maxDoubleChance` ayarı okunursa yok sayılır. Eski tamamlanmış tarama yeni yalnız-İY/MS taramasını engellemez.
+- Bozuk geçmiş dosyası sıfırlanmaz/üzerine yazılmaz; yeni kupon taraması durur. Günlük API bütçesi, genel rezerv, tek ana tarama, takım profili önbelleği ve tek maç önü kontrolü korunur. Ek market başına yeni API sorgusu veya yeni zamanlayıcı yoktur.
+- V24 Ana, Telegram/Live grup ve erken ÜST kararları değişmez. Kupon LAB yine Telegram'a göndermez.
+
+## İkinci sistem: Banko Kupon (henüz yapılmadı)
+
+Kullanıcının sonraki aşama taslağı: ayrı sistem ve panel başlığı, maç/ayak oranı en az 1.40, toplam kupon oranı 2.00 üstü; API'nin sunduğu tüm market aileleri değerlendirilebilir, olmayan marketler zorlanmaz. Bu sürümde uygulanmamıştır ve İY/MS moduna bu oran kuralları eklenmemiştir. “Banko” bir mod adı olacaktır, kazanma garantisi değildir.
+
+## Güncellemeden sonra
+
+Paneli Ctrl+F5 ile yenile: **İY/MS Kupon LAB** görünmeli, maksimum çifte şans alanı olmamalı. Eski kayıtlar aktif listeden ayrılacağı için güncel taramayı panelden başlatabilirsin. Yeni `.env` alanı gerekmez; `dino_coupon_lab_v1.json` ve diğer kalıcı verileri silme.
+
+42 test betiği çevrimdışı geçti. Ayrıca bir önceki gerçek API örneği yerelde tekrar ayrıştırıldı: 13 başlamamış örneğin 12 İY/MS marketi korundu, hiç çifte şans alanı üretilmedi. Bu sürüm için yeni gerçek API veya Telegram isteği yapılmadı; panel testleri DOM simülasyonuyla çalıştırıldı.
+
+---
+
+## Önceki birikimli V24 / Live grup / erken ÜST özellikleri (korundu)
 
 ## Onaylanan değişiklikler
 

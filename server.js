@@ -64,7 +64,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-early-win-2026-10-05';
+const BUILD_VERSION = 'mac-yakala-coupon-htft-only-2026-10-05';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -423,8 +423,6 @@ const COUPON_DAILY_LIMIT = Math.max(20, Number(process.env.DINO_COUPON_DAILY_LIM
 const COUPON_API_RESERVE = Math.max(0, Number(process.env.DINO_COUPON_API_RESERVE) || 1000);
 const COUPON_MAX_CANDIDATES = Math.max(1, Number(process.env.DINO_COUPON_MAX_CANDIDATES) || 30);
 const COUPON_MAX_SELECTED = Math.max(1, Number(process.env.DINO_COUPON_MAX_SELECTED) || 10);
-const COUPON_MAX_DOUBLE_CHANCE = Math.max(0, Math.min(COUPON_MAX_SELECTED,
-    Number.isFinite(Number(process.env.DINO_COUPON_MAX_DOUBLE_CHANCE)) ? Number(process.env.DINO_COUPON_MAX_DOUBLE_CHANCE) : 2));
 const COUPON_SCAN_HOUR = Math.min(23, Math.max(0, Number(process.env.DINO_COUPON_SCAN_HOUR) || 9));
 const COUPON_SCAN_MINUTE = Math.min(59, Math.max(0, Number(process.env.DINO_COUPON_SCAN_MINUTE) || 0));
 const COUPON_INCLUDE_TOMORROW = String(process.env.DINO_COUPON_INCLUDE_TOMORROW || 'false').toLowerCase() === 'true';
@@ -792,7 +790,6 @@ const couponLab = new CouponLab({
     reserve: COUPON_API_RESERVE,
     maxCandidates: COUPON_MAX_CANDIDATES,
     maxSelected: COUPON_MAX_SELECTED,
-    maxDoubleChance: COUPON_MAX_DOUBLE_CHANCE,
     scanHour: COUPON_SCAN_HOUR,
     scanMinute: COUPON_SCAN_MINUTE,
     includeTomorrow: COUPON_INCLUDE_TOMORROW,
@@ -7597,7 +7594,7 @@ const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 aynı | maç başına tek kayıt | Telegram YOK.`);
 addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Quiet + Seçici + V24/V25 Ortak hafta sonu; Gemini her gün aynı taze veriden ayrı geçmiş toplar; Guard ve yeni filtre deneyleri emekli; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
 addSystemLog(`> 🎯 V24 ODAK LAB: 7 kol | Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + B 2.5 pre>=52 + A 2.5 | yeni dönem B 2.5 pre32/pre52 kıyası | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
-addSystemLog(`> 🎟️ KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | İY/MS öncelikli puanlama | çifte şans en fazla ${couponLabStartupStatus.limits.maxDoubleChance} | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
+addSystemLog(`> 🎟️ İY/MS KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | yalnız İY/MS, maç başına tek ana aday | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);
 addSystemLog(`> 🟢 V22 LAB: ${DINO_V22_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | A/B/C OR | Temel/V16/V18 >%50 | 25–80 dk | 1.50–4.00 | taze doğrulama | maç başına 1 | V21 korunur | Telegram ayrı izlenir.`);
 telegramDelivery.load();
 sharingSettings.load();
