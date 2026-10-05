@@ -1984,7 +1984,7 @@
         <div class="card" id="section-coupon-lab">
             <div class="section-title">
                 <div>
-                    <h3>🎟️ Kupon LAB · Maç Önü</h3>
+                    <h3>🎟️ İY/MS Kupon LAB · Maç Önü</h3>
                     <p class="muted" id="coupon-lab-status" style="margin-top:4px;">Durum yükleniyor…</p>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
@@ -1992,7 +1992,7 @@
                     <button class="quick-scan-button" id="coupon-lab-scan" type="button" onclick="scanCouponLab()" style="width:auto;padding:10px 18px;">BUGÜNÜ ŞİMDİ TARA</button>
                 </div>
             </div>
-            <p class="muted">Bugünün, istenirse yarının başlamamış maçları taranır. Çifte şans API ile marjsız MS1/X/MS2 piyasa desteğini; İY/MS ayrıca en az 5 maçlık gol profili ve İY/2Y üretim-yeme dağılımını kullanır. Sonuçlar LAB’dır; Telegram’a ve canlı V24 kararına katkı yapmaz.</p>
+            <p class="muted">Yalnız İY/MS: 0/0, 0/1, 0/2, 1/0, 1/1, 1/2, 2/0, 2/1, 2/2. MS1/X/MS2 oranları yalnız analiz bağlamıdır; ayrı seçim değildir. Ana aday için iki takımda en az 5 maçlık gol profili, yeterli İY/2Y gol atma-yeme dağılımı ve dokuz İY/MS oranı gerekir. Maç başına tek ana aday seçilir; alternatifler kupona dahil değildir. Puan başarı olasılığı değildir. Sonuçlar yalnız LAB’dır; Telegram ve canlı V24 etkilenmez.</p>
             <div class="control-card" style="min-height:auto;margin:14px 0 16px;">
                 <div class="control-card__top">
                     <div><h3>Kupon tarama ayarları</h3><p>Değişiklikler sunucuda kalıcı tutulur ve yalnız Kupon LAB’ı etkiler.</p></div>
@@ -2006,20 +2006,19 @@
                     <label>Günlük API bütçesi<input type="number" id="coupon-setting-budget" min="20" max="2000" step="1" value="200" onchange="markCouponSettingsDirty()"></label>
                     <label>Maksimum aday<input type="number" id="coupon-setting-max-candidates" min="1" max="100" step="1" value="30" onchange="markCouponSettingsDirty()"></label>
                     <label>Maksimum kupon maçı<input type="number" id="coupon-setting-max-selected" min="1" max="30" step="1" value="10" onchange="markCouponSettingsDirty()"></label>
-                    <label>Maksimum çifte şans<input type="number" id="coupon-setting-max-double-chance" min="0" max="30" step="1" value="2" onchange="markCouponSettingsDirty()"></label>
                     <button class="quick-scan-button" id="coupon-settings-save" type="button" onclick="saveCouponLabSettings()" style="margin:8px 0;">AYARLARI KAYDET</button>
                 </div>
             </div>
             <div class="metrics">
-                <div class="metric info"><span class="metric-label">Marketteki maç</span><span class="metric-value" id="coupon-market-count">0</span></div>
+                <div class="metric info"><span class="metric-label">İY/MS marketli maç</span><span class="metric-value" id="coupon-market-count">0</span></div>
                 <div class="metric warning"><span class="metric-label">İncelenen</span><span class="metric-value" id="coupon-candidate-count">0</span></div>
-                <div class="metric success"><span class="metric-label">LAB seçimi</span><span class="metric-value" id="coupon-selected-count">0</span></div>
+                <div class="metric success"><span class="metric-label">Ana LAB adayı</span><span class="metric-value" id="coupon-selected-count">0</span></div>
                 <div class="metric info"><span class="metric-label">Maç önü geçti</span><span class="metric-value" id="coupon-passed-count">0</span></div>
                 <div class="metric warning"><span class="metric-label">Kupon API</span><span class="metric-value" id="coupon-api-usage">0 / 200</span></div>
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Saat</th><th>Lig / Maç</th><th>API tahmini</th><th>Takım gol profili</th><th>Bulunan marketler</th><th>LAB seçimleri</th><th>Maç önü kontrol</th><th>Sonuç</th></tr></thead>
+                    <thead><tr><th>Saat</th><th>Lig / Maç</th><th>API tahmini</th><th>Takım gol profili</th><th>İY/MS oranları / MS bağlamı</th><th>Ana aday / alternatif analiz</th><th>Maç önü kontrol</th><th>Ana seçim sonucu</th></tr></thead>
                     <tbody id="coupon-lab-rows"><tr><td colspan="8" class="empty-row">Henüz Kupon LAB taraması yapılmadı.</td></tr></tbody>
                 </table>
             </div>
@@ -2174,7 +2173,7 @@
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-<script src="/coupon_lab_panel.js?v=20260924a"></script>
+<script src="/coupon_lab_panel.js?v=20261005htft"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;

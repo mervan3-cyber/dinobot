@@ -32,7 +32,7 @@
         const played=profile.played ?? '-';
         const failed=profile.failedToScore ?? '-';
         const clean=profile.cleanSheets ?? '-';
-        return `${label}: ${played} maç · ${profile.scoredPerGame ?? '-'} atılan / ${profile.concededPerGame ?? '-'} yenen · İY %${profile.scoringMinutes?.firstShare ?? '-'} · 2Y %${profile.scoringMinutes?.secondShare ?? '-'} · gol atamadı ${failed} · gol yemedi ${clean}`;
+        return `${label}: ${played} saha maçı · ${profile.scoredPerGame ?? '-'} atılan / ${profile.concededPerGame ?? '-'} yenen · sezon tüm sahalar atılan İY/2Y %${profile.scoringMinutes?.firstShare ?? '-'}/%${profile.scoringMinutes?.secondShare ?? '-'} · yenen İY/2Y %${profile.concedingMinutes?.firstShare ?? '-'}/%${profile.concedingMinutes?.secondShare ?? '-'} · gol atamadı ${failed} · gol yemedi ${clean}`;
     }
     function predictionText(prediction) {
         const p=prediction?.percent || {};
@@ -54,10 +54,13 @@
         if(status==='passed')return '✅ Son kontrol geçti';
         if(status==='rejected')return `⛔ ${item.finalCheck.reasons?.join(' · ') || 'Reddedildi'}`;
         if(status==='error')return `⚠️ ${item.finalCheck.reasons?.join(' · ') || 'Kontrol hatası'}`;
-        return item?.selected ? '⏳ Maç önü kontrol bekliyor' : '— Seçilmedi';
+        if(!item?.selected)return `— Seçilmedi${item?.noSelectionReasons?.length?`: ${item.noSelectionReasons.join(' · ')}`:''}`;
+        if(Date.parse(item.kickoff)<=Date.now())return '⚠️ Maç önü kontrol tamamlanmadı; onaylı değil';
+        return '⏳ Maç önü kontrol bekliyor; henüz onaylı değil';
     }
     function resultText(item) {
-        if(item?.result?.status!=='settled')return '⏳ Bekliyor';
+        if(!item?.picks?.length)return '— Ana seçim yok';
+        if(item?.result?.status!=='settled')return `⏳ ${item?.result?.reason || 'Bekliyor'}`;
         const picks=(item.result.picks || []).map(pick=>`${pick.selection} ${pick.won?'✅':'❌'}`).join(' · ');
         return `${item.result.score || '-'}${picks?` · ${picks}`:''}`;
     }
@@ -77,10 +80,21 @@
             trCell(row,`${item.league || '-'} · ${item.home?.name || '-'} - ${item.away?.name || '-'}`);
             trCell(row,predictionText(item.prediction));
             trCell(row,`${profileText(item.profiles?.home,'Ev')} | ${profileText(item.profiles?.away,'Dep.')}`);
-            trCell(row,`ÇŞ: ${oddsText(item.odds?.doubleChance)} | İY/MS: ${oddsText(item.odds?.htft)}`);
-            trCell(row,picksText(item),item.selected?'positive':'muted');
+            trCell(row,`İY/MS: ${oddsText(item.odds?.htft)} | MS bağlamı: ${oddsText(item.odds?.winner)}`);
+            const pickCell=trCell(row,'');
+            const primary=document.createElement('div');
+            primary.textContent=`${item.selected?'Ana LAB adayı':'Ana seçim'}: ${picksText(item)}`;
+            primary.className=item.selected && item.finalCheck?.status==='passed'?'positive':item.selected?'warning-text':'muted';
+            pickCell.appendChild(primary);
+            const alternatives=(item.alternatives || []).filter(pick=>!item.picks?.some(primaryPick=>primaryPick.selection===pick.selection));
+            if(alternatives.length){
+                const alternate=document.createElement('div');
+                alternate.className='muted';
+                alternate.textContent=`Alternatif analiz (kupona dahil değil): ${picksText({picks:alternatives})}`;
+                pickCell.appendChild(alternate);
+            }
             trCell(row,finalText(item),item.finalCheck?.status==='passed'?'positive':item.finalCheck?.status==='rejected'?'warning-text':'muted');
-            trCell(row,resultText(item),item.result?.status==='settled'?'positive':'muted');
+            trCell(row,resultText(item),item.result?.status==='settled'?(item.result.picks?.every(pick=>pick.won===true)?'positive':'warning-text'):'muted');
             body.appendChild(row);
         }
     }
@@ -96,7 +110,6 @@
             setValue('coupon-setting-budget',settings.dailyLimit ?? data?.api?.limit ?? 200);
             setValue('coupon-setting-max-candidates',settings.maxCandidates ?? data?.limits?.maxCandidates ?? 30);
             setValue('coupon-setting-max-selected',settings.maxSelected ?? data?.limits?.maxSelected ?? 10);
-            setValue('coupon-setting-max-double-chance',settings.maxDoubleChance ?? data?.limits?.maxDoubleChance ?? 2);
         }
         const enabled=byId('coupon-setting-enabled')?.checked === true;
         const tomorrow=byId('coupon-setting-tomorrow')?.checked === true;
@@ -114,7 +127,7 @@
         const status=data?.settling?'Sonuçlar güncelleniyor…':data?.running?'Taranıyor…':scan
             ? `${(scan.days || [scan.day]).join(' + ')} · ${scan.status==='complete'?'tamamlandı':scan.status==='error'?'hata':'çalışıyor'} · ${data.bookmaker?.name || 'bookmaker'} · ${scan.apiUsed ?? 0} API`
             : `Her gün ${data?.scanTime || '09:00'} otomatik · henüz taranmadı`;
-        setText('coupon-lab-status',`${status} · ${data?.disclaimer || ''}`);
+        setText('coupon-lab-status',`${data?.storageError || status} · ${data?.disclaimer || ''}`);
         setText('coupon-market-count',scan?.marketFixtures ?? 0);
         setText('coupon-candidate-count',data?.summary?.candidates ?? 0);
         setText('coupon-selected-count',data?.summary?.selected ?? 0);
@@ -123,15 +136,15 @@
         renderSettings(data);
         const button=byId('coupon-lab-scan');
         if(button){
-            button.disabled=data?.running===true || data?.settling===true || data?.enabled===false;
+            button.disabled=data?.running===true || data?.settling===true || data?.enabled===false || Boolean(data?.storageError);
             button.textContent=data?.running?'TARANIYOR…':data?.includeTomorrow?'BUGÜN + YARINI ŞİMDİ TARA':'BUGÜNÜ ŞİMDİ TARA';
         }
         const settle=byId('coupon-lab-settle');
         if(settle){
-            settle.disabled=data?.running===true || data?.settling===true;
+            settle.disabled=data?.running===true || data?.settling===true || Boolean(data?.storageError);
             settle.textContent=data?.settling?'GÜNCELLENİYOR…':'SONUÇLARI GÜNCELLE';
         }
-        setText('coupon-lab-footnote',`Ana tarama her gün ${data?.scanTime || '09:00'}'da bir kez çalışır. İY/MS ana üründür; yalnız İY/MS bulunmayanlardan en fazla ${data?.limits?.maxDoubleChance ?? 2} çifte şans seçilir. Seçilen en fazla ${data?.limits?.maxSelected ?? 10} maç, başlangıçtan ${data?.finalCheckMinutes ?? 75} dakika önce bir kez doğrulanır. Günlük Kupon API bütçesi ${data?.api?.limit ?? 200}; genel API rezervi korunur.`);
+        setText('coupon-lab-footnote',`Yalnız İY/MS · maç başına tek ana aday; diğerleri kupona dahil olmayan alternatif analizdir. Puan başarı yüzdesi değildir; piyasa yüzdesi oranlardan hesaplanır. Ana tarama her gün ${data?.scanTime || '09:00'}'da bir kez çalışır. En fazla ${data?.limits?.maxSelected ?? 10} maç, başlangıçtan ${data?.finalCheckMinutes ?? 75} dakika önce bir kez doğrulanır. Günlük API bütçesi ${data?.api?.limit ?? 200}; genel rezerv korunur.${data?.archivedCandidates?` Önceki sürümün ${data.archivedCandidates} kaydı dosyada korunur; bu listede kıyaslanmaz.`:''}`);
         renderRows(data?.candidates || [],data?.day);
     }
     async function fetchCouponLab() {
@@ -177,8 +190,7 @@
             finalCheckMinutes:Number(byId('coupon-setting-final-minutes')?.value),
             dailyLimit:Number(byId('coupon-setting-budget')?.value),
             maxCandidates:Number(byId('coupon-setting-max-candidates')?.value),
-            maxSelected:Number(byId('coupon-setting-max-selected')?.value),
-            maxDoubleChance:Number(byId('coupon-setting-max-double-chance')?.value)
+            maxSelected:Number(byId('coupon-setting-max-selected')?.value)
         };
         settingsSaving=true;
         renderSettings(latestData || {settings:payload});
