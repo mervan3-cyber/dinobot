@@ -8,6 +8,7 @@
     const labels={waiting:'Ön aday · maç önü bekliyor',warning:'Uyarı · elle inceleyin',passed:'Maç önü kontrol geçti',rejected:'Güncel kontrol reddetti',pending:'Sonuç bekliyor',won:'Kazandı',lost:'Kaybetti'};
     const marketNames={1:'Maç sonucu',3:'2Y sonucu',5:'Toplam gol',6:'İY gol',7:'İY/MS',8:'KG Var/Yok',10:'Kesin skor',11:'En gollü yarı',12:'Çifte şans',13:'İY sonucu',16:'Ev takım golü',17:'Dep. takım golü',20:'İY çifte şans',26:'2Y gol',27:'Ev gol yememe',28:'Dep. gol yememe',31:'İY kesin skor',34:'İY KG',35:'2Y KG',45:'Toplam korner'};
     const statNames={'Total Shots':'Toplam şut','Shots on Goal':'İsabetli şut','Shots insidebox':'Ceza içi şut','Shots outsidebox':'Ceza dışı şut','Corner Kicks':'Korner','Yellow Cards':'Sarı kart','Red Cards':'Kırmızı kart',expected_goals:'xG'};
+    const optionalStats=new Set(['Yellow Cards','Red Cards','expected_goals']);
     const marketLabel=m=>{if(!m)return 'Seçim yok';const total=/^(Over|Under) (\d+(?:\.\d+)?)$/.exec(m.selection);const selection=total?`${total[2]} ${total[1]==='Over'?'ÜST':'ALT'}`:m.spec?.code?m.spec.code.replace(/X/g,m.spec.kind==='htft'?'0':'X'):({Home:'1',Draw:'X',Away:'2',Yes:'Var',No:'Yok'})[m.selection]||m.selection;return `${marketNames[m.betId]||m.market} · ${selection}`;};
     let latest=null,dirty=false,fetching=false,page=0,sessionId=null;
     const integerIds=['dailyLimit','maxCandidates','maxCoupons','precheckMinutes','maxOddsAgeHours'];
@@ -25,7 +26,10 @@
     }
     function profile(p,name){const box=el('div',undefined,'banko-profile');box.appendChild(el('h4',name));if(!p){box.appendChild(note('Geçmiş veri yok'));return box;}
         box.appendChild(table(['Örneklem','Maç','Atılan','Yenilen'],[['Son 5',p.last5.games,num(p.last5.scored),num(p.last5.conceded)],['Son 20 lig',p.last20.games,num(p.last20.scored),num(p.last20.conceded)],['Aynı saha',p.venueSummary.games,num(p.venueSummary.scored),num(p.venueSummary.conceded)]]));
-        box.appendChild(table(['Son 10 maçtan istatistik','Ort.','Dolu kayıt'],Object.entries(p.stats).map(([key,v])=>[statNames[key]||key,num(v.mean),`${v.games}/10`])));
+        const statRows=entries=>entries.map(([key,v])=>[statNames[key]||key,num(v.mean),`${v.games}/10`]);
+        box.appendChild(table(['Son 10 maçtan istatistik','Ort.','Dolu kayıt'],statRows(Object.entries(p.stats).filter(([key])=>!optionalStats.has(key)))));
+        const optional=el('details');optional.appendChild(el('summary','İsteğe bağlı veriler · kart / xG (seçim şartı değil)'));
+        optional.appendChild(table(['Son 10 maçtan isteğe bağlı veri','Ort.','Dolu kayıt'],statRows(Object.entries(p.stats).filter(([key])=>optionalStats.has(key)))));box.appendChild(optional);
         const history=el('details');history.appendChild(el('summary','Geçmiş maçları aç'));history.appendChild(table(['Tarih','Maç','Skor','İY'],p.rows.map(r=>[dt(r.date),`${r.homeName||r.homeId} - ${r.awayName||r.awayId}`,`${r.home}-${r.away}`,r.ht?`${r.ht.home}-${r.ht.away}`:'Eksik'])));box.appendChild(history);
         const players=el('details');players.appendChild(el('summary','Oyuncu geçmişi · son 5 / doğrulanmamış prop bağlamı'));players.appendChild(table(['Oyuncu','Süre','Gol / kayıt','Şut / kayıt','İsabet / kayıt'],p.players.map(p=>[p.name,p.minutes,`${p.goalSamples?p.goals:'—'} / ${p.goalSamples}`,`${p.shotSamples?p.shots:'—'} / ${p.shotSamples}`,`${p.onSamples?p.on:'—'} / ${p.onSamples}`])));box.appendChild(players);return box;
     }

@@ -1322,7 +1322,7 @@
         .filterlab-negative { color:#f3a294; font-weight:600; }
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
     </style>
-    <link rel="stylesheet" href="/banko_coupon.css?v=20261005banko1">
+    <link rel="stylesheet" href="/banko_coupon.css?v=20261006banko2">
 </head>
 <body>
     <div class="container" id="login-screen">
@@ -2045,7 +2045,7 @@
                     <label><input type="checkbox" id="banko-setting-predictionContext" checked onchange="markBankoDirty()"> API tavsiyesini bağlam olarak göster</label>
                     <label>Günlük Banko API tavanı<input type="number" id="banko-setting-dailyLimit" min="20" max="7500" value="2000" onchange="markBankoDirty()"></label>
                     <label>En fazla incelenecek maç<input type="number" id="banko-setting-maxCandidates" min="1" max="100" value="30" onchange="markBankoDirty()"></label>
-                    <label>En fazla kupon<input type="number" id="banko-setting-maxCoupons" min="1" max="2" value="1" onchange="markBankoDirty()"></label>
+                    <label>İstenen maksimum kupon sayısı<input type="number" id="banko-setting-maxCoupons" min="1" step="1" value="1" onchange="markBankoDirty()"></label>
                     <label>Maç önü kontrol (dk)<input type="number" id="banko-setting-precheckMinutes" min="15" max="120" value="75" onchange="markBankoDirty()"></label>
                     <label>Ayak minimum oran<input type="number" id="banko-setting-minLegOdd" min="1.4" max="3" step="0.01" value="1.40" onchange="markBankoDirty()"></label>
                     <label>Ayak maksimum oran<input type="number" id="banko-setting-maxLegOdd" min="1.4" max="5" step="0.01" value="2.20" onchange="markBankoDirty()"></label>
@@ -2057,6 +2057,8 @@
                     <label>Deneysel model/piyasa farkı (yüzde puan)<input type="number" id="banko-setting-minEdgePP" min="-10" max="20" step="0.1" value="0" onchange="markBankoDirty()"></label>
                     <label>En eski kabul edilen oran (saat)<input type="number" id="banko-setting-maxOddsAgeHours" min="1" max="24" value="6" onchange="markBankoDirty()"></label>
                 </div>
+                <p class="muted">Yeni taramalarda her iki takım için en az 8 geçmiş lig maçı ve 3 ilgili saha maçı gerekir. Yarı marketlerinde ayrıca 10 geçerli yarı skoru gerekir. Kart ve xG eksikliği seçim engeli değildir; isteğe bağlı ayrıntıda gösterilir.</p>
+                <p class="muted">Kupon sayısında sabit 2 tavanı yoktur; pozitif tam sayı yazabilirsiniz. Her kupon 1–2 maçlı kalır, aynı taramanın kuponlarında maç tekrarlanmaz. Bu sayı üst sınırdır; uygun maç yetmezse kupon zorlanmaz. İncelenecek maç ve API bütçesi ayarları ayrıca korunur.</p>
                 <p class="muted">Bu sınırlar başlangıç LAB filtreleridir; kanıtlanmış başarı eşikleri değildir. Bütçe 2000 isteği harcamaya zorlamaz. Günlük sayaç TSİ gününe göre tutulur; genel API kalan ve 1500 istek canlı rezervi de korunur.</p>
                 <div class="banko-families">
                     <label><input type="checkbox" data-banko-family="goals" checked onchange="markBankoDirty()"> ALT/ÜST</label>
@@ -2225,7 +2227,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
-<script src="/banko_coupon_panel.js?v=20261005banko1"></script>
+<script src="/banko_coupon_panel.js?v=20261006banko2"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
