@@ -1,6 +1,7 @@
 'use strict';
 // Transparent, uncalibrated LAB baselines. Never calls a provider or a messaging client.
-const VERSION='banko-model-lab-v1-2026-10-05';
+const VERSION='banko-model-lab-v2-2026-10-06';
+const DATA_POLICY=Object.freeze({minimumHistoryMatches:8,minimumVenueMatches:3,minimumPhaseMatches:10});
 const finite=value=>value===null||value===undefined||typeof value==='boolean'||String(value).trim()===''?null:Number.isFinite(Number(value))?Number(value):null;
 const mean=values=>values.length?values.reduce((s,v)=>s+v,0)/values.length:null;
 const normalize=value=>String(value??'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -44,7 +45,7 @@ function expectedGoals(home,away,baseline){
             defence:.6*shrink(p.venueRows,'conceded',opp)+.4*(.6*shrink(p.rows,'conceded',overall)+.4*shrink(p.rows.slice(0,5),'conceded',overall))};}
     const clamp=x=>Math.min(3.8,Math.max(.3,x));
     const goals={home:clamp(rates.home.attack*rates.away.defence/lh),away:clamp(rates.away.attack*rates.home.defence/la),rates,phase:null};
-    if(home.phases.games>=10&&away.phases.games>=10){
+    if(home.phases.games>=DATA_POLICY.minimumPhaseMatches&&away.phases.games>=DATA_POLICY.minimumPhaseMatches){
         const share=p=>{const score=p.phases.firstScored+p.phases.secondScored;return score>0?Math.max(.3,Math.min(.6,p.phases.firstScored/score)):.45;};
         goals.phase={homeFirst:goals.home*share(home),awayFirst:goals.away*share(away)};
         goals.phase.homeSecond=goals.home-goals.phase.homeFirst;goals.phase.awaySecond=goals.away-goals.phase.awayFirst;
@@ -105,13 +106,13 @@ function parseMarkets(rows,fixtureId,bookmakerId=8){
     return {update:row.update||null,bookmaker:{id:bookmakerId,name:b.name},markets:[...map.values()]};
 }
 function evaluateMarkets(odds,goals,profiles,settings,now,kickoff){
-    const sufficient=profiles.home.last20.games>=10&&profiles.away.last20.games>=10&&profiles.home.venueSummary.games>=5&&profiles.away.venueSummary.games>=5;
+    const sufficient=[profiles.home,profiles.away].every(p=>p.last20.games>=DATA_POLICY.minimumHistoryMatches&&p.venueSummary.games>=DATA_POLICY.minimumVenueMatches);
     const update=Date.parse(odds.update),validTime=Number.isFinite(update)&&update<=now.getTime()+60000&&update<Date.parse(kickoff)&&now.getTime()-update<=settings.maxOddsAgeHours*3600000;
     const memo=new Map();return odds.markets.map(m=>{
         const reasons=[];if(!m.spec)reasons.push('Bu marketin kuralı/oyuncu kimliği henüz doğrulanmadı; yalnız analiz');
         const key=m.spec?JSON.stringify(m.spec):m.key;let p=null;if(m.spec){if(!memo.has(key))memo.set(key,probability(m.spec,goals,profiles.home,profiles.away));p=memo.get(key);}
         if(p===null&&m.spec)reasons.push('Market için yeterli gol/yarı/istatistik örneklemi yok');
-        if(!sufficient)reasons.push('İki takımda 10 geçmiş lig maçı ve 5 saha maçı gerekli');
+        if(!sufficient)reasons.push(`İki takımda en az ${DATA_POLICY.minimumHistoryMatches} geçmiş lig maçı ve ${DATA_POLICY.minimumVenueMatches} saha maçı gerekli`);
         if(!validTime)reasons.push('Oran zaman damgası eski/geçersiz veya maç öncesi değil');
         if(m.spec?.kind==='corners')reasons.push('Korner tahmini deneysel; aşırı saçılım kalibre edilene kadar kupona alınmaz');
         if(m.odd<settings.minLegOdd||m.odd>settings.maxLegOdd)reasons.push('Ayak oran aralığı dışında');
@@ -146,4 +147,4 @@ function settle(pick,f){
     else {if(spec.period==='first'){h=ht.home;a=ht.away;}else if(spec.period==='second'){h-=ht.home;a-=ht.away;}won=predicate(spec,h,a);}
     return {status:won?'won':'lost',score:ft.home+'-'+ft.away,won,profitUnits:won?pick.odd-1:-1};
 }
-module.exports={VERSION,finite,mean,normalize,validScore,pastFixture,slimRich,teamProfile,expectedGoals,poisson,pairs,predicate,specFor,probability,parseMarkets,evaluateMarkets,optimize,settle};
+module.exports={VERSION,DATA_POLICY,finite,mean,normalize,validScore,pastFixture,slimRich,teamProfile,expectedGoals,poisson,pairs,predicate,specFor,probability,parseMarkets,evaluateMarkets,optimize,settle};

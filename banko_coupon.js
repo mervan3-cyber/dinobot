@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),M=require('./banko_model');
+// Storage schema stays v1 so existing sessions, frozen picks and API usage remain readable.
 const VERSION='banko-coupon-lab-v1-2026-10-05';
 const DEFAULTS=Object.freeze({enabled:true,dailyLimit:2000,maxCandidates:30,maxCoupons:1,minLegOdd:1.40,maxLegOdd:2.20,
     minCouponOdd:1.95,maxCouponOdd:2.40,minSingleOdd:1.80,maxSingleOdd:2.20,minModelProbability:65,minEdgePP:0,
@@ -12,8 +13,9 @@ function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});co
 function schemaSettings(input,previous=DEFAULTS){
     if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Ayar nesnesi gerekli.');const next=JSON.parse(JSON.stringify(previous));
     for(const key of ['enabled','autoPrecheck','women','predictionContext'])if(input[key]!==undefined){if(typeof input[key]!=='boolean')throw new Error(key+' true/false olmalı.');next[key]=input[key];}
-    const ranges={dailyLimit:[20,7500,true],maxCandidates:[1,100,true],maxCoupons:[1,2,true],minLegOdd:[1.4,3,false],maxLegOdd:[1.4,5,false],minCouponOdd:[1.8,4,false],maxCouponOdd:[1.8,5,false],minSingleOdd:[1.4,3,false],maxSingleOdd:[1.4,4,false],minModelProbability:[55,90,false],minEdgePP:[-10,20,false],maxOddsAgeHours:[1,24,true],precheckMinutes:[15,120,true]};
+    const ranges={dailyLimit:[20,7500,true],maxCandidates:[1,100,true],minLegOdd:[1.4,3,false],maxLegOdd:[1.4,5,false],minCouponOdd:[1.8,4,false],maxCouponOdd:[1.8,5,false],minSingleOdd:[1.4,3,false],maxSingleOdd:[1.4,4,false],minModelProbability:[55,90,false],minEdgePP:[-10,20,false],maxOddsAgeHours:[1,24,true],precheckMinutes:[15,120,true]};
     for(const [key,[lo,hi,int]] of Object.entries(ranges))if(input[key]!==undefined){const n=M.finite(input[key]);if(n===null||n<lo||n>hi||int&&!Number.isInteger(n))throw new Error(key+` ${lo}–${hi} arasında ${int?'tam ':''}sayı olmalı.`);next[key]=n;}
+    if(input.maxCoupons!==undefined){const n=M.finite(input.maxCoupons);if(!Number.isSafeInteger(n)||n<1)throw new Error('Kupon sayısı pozitif, güvenli bir tam sayı olmalı.');next.maxCoupons=n;}
     for(const [a,b] of [['minLegOdd','maxLegOdd'],['minCouponOdd','maxCouponOdd'],['minSingleOdd','maxSingleOdd']])if(next[a]>next[b])throw new Error('Minimum oran maksimumu aşamaz.');
     if(input.allowedLeagueIds!==undefined){if(!Array.isArray(input.allowedLeagueIds)||input.allowedLeagueIds.length>300||input.allowedLeagueIds.some(id=>!Number.isInteger(id)||id<1))throw new Error('Ligler pozitif kimlik dizisi olmalı.');next.allowedLeagueIds=[...new Set(input.allowedLeagueIds)];}
     if(input.marketFamilies!==undefined){if(!Array.isArray(input.marketFamilies)||!input.marketFamilies.length||input.marketFamilies.some(f=>!DEFAULTS.marketFamilies.includes(f)))throw new Error('En az bir geçerli market ailesi gerekli.');next.marketFamilies=[...new Set(input.marketFamilies)];}

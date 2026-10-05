@@ -30,9 +30,28 @@ const odds=M.parseMarkets(rows,1);assert.equal(odds.markets.length,1);assert.equ
 const settings={minLegOdd:1.4,maxLegOdd:2.2,maxOddsAgeHours:6,minModelProbability:65,minEdgePP:0,marketFamilies:['goals','corners']};
 const rejected=M.evaluateMarkets(odds,p,{home:profile(),away:profile()},settings,new Date('2099-01-01T12:00:00Z'),'2099-01-01T18:00:00Z');assert.equal(rejected[0].eligible,false);
 const cornerOdds={update:'2099-01-01T11:00:00Z',markets:[{key:'45|Over 6.5',betId:45,odd:1.5,spec:M.specFor(45,'Over 6.5')}]};assert.equal(M.evaluateMarkets(cornerOdds,p,{home:profile(),away:profile()},settings,new Date('2099-01-01T12:00:00Z'),'2099-01-01T18:00:00Z')[0].eligible,false,'Diagnostic corner model is never silently a coupon pick');
+assert.deepEqual(M.DATA_POLICY,{minimumHistoryMatches:8,minimumVenueMatches:3,minimumPhaseMatches:10});
+const goalOdds={update:'2099-01-01T11:00:00Z',markets:[{key:'5|Under 3.5',betId:5,odd:1.4,spec:M.specFor(5,'Under 3.5')}]};
+const limited=(games=8,venue=3)=>({...profile(),last20:{games},venueSummary:{games:venue}});
+const evaluate=(home,away=limited())=>M.evaluateMarkets(goalOdds,p,{home,away},settings,new Date('2099-01-01T12:00:00Z'),'2099-01-01T18:00:00Z')[0];
+assert.equal(evaluate(limited()).eligible,true,'Exactly 8 general + 3 venue matches passes the data gate');
+assert.equal(evaluate(limited(9,4)).eligible,true,'9 matches is sufficient; no exact-10 requirement');
+for(const [games,venue] of [[7,3],[8,2]])for(const side of ['home','away']){const pair={home:limited(),away:limited()};pair[side]=limited(games,venue);const result=evaluate(pair.home,pair.away);assert.equal(result.eligible,false,side+' must independently satisfy both minimums');assert(result.reasons.some(r=>r.includes('8 geçmiş lig maçı ve 3 saha maçı')));}
+assert.equal(evaluate(limited()).dataScore,36,'Lower coverage does not inflate the existing data score');
+const history=Array.from({length:10},(_,i)=>({id:500+i,date:new Date(Date.parse('2098-12-30T12:00:00Z')-i*86400000).toISOString(),homeId:11,awayId:12,home:2,away:1,ht:{home:1,away:0}}));
+const hp=M.teamProfile(history,11,'home',{}),ap=M.teamProfile(history,12,'away',{});
+for(const field of ['Yellow Cards','Red Cards','expected_goals']){assert.equal(hp.stats[field].games,0);assert.equal(hp.stats[field].mean,null);}
+assert.equal(evaluate(hp,ap).eligible,true,'Missing cards and xG remain optional and never become zero');
+const base={home:1.4,away:1};assert(M.expectedGoals(hp,ap,base).phase,'10 valid halves enable phase markets');
+for(const side of ['home','away']){const pair={home:hp,away:ap};pair[side]={...pair[side],phases:{...pair[side].phases,games:9}};assert.equal(M.expectedGoals(pair.home,pair.away,base).phase,null,'9 phase records must not enable half/HTFT markets');}
+const missingPhase=M.expectedGoals({...hp,phases:{...hp.phases,games:9}},ap,base);assert.equal(M.probability(M.specFor(7,'Home/Home'),missingPhase,hp,ap),null);
 const optimizerSettings={minCouponOdd:1.95,maxCouponOdd:2.4,minSingleOdd:1.8,maxSingleOdd:2.2,maxCoupons:2};
 const candidate=(id,odd=.0)=>({fixtureId:id,pick:{odd:odd||1.45,modelProbability:.8,dataScore:90},capturedAt:'2099-01-01'});
 const coupons=M.optimize([candidate(1),candidate(2),candidate(3),candidate(4)],optimizerSettings,'s');assert.equal(coupons.length,2);assert.equal(new Set(coupons.flatMap(c=>c.legs.map(l=>l.fixtureId))).size,4);
 assert.equal(M.optimize([candidate(1)],optimizerSettings,'s').length,0,'Do not force low-price single or add a third leg');
 assert.equal(M.optimize([candidate(1,1.9)],optimizerSettings,'s')[0].legs.length,1);
+const many=Array.from({length:10},(_,i)=>candidate(i+1));
+const three=M.optimize(many,{...optimizerSettings,maxCoupons:3},'many');assert.equal(three.length,3,'More than two coupons can be requested');
+const available=M.optimize(many,{...optimizerSettings,maxCoupons:1000},'many');assert.equal(available.length,5,'High requested count never forces extra candidates');
+assert(available.every(c=>c.legs.length<=2));assert.equal(new Set(available.flatMap(c=>c.legs.map(l=>l.fixtureId))).size,10,'No fixture reused between coupons');
 console.log('Banko model: market identities, probabilities, half-time consistency, missing data, strict normal-time settlement, as-of history, quote freshness and coupon diversification passed.');
