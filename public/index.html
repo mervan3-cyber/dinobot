@@ -1370,13 +1370,19 @@
         <section class="workspace-overview" id="section-sharing" style="margin-bottom:20px">
             <div class="control-card">
                 <h3>📣 Paylaşım Ayarları</h3>
-                <p>Ana Telegram kanalı mevcut kurallarıyla devam eder. Ek kopyalar sinyal sayısını artırmaz. Anahtarlar ve hedef ID yalnız sunucudaki .env dosyasından okunur.</p>
+                <p>Ana Telegram kanalı mevcut kurallarıyla devam eder. Ek hedefler aynı sinyali kopyalar; karar ve tarama sayısını artırmaz. Anahtarlar yalnız sunucudaki .env dosyasından okunur. Live grup hedefi hazırdır; TELEGRAM_GROUP_CHAT_ID ile değiştirilebilir.</p>
                 <div class="control-grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))">
                     <div class="control-card">
-                        <h3>Ek Telegram grubu</h3>
+                        <h3>Mevcut ek Telegram kanalı / grubu</h3>
                         <p>Aynı sinyal + kendi mesajına “Yakaladık!” yanıtı.</p>
-                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-extraTelegram" type="checkbox" disabled onchange="saveSharing('extraTelegram', this.checked)"> Ek gruba paylaş</label>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-extraTelegram" type="checkbox" disabled onchange="saveSharing('extraTelegram', this.checked)"> Mevcut ek hedefe paylaş</label>
                         <p id="sharing-extraTelegram-status" role="status">Ayarlar yükleniyor…</p>
+                    </div>
+                    <div class="control-card">
+                        <h3>Maç Yakala Live grubu</h3>
+                        <p>Aynı sinyal + grubun kendi mesajına “Yakaladık!” yanıtı. Mevcut ek kanaldan bağımsızdır.</p>
+                        <label style="display:flex;gap:12px;align-items:center"><input id="sharing-groupTelegram" type="checkbox" disabled onchange="saveSharing('groupTelegram', this.checked)"> Maç Yakala Live grubuna paylaş</label>
+                        <p id="sharing-groupTelegram-status" role="status">Ayarlar yükleniyor…</p>
                     </div>
                     <div class="control-card">
                         <h3>X paylaşımı</h3>
@@ -2470,14 +2476,14 @@
         function renderSharing(data) {
             sharingState = data;
             const names = {sent:'Gönderildi',declined:'Reddedildi',uncertain:'Sonuç belirsiz; tekrar gönderilmedi',skipped:'Atlandı',sending:'Gönderiliyor'};
-            for (const kind of ['extraTelegram','x']) {
-                const state = data[kind];
+            for (const kind of ['extraTelegram','groupTelegram','x']) {
+                const state = data[kind] || {enabled:false,active:false,configured:false,reason:'Sunucu bu hedefi henüz desteklemiyor; güncellemeyi yükleyin.'};
                 const toggle = document.getElementById(`sharing-${kind}`);
                 toggle.checked = !!state.enabled;
                 toggle.disabled = sharingSaving || data.disabled || (!state.enabled && (data.delivery?.disabled || !state.configured));
                 const last = data.delivery?.[kind]?.last;
                 document.getElementById(`sharing-${kind}-status`).textContent =
-                    `${state.active && !data.delivery?.disabled ? 'AÇIK' : 'KAPALI'} · ${state.configured ? '.env hazır (API yetkisi gönderimde doğrulanır)' : state.reason}` +
+                    `${state.active && !data.delivery?.disabled ? 'AÇIK' : 'KAPALI'} · ${state.configured ? 'Hedef hazır (Telegram/X yetkisi gönderimde doğrulanır)' : state.reason}` +
                     (last ? ` · Son paylaşım: ${names[last.status] || last.status}${last.errorCode ? ' ('+last.errorCode+')' : ''}${last.reason ? ' — '+last.reason : ''}` : ' · Henüz paylaşım yok');
             }
             if (data.disabled || data.delivery?.disabled) document.getElementById('sharing-message').textContent = 'Ek paylaşım dosyasında hata var. Ana Telegram etkilenmedi; sunucu günlüklerini kontrol edin.';
