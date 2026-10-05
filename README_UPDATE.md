@@ -1,4 +1,39 @@
-# İY/MS Kupon LAB — yalnız İY/MS güncellemesi — 5 Ekim 2026
+# Banko Kupon LAB — manuel maç önü — 5 Ekim 2026
+
+Bu ZIP, mevcut **1 Ekim V24 Ana + Odak pre52** sürümünden itibaren birikimli kod güncellemesidir; tam bot değildir. Önceki V24 canlı geçiş, Live grup, erken ÜST ve yalnız İY/MS paketlerini de içerir. Önceki ZIP'leri ayrıca yüklemek gerekmez. Güncel sunucu sürümü: `mac-yakala-banko-coupon-lab-2026-10-05`.
+
+## Yeni ayrı sistem: Banko Kupon
+
+- Panelde **Banko Kupon** başlığı: tarih seç → gerekirse **LİGLERİ GETİR** → ayarları kaydet → **SEÇİLİ GÜNE KUPON OLUŞTUR**. Tarama yalnız düğmeyle çalışır; otomatik günlük Banko taraması yoktur. Bugün ve en fazla 7 gün sonrası seçilebilir. Geçmiş günlerin kaydedilmiş kuponları arşivden görüntülenir; bugünkü verilerle geçmiş kupon üretilmez.
+- **SONUÇLARI GETİR · MANUEL** yalnız seçilen kupon maçlarını kontrol eder. Panelin 10 saniyelik durum yenilemesi API-Football sorgusu değildir. Banko sonuçlarına otomatik tarama eklenmedi.
+- Tercih iki farklı maç: her ayak en az **1.40**, kupon toplamı varsayılan **1.95–2.40**. Uygun çift bulunmazsa **1.80–2.20** tekli olabilir. Üçüncü ayak eklenmez, uygun seçim yoksa kupon zorlanmaz. Oran sınırları panelden ayarlanabilir.
+- Günlük ayrı **Banko API tavanı 2000**, ayarlardan değiştirilebilir. Bu harcama hedefi değildir. Sayaç TSİ gününe göre kalıcı tutulur, istek kuyruğunun gerçek gönderim noktasında sayılır; hata sonrası gizli tekrar yoktur. Ortak kotanın kalan bilgisi varsa **1500 canlı rezervi** ayrıca korunur. Lig/takım geçmişleri ve maç istatistikleri önbelleğe alınır.
+- **Yalnız seçilen maçları otomatik kontrol et** varsayılan açık: mevcut zamanlayıcı maçtan 75 dakika önce son tamamlanmış günlük kupon sürümünün seçilen maçlarını bir kez kontrol eder. Ayarlardan kapatılabilir. Eski sürümler otomatik tekrar kontrol edilmez; **MAÇ ÖNÜ KONTROL** düğmesiyle elle incelenebilir. Başlama yaklaştığında kadro için elle tekrar kontrol yapılabilir. Tarama/sonuçlar manuel kalır.
+- Her oluşturma ayrı sürümdür. İlk tahmin, oran ve model sürümü dondurulur; kontrolün yeni oranı ayrı görünür. Eski kuponlar değiştirilmez/silinmez. Eksik kadro/sakatlık kapsamı “oyuncu eksiği yok” anlamına gelmez; uyarı gösterilir. Başlamış, saati değişmiş veya güncel fiyat/veri sınırını geçemeyen seçim onaylanmaz.
+- Ayrıntılarda son 5 ve son 20 **aynı lig** maçı, son 10 ev/deplasman maçı; son 10 maçın şut, isabetli şut, ceza içi/dışı şut, korner, kart ve xG örneklemleri; son 5 maçın oyuncu bağlamı; tüm dönen bookmaker marketleri, seçim/pas nedenleri ve veri eksikleri gösterilir. Diğer kupa/ligler bu ilk sürümün form/dinlenme geçmişine dahil değildir. Boş veri sıfır yapılmaz.
+- Bu ilk sürüm **kalibrasyonsuz bağımsız Poisson gol tabanlı LAB modelidir**. Son 5 formu, uzun dönem ve saha gol geçmişini kullanır. Şut/xG/kart/oyuncu bilgileri ayrıntılı bağlamdır; henüz eğitilmiş karar ağırlıkları değildir. İki ayağın çarpımı gerçek kupon başarı oranı olarak sunulmaz. Varsayılan ham model %65 ve model/piyasa farkı ≥0 başlangıç filtreleridir; kanıtlanmış isabet eşikleri değildir.
+- Veri yeterliyse normal süre MS/çifte şans, ALT/ÜST yarım çizgileri, KG, takım golü/gol yememe, ilk/ikinci yarı ve İY/MS kuralları değerlendirilebilir. Her iki takımda en az 10 geçmiş lig ve 5 saha maçı gerekir; yarı marketlerinde ayrıca 10 geçerli İY/MS skor örneği gerekir. Korner tahmini tanısaldır, kupon seçimi değildir. Kart, şut, oyuncu, belirsiz kombinasyon ve Asya çizgileri **yalnız analiz**: fiyatları görünür, doğrulanmamış kuralla kupona alınmaz.
+- Bet365 tek bookmaker kaynağıdır; yeni eksik market eski cevapla doldurulmaz. Maç öncesi zaman damgası kontrol edilir. Sonuçlarda normal süre/ilk yarı skoru kullanılır, uzatma/penaltı golleri katılmaz. Eksik skor veya hükmen maç otomatik kazandı/kaybetti sayılmaz.
+- Banko **Telegram'a otomatik göndermez**. Panel özel mevcut kimlik doğrulaması altındadır. Metni kopyalayıp elle iletebilirsiniz. V24 canlı sinyalleri ve İY/MS LAB ayrı kalır; canlı tarifeler değiştirilmedi. “Banko” mod adıdır, kazanma garantisi değildir.
+
+Yeni kalıcı dosyalar ilk kullanımda oluşur: `dino_banko_coupon_v1.json`, `dino_banko_api_usage.json`, `dino_banko_cache_v1.json`. Bu dosyalar pakette yoktur; var olanlarını silmeyin. Bozuk dosya üzerine yazılmadan sistem güvenli şekilde durur. Yeni `.env` alanı veya npm bağımlılığı gerekmez; mevcut API anahtarı ve panel erişimi kullanılır.
+
+## Uygulama ve doğrulama
+
+Botu mevcut yönteminizle durdurup değişen kodları yedekleyin. ZIP içindeki kod dosyalarını **bot köküne klasör yapısını koruyarak** uygulayın; mevcut `.env`, veri/history/cache, model ve `node_modules` dosyalarını koruyun. Botu yeniden başlatın, paneli **Ctrl+F5** ile yenileyin. Ardından Banko tarihini/ayarlarını seçip manuel tarama başlatın.
+
+```sh
+node --check server.js
+npm run test:all
+```
+
+45 çevrimdışı test betiği (42 mevcut + 3 Banko), kaynak ve ZIP uygulanmış sürüm için doğrulanır. Testler API bütçesi/önbellek, veri sızıntısız geçmiş, ilk kayıt/sürüm koruma, normal süre sonuçları, manuel panel işlemleri, eksik veri uyarıları ve mevcut canlı akışları kapsar. Tarayıcı panel önizlemesi sahte verilerle kontrol edilmiştir. Bu geliştirmede gerçek API-Football/Telegram isteği yapılmamıştır. Gerçek servis yanıtı ilk manuel taramada doğrulanmalıdır. Windows yerel testlerinde yalnız izinli test-geçici klasör yönlendirmesi kullanılır; model/API davranışı değiştirilmez.
+
+Paket sunucuya otomatik yüklenmemiştir. Aşağıdaki notlar önceki birikimli özellikleri açıklar; güncel Banko davranışı yukarıdadır.
+
+---
+
+## Önceki İY/MS-only güncellemesi — korundu
 
 Bu ZIP mevcut **1 Ekim V24 Ana + Odak pre52** sürümü için birikimli güncellemedir; tam bot değildir.
 Önceki 5 Ekim V24 canlı geçiş, Live grup ve erken ÜST paketlerindeki değişiklikleri de içerir; eski ZIP'leri ayrıca yüklemek gerekmez.
@@ -19,9 +54,9 @@ Sürüm: `mac-yakala-coupon-htft-only-2026-10-05`.
 - Bozuk geçmiş dosyası sıfırlanmaz/üzerine yazılmaz; yeni kupon taraması durur. Günlük API bütçesi, genel rezerv, tek ana tarama, takım profili önbelleği ve tek maç önü kontrolü korunur. Ek market başına yeni API sorgusu veya yeni zamanlayıcı yoktur.
 - V24 Ana, Telegram/Live grup ve erken ÜST kararları değişmez. Kupon LAB yine Telegram'a göndermez.
 
-## İkinci sistem: Banko Kupon (henüz yapılmadı)
+## İkinci sistem: Banko Kupon (bu pakette eklendi)
 
-Kullanıcının sonraki aşama taslağı: ayrı sistem ve panel başlığı, maç/ayak oranı en az 1.40, toplam kupon oranı 2.00 üstü; API'nin sunduğu tüm market aileleri değerlendirilebilir, olmayan marketler zorlanmaz. Bu sürümde uygulanmamıştır ve İY/MS moduna bu oran kuralları eklenmemiştir. “Banko” bir mod adı olacaktır, kazanma garantisi değildir.
+Banko ayrı sistem olarak eklendi; ayrıntıları bu belgenin başındadır. İY/MS moduna Banko oran kuralları eklenmemiştir.
 
 ## Güncellemeden sonra
 

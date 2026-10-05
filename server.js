@@ -52,6 +52,8 @@ const { createV24FocusLab } = v24Focus;
 const v25Runtime = require('./v25_runtime');
 const { AdaptiveScan, providerTrouble } = require('./adaptive_scan');
 const { CouponLab } = require('./coupon_lab');
+const { BankoCoupon } = require('./banko_coupon');
+const { registerBankoRoutes } = require('./banko_routes');
 const { createIndependentLab, importV19History } = require('./independent_lab');
 const dinoSelectorV18 = require('./dino_selector_v18');
 const coreShadowTariff = require('./core_shadow_tariff');
@@ -64,7 +66,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-coupon-htft-only-2026-10-05';
+const BUILD_VERSION = 'mac-yakala-banko-coupon-lab-2026-10-05';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -705,12 +707,15 @@ function sleep(ms) {
 
 
 async function apiGet(url, config = {}) {
+    // Banko's quota/live guard runs at the actual queue dispatch, not when queued.
+    const beforeAttempt = config.dinoBeforeAttempt;
     const requestedAttempts = Number(config?.dinoMaxAttempts);
     const maximumAttempts = Number.isFinite(requestedAttempts)
         ? Math.max(1, Math.min(Math.floor(requestedAttempts), 3))
         : 3;
     const requestConfig = { ...config };
     delete requestConfig.dinoMaxAttempts;
+    delete requestConfig.dinoBeforeAttempt;
 
     const queuedRequest = apiQueue
         .catch(() => undefined)
@@ -726,6 +731,7 @@ async function apiGet(url, config = {}) {
                 }
 
                 lastApiRequestTime = Date.now();
+                if (typeof beforeAttempt === 'function') beforeAttempt();
 
                 try {
                     const result = await apiClient.get(url, requestConfig);
@@ -779,12 +785,13 @@ async function apiGet(url, config = {}) {
     return queuedRequest;
 }
 
+let bankoCoupon = null;
 const couponLab = new CouponLab({
     filePath: COUPON_LAB_FILE,
     apiGet,
     logger: message => addSystemLog(message),
     getQuotaRemaining: () => quotaRemaining,
-    canRun: () => !isScanning && !isSignalResultRefreshing,
+    canRun: () => !isScanning && !isSignalResultRefreshing && !bankoCoupon?.busy,
     bookmakerName: COUPON_BOOKMAKER_NAME,
     dailyLimit: COUPON_DAILY_LIMIT,
     reserve: COUPON_API_RESERVE,
@@ -799,8 +806,20 @@ const couponLab = new CouponLab({
     autoEnabled: COUPON_AUTO_SCAN_ENABLED
 });
 
+bankoCoupon = new BankoCoupon({
+    directory: __dirname,
+    apiGet,
+    getQuotaRemaining: () => quotaRemaining,
+    canRun: () => !isScanning && !isSignalResultRefreshing && !couponLab.running && !couponLab.settling,
+    reserve: 1500,
+    logger: message => addSystemLog(message),
+    priorityLeagues: VIP_LIGLER
+});
+
 async function couponLabClock() {
-    if (!couponLab.enabled || couponLab.running || couponLab.settling || isScanning || isSignalResultRefreshing) return;
+    // Existing one-minute clock; no automatic Banko scans or result queries.
+    if (bankoCoupon) await bankoCoupon.runDueChecks();
+    if (!couponLab.enabled || couponLab.running || couponLab.settling || bankoCoupon?.busy || isScanning || isSignalResultRefreshing) return;
     try {
         if (couponLab.shouldAutoScan()) await couponLab.scanToday({mode:'automatic'});
         await couponLab.runDueFinalChecks();
@@ -7116,6 +7135,8 @@ app.post(
 // API: KUPON LAB · MAÇ ÖNÜ
 // =========================================================
 
+registerBankoRoutes(app, {banko:bankoCoupon, apiReady:() => Boolean(apiFootballKey?.trim())});
+
 app.get('/api/coupon-lab', (req, res) => {
     res.json(couponLab.status());
 });
@@ -7590,6 +7611,8 @@ v24SelectiveWeekendTracker.load();
 v24V25JointWeekendTracker.load();
 v24FocusTracker.load();
 couponLab.load();
+bankoCoupon.load();
+addSystemLog('> 🎫 BANKO KUPON LAB: ayrı panel · tarama/sonuç manuel · tarih seçimi · başlangıç bütçesi 2000 (panelden değişir) · seçilen maça isteğe bağlı ön kontrol · Telegram YOK.');
 const couponLabStartupStatus = couponLab.status();
 addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 aynı | maç başına tek kayıt | Telegram YOK.`);
 addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Quiet + Seçici + V24/V25 Ortak hafta sonu; Gemini her gün aynı taze veriden ayrı geçmiş toplar; Guard ve yeni filtre deneyleri emekli; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
