@@ -1322,6 +1322,7 @@
         .filterlab-negative { color:#f3a294; font-weight:600; }
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
     </style>
+    <link rel="stylesheet" href="/banko_coupon.css?v=20261005banko1">
 </head>
 <body>
     <div class="container" id="login-screen">
@@ -1358,7 +1359,8 @@
             <button type="button" data-target="section-decision" onclick="jumpToSection('section-decision', this)">Son Karar</button>
             <button type="button" data-target="section-signals" onclick="jumpToSection('section-signals', this)">Sinyaller</button>
             <button type="button" data-target="section-v18-shadow" onclick="jumpToSection('section-v18-shadow', this)">Test Lab</button>
-            <button type="button" data-target="section-coupon-lab" onclick="jumpToSection('section-coupon-lab', this)">Kupon LAB</button>
+            <button type="button" data-target="section-coupon-lab" onclick="jumpToSection('section-coupon-lab', this)">İY/MS LAB</button>
+            <button type="button" data-target="section-banko-coupon" onclick="jumpToSection('section-banko-coupon', this)">Banko Kupon</button>
             <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
             <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
             <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
@@ -2025,6 +2027,55 @@
             <p class="muted" id="coupon-lab-footnote">Ana tarama her gün bir kez çalışır. Seçilen maçlar başlangıçtan önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden seçili gün kapsamını tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
         </div>
 
+        <div class="card" id="section-banko-coupon">
+            <div class="section-title"><div><h3>🎫 Banko Kupon LAB · Manuel maç önü</h3><p class="muted" id="banko-status">Tarih seçip oluşturabilirsiniz.</p></div><span class="mini-badge bg-info">ÖZEL PANEL · TELEGRAM YOK</span></div>
+            <p class="muted">Ayrı sistem: tercihimiz iki farklı maç, ayak başına en az 1.40 ve toplam yaklaşık 2.00. Uygun tek maç 1.80–2.20 ise tekli de olabilir. Seçim zorlanmaz. “Banko” garanti değildir; ham model yüzdeleri henüz kalibre edilmemiş LAB tahminleridir.</p>
+            <div class="banko-toolbar">
+                <label>Kupon tarihi (TSİ)<input type="date" id="banko-date" onchange="bankoDateChanged()"></label>
+                <button type="button" onclick="bankoSetDay(0)">BUGÜN</button><button type="button" onclick="bankoSetDay(1)">YARIN</button>
+                <button id="banko-discover" type="button" onclick="runBankoAction('discover')">LİGLERİ GETİR</button>
+                <button id="banko-scan" type="button" class="banko-primary" onclick="runBankoAction('scan')">SEÇİLİ GÜNE KUPON OLUŞTUR</button>
+            </div>
+            <div class="banko-toolbar"><label>Önceki sürümler<select id="banko-version" onchange="bankoVersionChanged()"><option>Son sürüm</option></select></label><label>Arşiv tarihi<select id="banko-archive" onchange="bankoArchiveChanged()"><option>Kayıtlı tarihler</option></select></label><button id="banko-check" type="button" onclick="runBankoAction('check')">MAÇ ÖNÜ KONTROL</button><button id="banko-results" type="button" onclick="runBankoAction('results')">SONUÇLARI GETİR · MANUEL</button></div>
+            <details class="banko-settings"><summary>⚙️ Banko ayarları · <span id="banko-dirty">Kaydedildi</span></summary>
+                <div class="banko-settings-grid">
+                    <label><input type="checkbox" id="banko-setting-enabled" checked onchange="markBankoDirty()"> Banko modu açık</label>
+                    <label><input type="checkbox" id="banko-setting-autoPrecheck" checked onchange="markBankoDirty()"> Yalnız seçilen maçları otomatik kontrol et</label>
+                    <label><input type="checkbox" id="banko-setting-women" checked onchange="markBankoDirty()"> Kadın ligleri açık</label>
+                    <label><input type="checkbox" id="banko-setting-predictionContext" checked onchange="markBankoDirty()"> API tavsiyesini bağlam olarak göster</label>
+                    <label>Günlük Banko API tavanı<input type="number" id="banko-setting-dailyLimit" min="20" max="7500" value="2000" onchange="markBankoDirty()"></label>
+                    <label>En fazla incelenecek maç<input type="number" id="banko-setting-maxCandidates" min="1" max="100" value="30" onchange="markBankoDirty()"></label>
+                    <label>En fazla kupon<input type="number" id="banko-setting-maxCoupons" min="1" max="2" value="1" onchange="markBankoDirty()"></label>
+                    <label>Maç önü kontrol (dk)<input type="number" id="banko-setting-precheckMinutes" min="15" max="120" value="75" onchange="markBankoDirty()"></label>
+                    <label>Ayak minimum oran<input type="number" id="banko-setting-minLegOdd" min="1.4" max="3" step="0.01" value="1.40" onchange="markBankoDirty()"></label>
+                    <label>Ayak maksimum oran<input type="number" id="banko-setting-maxLegOdd" min="1.4" max="5" step="0.01" value="2.20" onchange="markBankoDirty()"></label>
+                    <label>Kupon minimum oran<input type="number" id="banko-setting-minCouponOdd" min="1.8" max="4" step="0.01" value="1.95" onchange="markBankoDirty()"></label>
+                    <label>Kupon maksimum oran<input type="number" id="banko-setting-maxCouponOdd" min="1.8" max="5" step="0.01" value="2.40" onchange="markBankoDirty()"></label>
+                    <label>Tekli minimum oran<input type="number" id="banko-setting-minSingleOdd" min="1.4" max="3" step="0.01" value="1.80" onchange="markBankoDirty()"></label>
+                    <label>Tekli maksimum oran<input type="number" id="banko-setting-maxSingleOdd" min="1.4" max="4" step="0.01" value="2.20" onchange="markBankoDirty()"></label>
+                    <label>Deneysel ham model alt sınırı (%)<input type="number" id="banko-setting-minModelProbability" min="55" max="90" step="1" value="65" onchange="markBankoDirty()"></label>
+                    <label>Deneysel model/piyasa farkı (yüzde puan)<input type="number" id="banko-setting-minEdgePP" min="-10" max="20" step="0.1" value="0" onchange="markBankoDirty()"></label>
+                    <label>En eski kabul edilen oran (saat)<input type="number" id="banko-setting-maxOddsAgeHours" min="1" max="24" value="6" onchange="markBankoDirty()"></label>
+                </div>
+                <p class="muted">Bu sınırlar başlangıç LAB filtreleridir; kanıtlanmış başarı eşikleri değildir. Bütçe 2000 isteği harcamaya zorlamaz. Günlük sayaç TSİ gününe göre tutulur; genel API kalan ve 1500 istek canlı rezervi de korunur.</p>
+                <div class="banko-families">
+                    <label><input type="checkbox" data-banko-family="goals" checked onchange="markBankoDirty()"> ALT/ÜST</label>
+                    <label><input type="checkbox" data-banko-family="result" checked onchange="markBankoDirty()"> MS / Çifte şans</label>
+                    <label><input type="checkbox" data-banko-family="halves" checked onchange="markBankoDirty()"> İY / 2Y / İY-MS</label>
+                    <label><input type="checkbox" data-banko-family="btts" checked onchange="markBankoDirty()"> KG Var/Yok</label>
+                    <label><input type="checkbox" data-banko-family="teamGoals" checked onchange="markBankoDirty()"> Takım golü / gol yememe</label>
+                    <label><input type="checkbox" data-banko-family="corners" checked onchange="markBankoDirty()"> Korner (şimdilik analiz)</label>
+                </div>
+                <p class="muted">Lig kutuları boşsa seçili günde bookmaker marketi bulunan tüm ligler incelenebilir; VIP ligler yalnız sıralamada öndedir. Lig listesini manuel getirin, istediklerinizi işaretleyip kaydedin. Kart, şut ve oyuncu marketleri fiyatlarıyla görünür; eşleşme/sonuçlandırma kuralları doğrulanmadan kupona alınmaz.</p>
+                <button type="button" onclick="bankoAllLeagues()" style="width:auto;">TÜM LİGLERE İZİN VER</button><div id="banko-leagues" class="banko-leagues"></div>
+                <button id="banko-save" type="button" onclick="saveBankoSettings()">BANKO AYARLARINI KAYDET</button>
+            </details>
+            <div class="metrics"><div class="metric info"><span class="metric-label">Seçili gün</span><span id="banko-count" class="metric-value">0 kupon</span></div><div class="metric warning"><span class="metric-label">Banko API / günlük tavan</span><span id="banko-api" class="metric-value">0 / 2000</span><small id="banko-reserve"></small></div><div class="metric info"><span class="metric-label">Kupon sonuçları · ilk kayıt fiyatı</span><span id="banko-results-summary">0 K / 0 Y / 0 bekleyen</span></div></div>
+            <div id="banko-coupons"></div>
+            <details class="banko-settings"><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
+            <p class="muted">Her manuel oluşturma yeni, ayrı sürüm kaydeder; eski kupon değiştirilmez. Yeni veya yarım tarama eski kuponları silmez. Otomatik maç önü kontrol yalnız o günün son tamamlanmış sürümündeki seçilen maçlara uygulanır; eski sürümler elle kontrol edilebilir. Sonuçları kendiniz getirirsiniz; panelin durum yenilemesi API-Football taraması değildir. Otomatik Telegram gönderimi yok.</p>
+        </div>
+
         <div class="card" id="section-coverage">
             <div class="section-title">
                 <div>
@@ -2174,6 +2225,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
+<script src="/banko_coupon_panel.js?v=20261005banko1"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
@@ -2322,6 +2374,7 @@
                 "section-signals",
                 "section-v18-shadow",
                 "section-coupon-lab",
+                "section-banko-coupon",
                 "section-coverage",
                 "section-audit",
                 "section-tariff",
@@ -2560,7 +2613,7 @@
                 setInterval(fetchTestLabHistory, 10000);
                 setInterval(fetchCandidateHistory, 15000);
                 setInterval(fetchSharing, 15000);
-                setInterval(fetchCouponLab, 10000);
+                setInterval(() => { fetchCouponLab(); pollBankoCoupon(); }, 10000);
             }
         }
 
@@ -2574,6 +2627,7 @@
                 fetchTestLabHistory(),
                 fetchCandidateHistory(),
                 fetchCouponLab(),
+                fetchBankoCoupon(),
                 fetchLogs()
             ]);
         }
