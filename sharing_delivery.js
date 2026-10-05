@@ -3,6 +3,7 @@ const fs=require('fs'),crypto=require('crypto');
 const {atomicSave,SHARING_KINDS}=require('./sharing_settings');
 const isTelegram=kind=>kind==='extraTelegram'||kind==='groupTelegram';
 const {formatSignal,WIN_TEXT}=require('./mac_yakala_telegram');
+const {canNotifyWin}=require('./early_over_win');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
 const copy=s=>JSON.parse(JSON.stringify(s));
 const errorCode=e=>Number(e?.statusCode||e?.response?.body?.error_code)||null;
@@ -76,14 +77,16 @@ class SharingDelivery {
         try{
             for(const e of this.data.entries){
                 if(!isTelegram(e.kind)||!this.active(e)||e.status!=='sent'||!e.messageId||['sent','sending','uncertain','failed'].includes(e.win?.status)||(e.win?.retryAt||0)>this.now())continue;
-                if(this.tracker.data.signals.find(s=>s.deliveryKey===e.primaryKey)?.settlement?.result!=='W')continue;
-                e.win={status:'sending'};this.save();
+                const record=this.tracker.data.signals.find(s=>s.deliveryKey===e.primaryKey);
+                if(!canNotifyWin(record,{now:this.now(),epoch:this.tracker.earlyWinDisabled?Infinity:this.tracker.earlyWinEpoch}))continue;
+                const notification=record?.settlement?.result==='W'?'final':'early-over';
+                e.win={status:'sending',notification};this.save();
                 try{
                     const r=await boundedSend(()=>{
                         if(!this.active(e)){const error=Error('disabled');error.statusCode=409;throw error;}
                         return this.telegramSend(e.chatId,WIN_TEXT,{reply_parameters:JSON.stringify({message_id:e.messageId,allow_sending_without_reply:false})});
                     },this.timeoutMs);
-                    e.win=Number.isInteger(r?.message_id)&&r.message_id>0?{status:'sent',messageId:r.message_id}:{status:'uncertain'};
+                    e.win=Number.isInteger(r?.message_id)&&r.message_id>0?{status:'sent',messageId:r.message_id,notification}:{status:'uncertain',notification};
                     if(e.win.status==='sent')count++;
                 }catch(error){
                     const code=errorCode(error);

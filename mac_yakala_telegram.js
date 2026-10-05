@@ -3,6 +3,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {createIndependentLab}=require('./independent_lab');
 const {createV22Lab}=require('./v22_lab');
 const v21=require('./v21_tariff'),v22=require('./v22_tariff');
+const {canNotifyWin}=require('./early_over_win');
 const VERSION='mac-yakala-v24-live-2026-10-05';
 const WIN_TEXT='✅✅✅ YAKALADIK!';
 const FOOTER='';
@@ -142,11 +143,12 @@ class TelegramDelivery {
             for(const e of this.data.entries){
                 if(e.status!=='sent'||!e.messageId||['sent','sending','uncertain','failed'].includes(e.win?.status)||Number(e.win?.retryAt||0)>this.now())continue;
                 const record=this.tracker.data.signals.find(s=>s.deliveryKey===e.key);
-                if(record?.settlement?.result!=='W')continue; // No loss/push/void notifications, no live-score celebrations.
-                e.win={status:'sending',at:new Date(this.now()).toISOString()};this.save();
+                if(!canNotifyWin(record,{now:this.now(),epoch:this.tracker.earlyWinDisabled?Infinity:this.tracker.earlyWinEpoch}))continue;
+                const notification=record?.settlement?.result==='W'?'final':'early-over';
+                e.win={status:'sending',at:new Date(this.now()).toISOString(),notification};this.save();
                 try{
                     const msg=await this.send(e.chatId,WIN_TEXT,{reply_parameters:JSON.stringify({message_id:e.messageId,allow_sending_without_reply:false})});
-                    e.win=Number.isInteger(msg?.message_id)&&msg.message_id>0?{status:'sent',messageId:msg.message_id,at:new Date(this.now()).toISOString()}:{status:'uncertain'};
+                    e.win=Number.isInteger(msg?.message_id)&&msg.message_id>0?{status:'sent',messageId:msg.message_id,at:new Date(this.now()).toISOString(),notification}:{status:'uncertain',notification};
                     if(e.win.status==='sent')count++;
                 }catch(error){
                     const code=Number(error?.response?.body?.error_code);

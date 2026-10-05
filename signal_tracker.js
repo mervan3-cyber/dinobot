@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const {observeOverWin}=require('./early_over_win');
 
 const HISTORY_VERSION = 2;
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
@@ -108,10 +109,14 @@ function addToBucket(bucket, signal) {
 }
 
 class SignalTracker {
-    constructor({ filePath, logger = () => {}, strict = false }) {
+    constructor({ filePath, logger = () => {}, strict = false, now = Date.now }) {
         this.filePath = filePath;
         this.strict = strict;
         this.logger = logger;
+        this.now=now;
+        // Evidence before this process must earn two fresh confirmations after restart.
+        this.earlyWinEpoch=now();
+        this.earlyWinDisabled=false;
         this.data = {
             version: HISTORY_VERSION,
             startedAt: null,
@@ -289,6 +294,28 @@ class SignalTracker {
                 .map(signal => Number(signal.fixtureId))
                 .filter(fixtureId => Number.isFinite(fixtureId) && fixtureId > 0)
         )];
+    }
+
+    observeLiveFixtures(fixtures, observation) {
+        if(this.earlyWinDisabled||!Array.isArray(fixtures))return 0;
+        const byId=new Map(),duplicates=new Set();
+        for(const fixture of fixtures){const id=Number(fixture?.fixture?.id);if(byId.has(id))duplicates.add(id);byId.set(id,fixture);}
+        const updates=[];
+        for(const record of this.data.signals){
+            const id=Number(record.fixtureId);
+            if(!byId.has(id)||duplicates.has(id))continue;
+            const before=record.earlyOverWin;
+            const next=observeOverWin(record,byId.get(id),observation,{now:this.now(),epoch:this.earlyWinEpoch});
+            if(JSON.stringify(before||null)===JSON.stringify(next))continue;
+            updates.push({record,before});record.earlyOverWin=next;
+        }
+        if(updates.length){
+            try{this.save();}catch(error){
+                for(const {record,before}of updates){if(before===undefined)delete record.earlyOverWin;else record.earlyOverWin=before;}
+                this.earlyWinDisabled=true;throw error;
+            }
+        }
+        return updates.length;
     }
 
     settleFixture(fixture) {

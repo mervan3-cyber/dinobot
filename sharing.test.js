@@ -104,7 +104,7 @@ async function main(){
     assert.equal(fetched.options.body,'{}');assert.equal(fetched.options.headers['Content-Type'],'application/json');assert.equal(fetched.options.headers['X-Mac-Yakala-Request'],'1');
     sandbox.fetch=async()=>({ok:false,status:400,json:async()=>({error:'Disk hatası'})});
     await sandbox.saveSharing('x',false);assert.equal(get('sharing-x').checked,true,'Failed toggle must roll back');assert.match(get('sharing-message').textContent,/Disk hatası/);
-    const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');assert(server.indexOf('app.use(createPanelAuth')<server.indexOf('app.get('));assert(server.includes('sharingDelivery.publish(telegramDelivery.findSent'));assert.equal((server.match(/await sharingDelivery.flushWins\(\)/g)||[]).length,2);
+    const server=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');assert(server.indexOf('app.use(createPanelAuth')<server.indexOf('app.get('));assert(server.includes('sharingDelivery.publish(telegramDelivery.findSent'));assert.equal((server.match(/await sharingDelivery.flushWins\(\)/g)||[]).length,3,'Existing final paths plus the shared early-over observer');
     console.log('Sharing/auth/X tests OK: isolated fan-out, independent V21/V22, persistence, toggles, failures, win replies, OAuth, panel.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>fs.rmSync(root,{recursive:true,force:true}));

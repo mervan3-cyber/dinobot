@@ -64,7 +64,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-live-group-2026-10-05';
+const BUILD_VERSION = 'mac-yakala-v24-early-win-2026-10-05';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -2925,6 +2925,11 @@ async function canliMaclariHazirla() {
             fixture._dino_fixture_request_started_at = liveFixtureRequestStartedAt;
             fixture._dino_fixture_received_at = liveFixtureReceivedAt;
         }
+
+        // Raw scoreboard before minute/league/stats/odds filters: includes 80+ minute goals.
+        // Reuses this response; the notifier makes no football API requests/model calls.
+        void erkenUstKazanimlariniGozle(allLiveFixtures,{source:'live-fixtures',
+            requestedAt:liveFixtureRequestStartedAt,receivedAt:liveFixtureReceivedAt});
 
 
         addSystemLog(
@@ -5829,6 +5834,16 @@ function masterClock() {
 // PAYLAŞILAN SİNYAL SONUÇ TAKİBİ
 // =========================================================
 
+async function erkenUstKazanimlariniGozle(fixtures, observation) {
+    try {
+        if(!signalTracker.observeLiveFixtures(fixtures,observation))return;
+        await telegramDelivery.flushWins();
+        await sharingDelivery.flushWins();
+    } catch (error) {
+        addSystemLog('> ⚠️ Erken ÜST bildirim kontrolü başarısız; kesin sonuç takibi korunuyor.');
+    }
+}
+
 async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
     if (isSignalResultRefreshing) {
         return {
@@ -5887,12 +5902,17 @@ async function paylasilanSinyalSonuclariniGuncelle({ manuel = false } = {}) {
                 index,
                 index + SIGNAL_RESULT_BATCH_SIZE
             );
+            const resultRequestStartedAt = new Date().toISOString();
             const response = await apiGet(
                 `/fixtures?ids=${batch.join('-')}`
             );
+            const resultReceivedAt = new Date().toISOString();
             const fixtures = Array.isArray(response.data?.response)
                 ? response.data.response
                 : [];
+
+            await erkenUstKazanimlariniGozle(fixtures,{source:'result-fixtures',
+                requestedAt:resultRequestStartedAt,receivedAt:resultReceivedAt});
 
             checkedFixtures += batch.length;
             for (const fixture of fixtures) {

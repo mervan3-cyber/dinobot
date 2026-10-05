@@ -1,9 +1,9 @@
-# V24 Ana canlı geçiş + Maç Yakala Live grubu — 5 Ekim 2026
+# V24 Ana + Live grup + erken ÜST “YAKALADIK!” — 5 Ekim 2026
 
 Bu ZIP mevcut **1 Ekim V24 Ana + Odak pre52** sürümü için birikimli güncellemedir; tam bot değildir.
-Önceki 5 Ekim V24 canlı geçiş paketindeki değişiklikleri de içerir; iki ZIP'i üst üste yüklemek gerekmez.
-Önceki geçiş paketini zaten yüklediysen bu paketi de aynı şekilde uygulayabilirsin.
-Sürüm: `mac-yakala-v24-live-group-2026-10-05`.
+Önceki 5 Ekim V24 canlı geçiş ve Live grup paketlerindeki değişiklikleri de içerir; eski ZIP'leri ayrıca yüklemek gerekmez.
+Önceki paketleri zaten yüklediysen bu paketi de aynı şekilde uygulayabilirsin.
+Sürüm: `mac-yakala-v24-early-win-2026-10-05`.
 
 ## Onaylanan değişiklikler
 
@@ -15,6 +15,23 @@ Sürüm: `mac-yakala-v24-live-group-2026-10-05`.
 - Yalnız Weekend Guard paneli ve motoru durduruldu. Quiet, Seçici, V24+V25 Ortak, Odak, V21 ve V22 LAB'ları devam eder.
 - Mesajdan yalnız “Öncelikli modelimiz V22” satırı kaldırıldı. Diğer alanlar, analiz biçimi, oran yazımı ve kazandı yanıtı korunur; model V24 olarak görünür.
 - Maç Yakala Live grubu, mevcut ek Telegram kanalı ve X'ten bağımsız üçüncü paylaşım hedefidir.
+- ÜST eşiği iki ayrı taze skor cevabında aşılmışsa, maç sonunu beklemeden tek “YAKALADIK!” yanıtı gönderilir. Kesin sonuçlandırma ayrı kalır.
+
+## Erken ÜST kazanım bildirimi
+
+- Paylaşılmış normal süre yarım çizgi ÜSTleri: 0.5 → en az 1 toplam gol, 1.5 → 2, 2.5 → 3, 3.5 → 4, 4.5 → 5.
+- Yalnız sinyal sonrası başlamış iki ayrı fixture isteği sayılır; aynı cevap/tekrar çağrı, örtüşen istek veya 60 saniyeden kısa aralık doğrulama oluşturmaz.
+- Mevcut `/fixtures?live=all` tarama cevabı dakika/lig/istatistik/oran filtresinden ÖNCE kullanılır; 80+ dakikalar da izlenir. Mevcut 10 dakikalık `/fixtures?ids=...` sonuç sorgusu da ikinci taze kontrolü sağlayabilir.
+- Yeni API-Football isteği, şut/istatistik/oran/model sorgusu veya zamanlayıcı EKLENMEZ. Normal taramanın 5/10 dakika ayarı değişmedi.
+- İlk uygun gözlem kaydedilir. Sonraki bağımsız taze gözlemde skor çizginin üstünde kalırsa ana kanal ve etkin ek Telegram hedefleri kendi mesajlarına yanıt verir. X'e sonuç paylaşımı eklenmedi.
+- Skor azalırsa, dakika gerilerse, gol bilgisi geçersiz/eksikse veya normal süre canlı statüsü kaybolursa onay sıfırlanır. Skor azalsa bile hâlâ çizginin üstündeyse yeni iki-kontrol dizisi gerekir.
+- İlk/ikinci kontrol arasında en fazla 20 dakika, kullanılan cevapta en fazla 2 dakika yaş/istek süresi kabul edilir. Sistem yeniden başlayınca eski canlı onaylar tek başına kullanılamaz; iki yeni kontrol gerekir.
+- `1H/HT/2H` dışındaki uzatma/penaltı/askıya alınmış maçlar erken kazanım üretemez. ALT ve MS1/MS2 sonuçları eskisi gibi maç sonunu bekler.
+- Erken onay yalnız bildirim kanıtıdır (`earlyOverWin`); `settlement.result`, kâr, ROI ve kesin final skoruna dokunmaz. Panel maç sonuna kadar “Bekliyor” gösterebilir; bu normaldir.
+- Kalıcı Telegram gönderim kilitleri korunur: başarılı erken yanıt maç sonunda veya yeniden başlatmada tekrarlanmaz. Belirsiz/eksik yanıt otomatik yeniden gönderilmez; 429 mevcut bekleme kuralını kullanır ve taze onay yoksa bekler.
+- İki gözlem VAR/skor düzeltmesi riskini AZALTIR, sıfırlamaz. Daha sonra iptal/yarıda kalma veya gol düzeltmesi olursa nihai panel sonucu gerçek FT/VOID verisine göre kapanır; erken mesaj resmi bahis sonuçlandırması değildir.
+
+Bu özellik yeni sürümde otomatik çalışır; yeni `.env` alanı veya panel şalteri gerekmez. Live gruba mesaj gitmesi için mevcut grup paylaşımı anahtarı ayrıca açık olmalıdır.
 
 ## Maç Yakala Live grubunu açma
 
@@ -92,14 +109,16 @@ RSS/RAM tasarrufu sunucuda ölçülmedi.
 node --check server.js
 node --check v24_telegram_router.js
 node --check sharing_delivery.js
+node --check early_over_win.js
 npm test
 ```
 
 5. Testler geçince mevcut yöntemle botu yeniden başlat ve paneli Ctrl+F5 ile yenile.
 6. Sürümün yukarıdaki değer olduğunu; Telegram kaynaklarının yalnız V24 olduğunu; Gemini'nin “her gün”, Eski Telegram'ın “LAB” olduğunu kontrol et. Weekend Guard ve Yeni Filtre Deneyleri görünmemeli. Ek paylaşım bölümünde mevcut ek hedef ve Maç Yakala Live ayrı anahtarlar olarak görünmeli.
 
-Yerel doğrulama: 38 güncel test betiği; dört canlı kol, kadınlar, son dakika/oran/edge kontrolü, kalıcı fixture kilidi, belirsiz gönderim, geçmişi yeniden göndermeme, eski kapı eşdeğerliği, LAB sonuç kapatma ve panel DOM/dışa aktarma.
+Yerel doğrulama: 40 güncel test betiği; dört canlı kol, kadınlar, son dakika/oran/edge kontrolü, kalıcı fixture kilidi, belirsiz gönderim, geçmişi yeniden göndermeme, eski kapı eşdeğerliği, LAB sonuç kapatma ve panel DOM/dışa aktarma.
 Yeni grup testleri: eski ayar/günlük yükseltme, üçüncü hedef, mevcut kanalın korunması, ayrı sonuç yanıtları, kapat/aç ve hedef değişikliği, reddetme/timeout/yeniden başlatma, mükerrer hedef, varsayılan/.env grup hedefi ve panel kaydetme/hata dönüşü. Gerçek sunucu akışı sahte Telegram ile ana+ek+grup gönderimini ve ortak tek taze kontrolü doğrular.
+Erken ÜST testleri: iki taze cevap/60 saniye sınırı, aynı/örtüşen/eski cevap, yanlış fixture, skor/dakika/VAR düzeltmesi, uzatma/penaltı engeli, 80+ dakika gerçek sunucu akışı, mevcut sonuç sorgusuyla ikinci onay, kesin sonuç/kâr izolasyonu, yeniden başlatma/429/belirsiz gönderim/disk hatası ve üç hedefe bağımsız tek yanıt. Futbol istek sayısı sunucu simülasyonunda eski tarama/sonuç istekleriyle birebir aynı doğrulandı.
 Emekli V21/V22 canlı gönderim ve V23 panel/bakım akış testlerinin yerini V24 geçiş testleri aldı; ilgili saf karar/arşiv testleri korunur.
 Testler çevrimdışı yürütüldü; gerçek Telegram/API isteği yapılmadı.
 
