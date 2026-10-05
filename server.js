@@ -64,7 +64,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-live-transition-2026-10-05';
+const BUILD_VERSION = 'mac-yakala-v24-live-group-2026-10-05';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -603,22 +603,26 @@ const oldTelegramLab = createLegacyTelegramLab({tracker: oldTelegramTracker,
     v21Enabled: MY_V21_TELEGRAM_ENABLED, v22Enabled: MY_V22_TELEGRAM_ENABLED, gateEnabled: DINO_V23_V22_GATE_ENABLED });
 
 const extraChatId = String(process.env.TELEGRAM_EXTRA_CHAT_ID || '').trim();
+// User-approved default; the optional .env field overrides it (including an empty value).
+const groupChatId = String(process.env.TELEGRAM_GROUP_CHAT_ID ?? '-1004308912742').trim();
 const xCredentials = {apiKey:process.env.X_API_KEY || '',apiSecret:process.env.X_API_SECRET || '',
     accessToken:process.env.X_ACCESS_TOKEN || '',accessSecret:process.env.X_ACCESS_TOKEN_SECRET || ''};
-const sameTelegramTarget = () => extraChatId===String(kanalID) || telegramDelivery.data.entries.some(e=>e.status==='sent'&&e.requestedChannel===String(kanalID)&&String(e.chatId)===extraChatId);
+const sameTelegramTarget = target => target===String(kanalID) || telegramDelivery.data.entries.some(e=>e.status==='sent'&&e.requestedChannel===String(kanalID)&&String(e.chatId)===target);
 const sharingSettings = new SharingSettings({filePath:path.join(__dirname,'mac_yakala_sharing_settings.json'),
-identities:()=>({extraTelegram:crypto.createHash('sha256').update(extraChatId).digest('hex'),x:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex')}),availability:()=>({
-    extraTelegram:{configured:!!bot && /^-\d+$/.test(extraChatId) && !sameTelegramTarget(),
-        reason:!bot?'Telegram bot ayarı eksik.':!extraChatId?'TELEGRAM_EXTRA_CHAT_ID .env içinde boş.':! /^-\d+$/.test(extraChatId)?'Ek grup için sayısal negatif chat ID gerekli.':sameTelegramTarget()?'Ek hedef ana kanalla aynı olamaz.':null},
+identities:()=>({extraTelegram:crypto.createHash('sha256').update(extraChatId).digest('hex'),groupTelegram:crypto.createHash('sha256').update(groupChatId).digest('hex'),x:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex')}),availability:()=>({
+    extraTelegram:{configured:!!bot && /^-\d+$/.test(extraChatId) && !sameTelegramTarget(extraChatId),
+        reason:!bot?'Telegram bot ayarı eksik.':!extraChatId?'TELEGRAM_EXTRA_CHAT_ID .env içinde boş.':! /^-\d+$/.test(extraChatId)?'Ek kanal/grup için sayısal negatif chat ID gerekli.':sameTelegramTarget(extraChatId)?'Ek hedef ana kanalla aynı olamaz.':null},
+    groupTelegram:{configured:!!bot && /^-\d+$/.test(groupChatId) && !sameTelegramTarget(groupChatId) && groupChatId!==extraChatId,
+        reason:!bot?'Telegram bot ayarı eksik.':!groupChatId?'TELEGRAM_GROUP_CHAT_ID boş.':! /^-\d+$/.test(groupChatId)?'Live grup için sayısal negatif chat ID gerekli.':sameTelegramTarget(groupChatId)?'Live grup ana kanalla aynı olamaz.':groupChatId===extraChatId?'Live grup mevcut ek hedefle aynı olamaz.':null},
     x:{configured:Object.values(xCredentials).every(v=>!!v.trim()),reason:Object.values(xCredentials).every(v=>!!v.trim())?null:'Dört X OAuth 1.0a kullanıcı anahtarını .env içine girin.'}
 })});
 const sharingDelivery = new SharingDelivery({filePath:path.join(__dirname,'mac_yakala_sharing_delivery.json'),settings:sharingSettings,tracker:signalTracker,
-    extraChatId,xIdentity:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex'),
+    extraChatId,groupChatId,xIdentity:crypto.createHash('sha256').update(xCredentials.accessToken).digest('hex'),
     telegramSend:(chat,text,options)=>{if(!bot)throw Error('Telegram ayarı eksik');return bot.sendMessage(chat,text,options);},
     xSend:createXPublisher({credentials:xCredentials}),logger:message=>addSystemLog(message)});
 app.get('/api/sharing-settings', (req,res)=>res.json({success:true,...sharingSettings.status(),delivery:sharingDelivery.status()}));
 app.post('/api/sharing-settings', (req,res)=>{
-    try { const status=sharingSettings.update(req.body); addSystemLog(`> 📣 Ek paylaşım ayarları güncellendi: ek Telegram ${status.extraTelegram.active?'açık':'kapalı'}, X ${status.x.active?'açık':'kapalı'}. Ana kanal değişmedi.`); res.json({success:true,...status,delivery:sharingDelivery.status()}); }
+    try { const status=sharingSettings.update(req.body); addSystemLog(`> 📣 Ek paylaşım ayarları güncellendi: ek Telegram ${status.extraTelegram.active?'açık':'kapalı'}, Live grup ${status.groupTelegram.active?'açık':'kapalı'}, X ${status.x.active?'açık':'kapalı'}. Ana kanal değişmedi.`); res.json({success:true,...status,delivery:sharingDelivery.status()}); }
     catch(error){res.status(400).json({success:false,error:error.message});}
 });
 

@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('fs'),crypto=require('crypto');
-const {atomicSave}=require('./sharing_settings');
+const {atomicSave,SHARING_KINDS}=require('./sharing_settings');
+const isTelegram=kind=>kind==='extraTelegram'||kind==='groupTelegram';
 const {formatSignal,WIN_TEXT}=require('./mac_yakala_telegram');
 const hash=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
 const copy=s=>JSON.parse(JSON.stringify(s));
@@ -10,8 +11,8 @@ function boundedSend(action,ms=15000) {
     return Promise.race([Promise.resolve().then(action),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),ms);})]).finally(()=>clearTimeout(timer));
 }
 class SharingDelivery {
-    constructor({filePath,settings,tracker,extraChatId='',xIdentity='',telegramSend,xSend,logger=()=>{},now=Date.now,timeoutMs=15000}) {
-        Object.assign(this,{filePath,settings,tracker,extraChatId:String(extraChatId),xIdentity,telegramSend,xSend,logger,now,timeoutMs});
+    constructor({filePath,settings,tracker,extraChatId='',groupChatId='',xIdentity='',telegramSend,xSend,logger=()=>{},now=Date.now,timeoutMs=15000}) {
+        Object.assign(this,{filePath,settings,tracker,extraChatId:String(extraChatId),groupChatId:String(groupChatId),xIdentity,telegramSend,xSend,logger,now,timeoutMs});
         this.data={version:1,entries:[]};this.disabled=false;this.flushing=false;
     }
     save() {try{atomicSave(this.filePath,this.data);}catch(e){this.disabled=true;throw e;}}
@@ -19,17 +20,17 @@ class SharingDelivery {
         try {
             if(!fs.existsSync(this.filePath))return;
             const d=JSON.parse(fs.readFileSync(this.filePath,'utf8'));
-            if(d.version!==1||!Array.isArray(d.entries)||d.entries.some(e=>!e.key||!e.primaryKey||!['extraTelegram','x'].includes(e.kind)||!['sending','sent','declined','uncertain','skipped'].includes(e.status)||!Number.isSafeInteger(e.epoch)))throw Error('invalid');
+            if(d.version!==1||!Array.isArray(d.entries)||d.entries.some(e=>!e.key||!e.primaryKey||!SHARING_KINDS.includes(e.kind)||!['sending','sent','declined','uncertain','skipped'].includes(e.status)||!Number.isSafeInteger(e.epoch)))throw Error('invalid');
             this.data=d;
             for(const e of d.entries){if(e.status==='sending')e.status='uncertain';if(e.win?.status==='sending')e.win.status='uncertain';}
             this.save();
         }catch(_){this.disabled=true;this.logger('> ⚠️ Ek paylaşım günlüğü hatalı; ana Telegram etkilenmedi, ek paylaşımlar kapalı.');}
     }
-    target(kind){return kind==='extraTelegram'?this.extraChatId:this.xIdentity;}
+    target(kind){return kind==='extraTelegram'?this.extraChatId:kind==='groupTelegram'?this.groupChatId:kind==='x'?this.xIdentity:'';}
     active(e){return !this.disabled&&this.settings.active(e.kind)&&e.target===this.target(e.kind)&&e.epoch===this.settings.data.epochs[e.kind];}
     status(){
         const result={disabled:this.disabled};
-        for(const kind of ['extraTelegram','x']){
+        for(const kind of SHARING_KINDS){
             const entries=this.data.entries.filter(e=>e.kind===kind&&e.target===this.target(kind));
             const e=entries[entries.length-1];
             result[kind]={sent:entries.filter(e=>e.status==='sent').length,last:e?{status:e.status,at:e.createdAt,errorCode:e.errorCode||null,reason:e.reason||null}:null};
@@ -39,14 +40,16 @@ class SharingDelivery {
     async publish(primary){
         if(this.disabled||primary?.status!=='sent'||!primary.key||!primary.messageId)return;
         // Only the primary acknowledged send triggers mirrors. No replay/backfill on startup or toggle.
-        await Promise.all(['extraTelegram','x'].map(kind=>this.publishOne(primary,kind)));
+        await Promise.all(SHARING_KINDS.map(kind=>this.publishOne(primary,kind)));
     }
     async publishOne(primary,kind){
         if(!this.settings.active(kind)||this.disabled)return;
         const target=this.target(kind),key=hash(primary.key+'|'+kind+'|'+target);
         if(!target||this.data.entries.some(e=>e.key===key))return;
         const entry={key,primaryKey:primary.key,kind,target,epoch:this.settings.data.epochs[kind],status:'sending',createdAt:new Date(this.now()).toISOString(),win:null};
-        if(kind==='extraTelegram'&&[primary.chatId,primary.requestedChannel].some(id=>String(id)===target))return;
+        if(isTelegram(kind)&&[primary.chatId,primary.requestedChannel].some(id=>String(id)===target))return;
+        // Defensive de-duplication if two mirror kinds point at the same chat.
+        if(isTelegram(kind)&&this.data.entries.some(e=>e.primaryKey===primary.key&&isTelegram(e.kind)&&(e.target===target||String(e.chatId)===target)))return;
         try{
             this.data.entries.push(entry);this.save();
             if(!this.active(entry)){entry.status='skipped';this.save();return;}
@@ -54,15 +57,15 @@ class SharingDelivery {
             try{
                 response=await boundedSend(()=>{
                     if(!this.active(entry)){const e=Error('disabled');e.statusCode=409;throw e;}
-                    return kind==='extraTelegram'?this.telegramSend(target,formatSignal(primary.payload),{parse_mode:'HTML'}):this.xSend(copy(primary.payload));
+                    return isTelegram(kind)?this.telegramSend(target,formatSignal(primary.payload),{parse_mode:'HTML'}):this.xSend(copy(primary.payload));
                 },this.timeoutMs);
-                const id=kind==='extraTelegram'?response?.message_id:response?.id;
-                if(kind==='extraTelegram'?(!Number.isInteger(id)||id<=0):!/^\d+$/.test(String(id||'')))throw Error('missing ack');
-                entry.messageId=id;entry.chatId=kind==='extraTelegram'?(response.chat?.id??target):undefined;entry.status='sent';
+                const id=isTelegram(kind)?response?.message_id:response?.id;
+                if(isTelegram(kind)?(!Number.isInteger(id)||id<=0):!/^\d+$/.test(String(id||'')))throw Error('missing ack');
+                entry.messageId=id;entry.chatId=isTelegram(kind)?(response.chat?.id??target):undefined;entry.status='sent';
             }catch(e){
                 entry.errorCode=errorCode(e);entry.status=entry.errorCode>=400&&entry.errorCode<500?'declined':'uncertain';
                 entry.reason=e?.safeReason||null;
-                this.logger(`> ⚠️ ${kind==='x'?'X':'Ek Telegram'} paylaşımı ${entry.status}; ana kanal etkilenmedi. Otomatik tekrar yok.`);
+                this.logger(`> ⚠️ ${kind==='x'?'X':kind==='groupTelegram'?'Maç Yakala Live':'Ek Telegram'} paylaşımı ${entry.status}; ana kanal etkilenmedi. Otomatik tekrar yok.`);
             }
             this.save();
         }catch(_){this.disabled=true;this.logger('> ⚠️ Ek paylaşım kaydı yazılamadı; yalnız ek paylaşımlar durduruldu.');}
@@ -72,7 +75,7 @@ class SharingDelivery {
         this.flushing=true;let count=0;
         try{
             for(const e of this.data.entries){
-                if(e.kind!=='extraTelegram'||!this.active(e)||e.status!=='sent'||!e.messageId||['sent','sending','uncertain','failed'].includes(e.win?.status)||(e.win?.retryAt||0)>this.now())continue;
+                if(!isTelegram(e.kind)||!this.active(e)||e.status!=='sent'||!e.messageId||['sent','sending','uncertain','failed'].includes(e.win?.status)||(e.win?.retryAt||0)>this.now())continue;
                 if(this.tracker.data.signals.find(s=>s.deliveryKey===e.primaryKey)?.settlement?.result!=='W')continue;
                 e.win={status:'sending'};this.save();
                 try{

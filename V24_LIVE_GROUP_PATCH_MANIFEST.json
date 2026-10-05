@@ -1,0 +1,362 @@
+{
+  "build": "mac-yakala-v24-live-group-2026-10-05",
+  "generatedAt": "2026-10-05T17:02:30.791Z",
+  "packageType": "cumulative-patch",
+  "baseBuild": "mac-yakala-v24-main-focus-b65-sniper75-pre52-2026-10-01",
+  "previousBuild": "mac-yakala-v24-live-transition-2026-10-05",
+  "tests": 38,
+  "liveSources": [
+    "V24"
+  ],
+  "mainPolicy": {
+    "key": "main",
+    "label": "V24 Ana",
+    "version": "v24-main-live-women-2026-10-05",
+    "telegram": true,
+    "weekendOnly": false,
+    "validationMode": "fresh-required",
+    "womenExcluded": false,
+    "maximumSignalsPerFixture": 1,
+    "priority": [
+      "SNIPER",
+      "B",
+      "A",
+      "MS"
+    ],
+    "allowedOverMarketsByBranch": null,
+    "excludedNationalCompetitions": false,
+    "v25Joint": null,
+    "over": {
+      "minuteLow": 25,
+      "minuteHigh": 70,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4,
+      "dinoMinimum": 45,
+      "v18Minimum": 50,
+      "eventScoreRequired": true,
+      "edgeField": "dino",
+      "edgeLow": null,
+      "edgeHigh": 0,
+      "edgeInclusive": true,
+      "goalsNeededMaximum": 2,
+      "branches": {
+        "SNIPER": {
+          "score": "0-0",
+          "markets": [
+            "1.5_UST"
+          ],
+          "goalsNeeded": 2,
+          "dinoMinimum": 50,
+          "v16Minimum": 72,
+          "v18Minimum": 50,
+          "prematchByMarket": {
+            "1.5_UST": 75
+          }
+        },
+        "B": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 1,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "1.5_UST": 70,
+            "2.5_UST": 32,
+            "3.5_UST": 30,
+            "4.5_UST": 25
+          }
+        },
+        "A": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 2,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "2.5_UST": 52,
+            "3.5_UST": 25,
+            "4.5_UST": 25
+          }
+        }
+      }
+    },
+    "leadingWinner": {
+      "enabled": true,
+      "minuteLow": 25,
+      "minuteHigh": 44,
+      "minimumOdd": 1.5,
+      "maximumOdd": 2.5,
+      "v16Minimum": 60,
+      "v16EdgeLow": 0,
+      "v16EdgeHigh": 5,
+      "eventScoreRequired": true
+    },
+    "quietLeagueDailyLimit": null,
+    "excludedLeagues": []
+  },
+  "geminiPolicy": {
+    "key": "gemini-weekend",
+    "label": "V24 Gemini Weekend",
+    "version": "v24-main-live-women-2026-10-05-gemini-weekend",
+    "telegram": false,
+    "weekendOnly": false,
+    "validationMode": "fresh-required",
+    "womenExcluded": false,
+    "maximumSignalsPerFixture": 1,
+    "priority": [
+      "SNIPER",
+      "B",
+      "A",
+      "MS"
+    ],
+    "allowedOverMarketsByBranch": null,
+    "excludedNationalCompetitions": false,
+    "v25Joint": null,
+    "over": {
+      "minuteLow": 25,
+      "minuteHigh": 68,
+      "minimumOdd": 1.5,
+      "maximumOdd": 4,
+      "dinoMinimum": 45,
+      "v18Minimum": 50,
+      "eventScoreRequired": true,
+      "edgeField": "dino",
+      "edgeLow": -12,
+      "edgeHigh": 0,
+      "edgeInclusive": true,
+      "goalsNeededMaximum": 2,
+      "branches": {
+        "SNIPER": {
+          "score": "0-0",
+          "markets": [
+            "1.5_UST"
+          ],
+          "goalsNeeded": 2,
+          "dinoMinimum": 50,
+          "v16Minimum": 72,
+          "v18Minimum": 50,
+          "prematchByMarket": {
+            "1.5_UST": 75
+          }
+        },
+        "B": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 1,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "1.5_UST": 70,
+            "2.5_UST": 32,
+            "3.5_UST": 30,
+            "4.5_UST": 25
+          }
+        },
+        "A": {
+          "zeroZeroAllowed": false,
+          "goalsNeeded": 2,
+          "v16Minimum": 65,
+          "prematchByMarket": {
+            "2.5_UST": 52,
+            "3.5_UST": 25,
+            "4.5_UST": 25
+          }
+        }
+      }
+    },
+    "leadingWinner": {
+      "enabled": true,
+      "minuteLow": 25,
+      "minuteHigh": 44,
+      "minimumOdd": 1.5,
+      "maximumOdd": 2.5,
+      "v16Minimum": 60,
+      "v16EdgeLow": 0,
+      "v16EdgeHigh": 5,
+      "eventScoreRequired": true
+    },
+    "quietLeagueDailyLimit": null,
+    "excludedLeagues": [
+      "League One",
+      "League Two"
+    ]
+  },
+  "group": {
+    "kind": "groupTelegram",
+    "defaultChatId": "-1004308912742",
+    "envOverride": "TELEGRAM_GROUP_CHAT_ID",
+    "enabledByDefault": false
+  },
+  "preservedLabs": [
+    "V21",
+    "V22",
+    "V24 main mirror",
+    "V24 focus",
+    "Weekend Quiet",
+    "Gemini (daily)",
+    "Selective Weekend",
+    "V24+V25 Joint Weekend",
+    "Old Telegram LAB"
+  ],
+  "retiredRuntime": [
+    "V21/V22 New Filter Experiments",
+    "V24 Weekend Guard"
+  ],
+  "exclusions": [
+    ".env",
+    "model JSONs",
+    "live histories",
+    "cache files",
+    "database",
+    "node_modules"
+  ],
+  "checks": [
+    "all decision thresholds and market sets preserved",
+    "four live arms + women",
+    "actual server flow, stale/final gates and no legacy writes",
+    "ledger activation, restart and uncertain delivery locks",
+    "legacy gate parity",
+    "archive byte preservation and no retired modules/timers",
+    "panel DOM and matching source/public HTML",
+    "38 offline test scripts",
+    "unchanged model/decision code vs previous V24 release",
+    "v1 sharing settings migration preserves existing toggles/epochs/targets and delivery ledger",
+    "actual main + existing Telegram + group fan-out and own-message winner replies",
+    "independent failures, timeout/restart, off/on and target-change locks, no historical replay",
+    "default group/env overrides, duplicate target prevention and independent panel save/rollback"
+  ],
+  "files": [
+    {
+      "path": "server.js",
+      "sha256": "dd6d57ecbffc2089f357a6a6219ae5a312c9f7aff33981aaa8ed202076845ce9",
+      "baseSha256": "dd0adc553ab08a60c1b5679bca90fbf028ccf4e2dc59dca8124d3bf717967c00",
+      "previousSha256": "3e4b863bfe903fc24961b10b680b7d836d06d8f8cb8ffd4296b21b75c51c270b"
+    },
+    {
+      "path": "mac_yakala_telegram.js",
+      "sha256": "56e1ec532753f0f18d02326a513d08b19b271ac5a60c25f53a44eda1918a0e5a",
+      "baseSha256": "a43dd3c10ac48064896462a3118967b4e77d2544f36abda96c840b355fde60f6",
+      "previousSha256": "56e1ec532753f0f18d02326a513d08b19b271ac5a60c25f53a44eda1918a0e5a"
+    },
+    {
+      "path": "v24_telegram_router.js",
+      "sha256": "dbc6c06236f9b9bebca64365282effcf543da40aed2f6d0d59276100192a3f38",
+      "baseSha256": null,
+      "previousSha256": "dbc6c06236f9b9bebca64365282effcf543da40aed2f6d0d59276100192a3f38"
+    },
+    {
+      "path": "legacy_telegram_lab.js",
+      "sha256": "201acb939e12c1477f8184cb7f0f4ce7a2f6a4647d94e8690366a73131831cdf",
+      "baseSha256": null,
+      "previousSha256": "201acb939e12c1477f8184cb7f0f4ce7a2f6a4647d94e8690366a73131831cdf"
+    },
+    {
+      "path": "v23_entry_gate.js",
+      "sha256": "0d00bcb5b2aae25bd684282a9e8c2fd26ff253c50dc347ab9a631151a745335a",
+      "baseSha256": null,
+      "previousSha256": "0d00bcb5b2aae25bd684282a9e8c2fd26ff253c50dc347ab9a631151a745335a"
+    },
+    {
+      "path": "v24_tariff.js",
+      "sha256": "33b398688dfa3b89b8d0b5a8256a2b80cf2c618dc57c61845bc3f07e6a7742d0",
+      "baseSha256": "d4c5343ac8f6f80ddf6c09f5fbc1d2a0238b25b62b686e4f332f984e0467d14a",
+      "previousSha256": "33b398688dfa3b89b8d0b5a8256a2b80cf2c618dc57c61845bc3f07e6a7742d0"
+    },
+    {
+      "path": "v24_lab.js",
+      "sha256": "edc6b56b826441f5866eca4f1dec97cbe2c352c5465b656d91647b1e7712bce2",
+      "baseSha256": "5b26825cda46714a2440e7b0e8a9b113bc27c43233a4ae8e6b6531a99899ed5a",
+      "previousSha256": "edc6b56b826441f5866eca4f1dec97cbe2c352c5465b656d91647b1e7712bce2"
+    },
+    {
+      "path": "signal_tracker.js",
+      "sha256": "1e7d3409bc7f41e1619592bddc9cb6d813437391b8f1496539ab8f4b57f2c7c7",
+      "baseSha256": "ddd16bc11802222dd5201c8798fbe3d14c8c7aae8c8f7af6061b90696df3b8f2",
+      "previousSha256": "1e7d3409bc7f41e1619592bddc9cb6d813437391b8f1496539ab8f4b57f2c7c7"
+    },
+    {
+      "path": "index.html",
+      "sha256": "97179c4c42b106aa94729af085b33cddc0a5297693f98b1da2e9df4902747b7f",
+      "baseSha256": "3fe4ae7e920a735788656ef67c9111a253b93c99ba3232ad97893c6ef18de628",
+      "previousSha256": "d169f8418c3aecb2cd485f9e801804db9c5dfe33694aeb6a2993af1be02d7ffc"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "97179c4c42b106aa94729af085b33cddc0a5297693f98b1da2e9df4902747b7f",
+      "baseSha256": "3fe4ae7e920a735788656ef67c9111a253b93c99ba3232ad97893c6ef18de628",
+      "previousSha256": "d169f8418c3aecb2cd485f9e801804db9c5dfe33694aeb6a2993af1be02d7ffc"
+    },
+    {
+      "path": "package.json",
+      "sha256": "199130917c54f7755262563b512701046ca2223c4c662657185b9ddfce90a4b9",
+      "baseSha256": "986afc15dc10d04cb0c73b9f6f0ee8ffa2a7bf3ae978ad4b0890472c0a915a19",
+      "previousSha256": "c9a21be341a510f95146d3b3baeac3095b34f2dfebe9ef810a1d7c55c1bb0c63"
+    },
+    {
+      "path": "README_UPDATE.md",
+      "sha256": "0c5b8884c1097e3cda45e0967b97a3a91df72f126a15073def10cf707aa4c6ed",
+      "baseSha256": "906d4d25b9b9fc216088d1ed611da76460344a7ded8797947543ce70c109fd06",
+      "previousSha256": "41890dd05cf4952f097cec024e84f4fda0493e3493f3966f5692d1b35dd93fac"
+    },
+    {
+      "path": "v24_live_transition.test.js",
+      "sha256": "8a12bc81b9c52eaea564e5599838541a16a85e2b37236ca67175fc19bba035b4",
+      "baseSha256": null,
+      "previousSha256": "8a12bc81b9c52eaea564e5599838541a16a85e2b37236ca67175fc19bba035b4"
+    },
+    {
+      "path": "v24_transition_server_flow.test.js",
+      "sha256": "40f8c5e5602bcfb34faf3ee40cc12906fdc77d8fa17d388b1ce26547123b298b",
+      "baseSha256": null,
+      "previousSha256": "3293b05059fa32ada0163fa649e9fb0405b553caf6f6bb3c5e9cc3d271f5a312"
+    },
+    {
+      "path": "v24_lab.test.js",
+      "sha256": "c8214b7240e260c5ed8638d595295458ff5aa650a349c7025b1648c6017e2c2f",
+      "baseSha256": "eeb23216bc698fb49ba5fa7a70c89ddb6ba3d1e6c0603e1e7de118cdba928422",
+      "previousSha256": "c8214b7240e260c5ed8638d595295458ff5aa650a349c7025b1648c6017e2c2f"
+    },
+    {
+      "path": "v24_b65_sniper75.test.js",
+      "sha256": "27959b4e7b1ce26e553e85b417652aeec64ab55c73c8231d10e03e1393151ed7",
+      "baseSha256": "92407730dd71cb82b316c4373c08e15a515295a61677461883b0094abb25e94a",
+      "previousSha256": "27959b4e7b1ce26e553e85b417652aeec64ab55c73c8231d10e03e1393151ed7"
+    },
+    {
+      "path": "v24_focus_panel.test.js",
+      "sha256": "8636d95222ff1aabdc4d061eaf26c8305b065562e08ade342c8f75d2f6c7519f",
+      "baseSha256": "81eb02e9d387ac9b634e6301f4b71fbdfcb06aa72d298aeb96e995d3ae203b8f",
+      "previousSha256": "8636d95222ff1aabdc4d061eaf26c8305b065562e08ade342c8f75d2f6c7519f"
+    },
+    {
+      "path": "test_lab_server_contract.test.js",
+      "sha256": "1155fe422e41f98fd0c8932db7c9ef80b77fad3f2c14856cfbdff3471853104d",
+      "baseSha256": "d35bd86a043f94efba7179bfc96608f1c011b8f5d0a1ab64a097711e893f5f4b",
+      "previousSha256": "1155fe422e41f98fd0c8932db7c9ef80b77fad3f2c14856cfbdff3471853104d"
+    },
+    {
+      "path": "test_lab_panel_contract.test.js",
+      "sha256": "0bc6956a08bcc63a372715a5eb02747326b211bcb6fae84e25eb68014be2bc81",
+      "baseSha256": "170ab7c50287ae39338915cfb629b8768b990ad83a3e5d991d32270e179fa763",
+      "previousSha256": "0bc6956a08bcc63a372715a5eb02747326b211bcb6fae84e25eb68014be2bc81"
+    },
+    {
+      "path": "coupon_lab_contract.test.js",
+      "sha256": "b9f98901cdb3cb1a67ae565153c5ca54e9ae9d07b001812fa87ae30aa70603a0",
+      "baseSha256": "e9fbb8244fa5d8d7824440d46c96e77e7b380fa290f4868f9fa0c496c7d9d866",
+      "previousSha256": "b9f98901cdb3cb1a67ae565153c5ca54e9ae9d07b001812fa87ae30aa70603a0"
+    },
+    {
+      "path": "sharing_settings.js",
+      "sha256": "30b990b7a797dbccd1400948e65fbb961e8947a3ed0416546d8aee9add086d34",
+      "baseSha256": "690ea4b2f83bd5e738971482c6b1972958d71061350c45eafeda1013faa2e1e6",
+      "previousSha256": "690ea4b2f83bd5e738971482c6b1972958d71061350c45eafeda1013faa2e1e6"
+    },
+    {
+      "path": "sharing_delivery.js",
+      "sha256": "aa1c634154802e3f37e9541c0d6da9305b53d61d4ead3f5ae8c97d9dbb7aa3e4",
+      "baseSha256": "5fb1bcabe20ce239f9399ce1dbb19d8b3df263d2252b7d54477d1ab657443bc9",
+      "previousSha256": "5fb1bcabe20ce239f9399ce1dbb19d8b3df263d2252b7d54477d1ab657443bc9"
+    },
+    {
+      "path": "sharing_group.test.js",
+      "sha256": "1fb2dd6b2d421fa8d5f8d2faf94ab9c871f3679c5e289bf5ebcb98f223e17d8a",
+      "baseSha256": null,
+      "previousSha256": null
+    }
+  ]
+}

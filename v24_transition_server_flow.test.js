@@ -15,13 +15,13 @@ const external={dotenv:{config(){}},express,cors:()=>()=>{},axios:{create:()=>({
 const retired=['dino_v23_filter_history_v2.json','dino_v23_goal_history.json','dino_v23_goal_cache.json','dino_v24_weekend_guard_history.json'];
 for(const name of retired)fs.writeFileSync(path.join(root,name),'retired evidence preserved: '+name);
 const ctx=vm.createContext({require(name){required.push(name);return Object.hasOwn(external,name)?external[name]:localRequire(name);},__dirname:root,
-    process:{env:{TELEGRAM_BOT_TOKEN:'offline',TELEGRAM_CHANNEL_ID:'offline',MAC_YAKALA_V21_TELEGRAM_ENABLED:'true',MAC_YAKALA_V22_TELEGRAM_ENABLED:'true',DINO_V23_SHADOW_ENABLED:'true',DINO_V24_WEEKEND_GUARD_HISTORY_FILE:path.join(root,retired[3])},platform:process.platform},
+    process:{env:{TELEGRAM_BOT_TOKEN:'offline',TELEGRAM_CHANNEL_ID:'offline',TELEGRAM_EXTRA_CHAT_ID:'-1002',MAC_YAKALA_V21_TELEGRAM_ENABLED:'true',MAC_YAKALA_V22_TELEGRAM_ENABLED:'true',DINO_V23_SHADOW_ENABLED:'true',DINO_V24_WEEKEND_GUARD_HISTORY_FILE:path.join(root,retired[3])},platform:process.platform},
     console:{log(){},warn(){},error(){}},Date,Buffer,URL,URLSearchParams,
     setInterval(fn,ms){timers.push({fn,ms});return {unref(){}};},setTimeout(){},setImmediate(){},clearInterval(){},clearTimeout(){}});
 const source=fs.readFileSync(path.join(__dirname,'server.js'),'utf8');
 assert.doesNotMatch(source,/new FilterLab|v23GoalLab|v23YerelArsivBakimi|v24WeekendGuardTracker|v24WeekendGuardLab/);
 vm.runInContext(source+`
-globalThis.api={botuCalistir,signalTracker,v24ShadowTracker,oldTelegramTracker,v24GeminiWeekendLab,paylasilanSinyalSonuclariniGuncelle,
+globalThis.api={botuCalistir,signalTracker,v24ShadowTracker,oldTelegramTracker,v24GeminiWeekendLab,paylasilanSinyalSonuclariniGuncelle,sharingSettings,sharingDelivery,
     logs:()=>systemLogs,
     setup(mac,initial,fresh,options={}) {
         let calls=0; globalThis.api.freshChecks=0;
@@ -82,6 +82,22 @@ async function run(m,options={},freshP=54){api.setup(m,dino(Object.keys(m.canli_
     assert(api.signalTracker.data.signals.every(s=>s.settlement?.result==='W'));
     assert(api.oldTelegramTracker.data.signals.some(s=>s.settlement),'Former Telegram LAB settles through shared result batch');
     for(const name of retired)assert.equal(fs.readFileSync(path.join(root,name),'utf8'),'retired evidence preserved: '+name);
+    // Real production fan-out: main ack triggers both Telegram mirrors, not new model/API work.
+    const before=sends.length,signalsBefore=api.signalTracker.data.signals.length;
+    assert.equal(api.sharingSettings.active('groupTelegram'),false);
+    assert.equal(api.sharingSettings.status().groupTelegram.configured,true);
+    api.sharingSettings.update({revision:api.sharingSettings.data.revision,extraTelegram:true,groupTelegram:true});
+    assert.equal(sends.length,before,'Enabling a new destination never backfills old signals');
+    await run(mac(13));await new Promise(setImmediate);
+    assert.equal(sends.length,before+3,'One main + existing channel + new Live group');
+    const fanout=sends.slice(before);assert.deepEqual(fanout.map(s=>String(s.channel)).sort(),['-1002','-1004308912742','offline'].sort());
+    assert(fanout.every(s=>s.text===fanout[0].text),'Exact same live V24 signal');
+    assert.equal(api.signalTracker.data.signals.length,signalsBefore+1,'Mirrors do not duplicate shared signal counters');
+    assert.equal(api.freshChecks,1,'No extra football API/model validation for group mirroring');
+    const priorWins=sends.length;api.settle([13]);await api.paylasilanSinyalSonuclariniGuncelle({manuel:true});
+    assert.equal(sends.length,priorWins+3,'Each destination replies to its own winning signal');
+    for(const original of fanout){const win=sends.slice(priorWins).find(s=>String(s.channel)===String(original.channel));assert(win);assert.equal(JSON.parse(win.options.reply_parameters).message_id,sends.indexOf(original)+1);}
+    await run(mac(13));await new Promise(setImmediate);assert.equal(sends.length,priorWins+3,'No duplicate send to any destination');
     console.log('V24 real server flow (offline): all live arms and women, no V21/V22 sends, fresh/final gates, single fixture lock, legacy LAB settlement, no retired modules/timers/routes and byte-preserved archives passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{
     if(path.dirname(root)===os.tmpdir()&&path.basename(root).startsWith('v24-transition-server-'))fs.rmSync(root,{recursive:true,force:true});
