@@ -1322,7 +1322,7 @@
         .filterlab-negative { color:#f3a294; font-weight:600; }
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
     </style>
-    <link rel="stylesheet" href="/banko_coupon.css?v=20261006banko2">
+    <link rel="stylesheet" href="/banko_coupon.css?v=20261006banko4">
 </head>
 <body>
     <div class="container" id="login-screen">
@@ -2074,7 +2074,7 @@
             </details>
             <div class="metrics"><div class="metric info"><span class="metric-label">Seçili gün</span><span id="banko-count" class="metric-value">0 kupon</span></div><div class="metric warning"><span class="metric-label">Banko API / günlük tavan</span><span id="banko-api" class="metric-value">0 / 2000</span><small id="banko-reserve"></small></div><div class="metric info"><span class="metric-label">Kupon sonuçları · ilk kayıt fiyatı</span><span id="banko-results-summary">0 K / 0 Y / 0 bekleyen</span></div></div>
             <div id="banko-coupons"></div>
-            <details class="banko-settings"><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
+            <details class="banko-settings"><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><p class="muted">Her maçın yanındaki ↻ Alternatif tahmin, aynı kayıtta şartları geçen ikinci farklı seçeneği gösterir. Ek API harcamaz; ana seçim ve kayıtlı kupon değişmez. Uygun ikinci seçenek yoksa tahmin zorlanmaz.</p><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
             <p class="muted">Canlı tarama/sonuç kontrolü sırasında Banko bekler; işlem bitince aynı tarama kaldığı yerden otomatik devam eder. Beklerken API isteği gönderilmez; tekrar oluştur düğmesine basmanız gerekmez. Sunucu yeniden başlatılırsa yarım kayıt korunur ama otomatik devam etmez; yeni manuel tarama gerekir.</p>
             <p class="muted">Her manuel oluşturma yeni, ayrı sürüm kaydeder; eski kupon değiştirilmez. Yeni veya yarım tarama eski kuponları silmez. Otomatik maç önü kontrol yalnız o günün son tamamlanmış sürümündeki seçilen maçlara uygulanır; eski sürümler elle kontrol edilebilir. Sonuçları kendiniz getirirsiniz; panelin durum yenilemesi API-Football taraması değildir. Otomatik Telegram gönderimi yok.</p>
         </div>
@@ -2228,7 +2228,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
-<script src="/banko_coupon_panel.js?v=20261006banko3"></script>
+<script src="/banko_coupon_panel.js?v=20261006banko4"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;

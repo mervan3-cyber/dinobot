@@ -10,7 +10,26 @@
     const statNames={'Total Shots':'Toplam şut','Shots on Goal':'İsabetli şut','Shots insidebox':'Ceza içi şut','Shots outsidebox':'Ceza dışı şut','Corner Kicks':'Korner','Yellow Cards':'Sarı kart','Red Cards':'Kırmızı kart',expected_goals:'xG'};
     const optionalStats=new Set(['Yellow Cards','Red Cards','expected_goals']);
     const marketLabel=m=>{if(!m)return 'Seçim yok';const total=/^(Over|Under) (\d+(?:\.\d+)?)$/.exec(m.selection);const selection=total?`${total[2]} ${total[1]==='Over'?'ÜST':'ALT'}`:m.spec?.code?m.spec.code.replace(/X/g,m.spec.kind==='htft'?'0':'X'):({Home:'1',Draw:'X',Away:'2',Yes:'Var',No:'Yok'})[m.selection]||m.selection;return `${marketNames[m.betId]||m.market} · ${selection}`;};
-    let latest=null,dirty=false,fetching=false,page=0,sessionId=null;
+    let latest=null,dirty=false,fetching=false,page=0,sessionId=null,candidateSerial=0;
+    const openAlternatives=new Set();
+    // Read-only choices from the saved scan. Never refresh odds, relax eligibility or replace a frozen pick.
+    const outcomeKey=m=>m?.spec&&typeof m.spec==='object'?JSON.stringify(Object.keys(m.spec).filter(k=>k!=='family').sort().map(k=>[k,m.spec[k]])):null;
+    function alternative(row,settings){
+        const main=outcomeKey(row.pick);if(!main)return null;
+        const eligible=(row.markets||[]).filter(m=>{
+            const key=outcomeKey(m);
+            if(!key||key===main||m.key&&m.key===row.pick.key||m.eligible!==true||!Array.isArray(m.reasons)||m.reasons.length)return false;
+            if(!Number.isFinite(m.modelProbability)||m.modelProbability<0||m.modelProbability>1||!Number.isFinite(m.odd)||m.odd<=1||!Number.isFinite(m.dataScore)||!Number.isFinite(m.edgePP))return false;
+            // Recheck the scan's own saved settings, not subsequently edited panel settings.
+            if(settings){
+                if(m.odd<settings.minLegOdd||m.odd>settings.maxLegOdd||m.modelProbability*100<settings.minModelProbability||m.edgePP<settings.minEdgePP)return false;
+                if(Array.isArray(settings.marketFamilies)&&!settings.marketFamilies.includes(m.spec.family))return false;
+            }
+            return true;
+        });
+        eligible.sort((a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||(Number(a.betId)||0)-(Number(b.betId)||0)||String(a.selection).localeCompare(String(b.selection)));
+        return eligible[0]||null;
+    }
     const integerIds=['dailyLimit','maxCandidates','maxCoupons','precheckMinutes','maxOddsAgeHours'];
     const numericIds=[...integerIds,'minLegOdd','maxLegOdd','minCouponOdd','maxCouponOdd','minSingleOdd','maxSingleOdd','minModelProbability','minEdgePP'];
     const booleanIds=['enabled','autoPrecheck','women','predictionContext'];
@@ -33,7 +52,23 @@
         const history=el('details');history.appendChild(el('summary','Geçmiş maçları aç'));history.appendChild(table(['Tarih','Maç','Skor','İY'],p.rows.map(r=>[dt(r.date),`${r.homeName||r.homeId} - ${r.awayName||r.awayId}`,`${r.home}-${r.away}`,r.ht?`${r.ht.home}-${r.ht.away}`:'Eksik'])));box.appendChild(history);
         const players=el('details');players.appendChild(el('summary','Oyuncu geçmişi · son 5 / doğrulanmamış prop bağlamı'));players.appendChild(table(['Oyuncu','Süre','Gol / kayıt','Şut / kayıt','İsabet / kayıt'],p.players.map(p=>[p.name,p.minutes,`${p.goalSamples?p.goals:'—'} / ${p.goalSamples}`,`${p.shotSamples?p.shots:'—'} / ${p.shotSamples}`,`${p.onSamples?p.on:'—'} / ${p.onSamples}`])));box.appendChild(players);return box;
     }
-    function candidate(row){const details=el('details',undefined,'banko-analysis');details.appendChild(el('summary',`${row.match} · ${row.league} · ${dt(row.kickoff)} · ${row.pick?marketLabel(row.pick)+' @ '+num(row.pick.odd):'PAS'}`));
+    function candidate(row){const details=el('details',undefined,'banko-analysis'),summary=el('summary'),heading=el('span',`${row.match} · ${row.league} · ${dt(row.kickoff)} · ${row.pick?marketLabel(row.pick)+' @ '+num(row.pick.odd):'PAS'}`,'banko-analysis-title');
+        const button=el('button','↻ Alternatif tahmin','banko-alternative-button'),backup=el('section',undefined,'banko-alternative');
+        const stateKey=JSON.stringify([latest?.session?.id,row.id||row.fixtureId]),backupId='banko-alternative-'+(++candidateSerial);
+        button.type='button';button.dataset.bankoAlternative=String(row.fixtureId);button.title='Aynı kayıttaki uygun ikinci seçeneği gösterir; API harcamaz ve kuponu değiştirmez.';
+        button.setAttribute('aria-controls',backupId);button.setAttribute('aria-label',`${row.match} · alternatif tahmin`);backup.id=backupId;backup.setAttribute('aria-live','polite');backup.hidden=true;
+        const showBackup=()=>{const pick=alternative(row,latest?.session?.settings);backup.replaceChildren();
+            backup.appendChild(el('h4',pick?'Yedek seçenek · '+marketLabel(pick):'Uygun alternatif yok'));
+            if(pick){
+                backup.appendChild(el('p',`Kayıt oranı ${num(pick.odd)} · Ham model %${num(pick.modelProbability*100,1)} · Veri puanı ${pick.dataScore}/100 · Model − piyasa farkı ${num(pick.edgePP,1)} yüzde puan.`));
+                backup.appendChild(el('p','Ana seçimden sonra, aynı veri/oran/model şartlarını geçen en yüksek ham model puanlı farklı seçenek. Aynı tahminin farklı adla tekrarı değildir.'));
+                backup.appendChild(el('small',`Kaydedilmiş analiz · Oran güncellemesi ${dt(row.oddsUpdatedAt)}. Canlı yenileme veya yeni maç önü kontrolü yapılmadı; ham yüzde doğrulanmış başarı oranı değildir.`));
+            }else backup.appendChild(el('p',row.pick?'Ana tahmin dışındaki marketlerde aynı koşulları geçen ikinci seçim yok; eşikler düşürülmedi.':'Bu maç PAS; ana seçim şartlarını geçmediği için yedek tahmin zorlanmadı.'));
+            backup.appendChild(el('small','Ana tahmin, kayıtlı kupon ve sonuç takibi değişmez. Yedek seçenek ayrı bir bahistir, ana tahminin sigortası değildir.'));
+        };
+        const setVisible=visible=>{backup.hidden=!visible;button.setAttribute('aria-expanded',String(visible));button.textContent=visible?'Yedeği gizle':'↻ Alternatif tahmin';if(visible){showBackup();details.open=true;openAlternatives.add(stateKey);}else openAlternatives.delete(stateKey);};
+        button.onclick=event=>{event?.preventDefault();event?.stopPropagation();setVisible(backup.hidden);};
+        summary.append(heading,button);details.append(summary,backup);setVisible(openAlternatives.has(stateKey));
         const reasons=row.pick?[`Ham model %${num(row.pick.modelProbability*100,1)}; kalibre edilmiş başarı yüzdesi değildir. Veri puanı ${row.pick.dataScore}/100. Model − piyasa farkı ${num(row.pick.edgePP,1)} yüzde puan.`,...row.risks]:[...row.reasons,...row.risks];reasons.forEach(r=>details.appendChild(note(r)));
         if(row.apiPrediction?.advice)details.appendChild(el('p','API tavsiyesi (yalnız bağlam): '+row.apiPrediction.advice));
         details.appendChild(el('p',`Veri: ${dt(row.capturedAt)} · Oran güncellemesi: ${dt(row.oddsUpdatedAt)} · Beklenen gol ${num(row.expectedGoals?.home)} / ${num(row.expectedGoals?.away)}`));
