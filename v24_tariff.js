@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = 'v24-main-live-women-2026-10-05';
+const VERSION = 'v24-main-ms-pre36-2026-10-06';
 
 function freezePolicy(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -73,6 +73,7 @@ const MAIN_POLICY = freezePolicy({
         minuteHigh: 44,
         minimumOdd: 1.5,
         maximumOdd: 2.5,
+        prematchMinimum: 36,
         v16Minimum: 60,
         v16EdgeLow: 0,
         v16EdgeHigh: 5,
@@ -95,6 +96,8 @@ function variant(key, label, mutate) {
     // Other weekend experiments retain their previous competition scope.
     policy.telegram = false;
     policy.womenExcluded = true;
+    // The new MS prematch gate is Ana/Telegram-only; comparison LABs keep their rules.
+    policy.leadingWinner.prematchMinimum = null;
     mutate(policy);
     return freezePolicy(policy);
 }
@@ -275,6 +278,8 @@ function winnerCheck(args, {
     const odds = finite(args?.odds);
     const score = parseScore(args?.score);
     const expectedMarket = leadingWinnerMarket(args?.score);
+    const prematchSupport = percent(args?.prematchSupport);
+    const prematchMinimum = percent(policy.leadingWinner.prematchMinimum);
     const v16Probability = percent(args?.v16Probability);
     const marketProbability = impliedProbability(odds);
     const v16Edge = v16Probability !== null && marketProbability !== null
@@ -288,6 +293,10 @@ function winnerCheck(args, {
     if (String(args?.market || '') !== expectedMarket) reasons.push('LEADING_MARKET_MISMATCH');
     if (minute === null || minute < policy.leadingWinner.minuteLow || minute > policy.leadingWinner.minuteHigh) reasons.push('MINUTE_OUTSIDE');
     if (odds === null || odds < policy.leadingWinner.minimumOdd || odds > policy.leadingWinner.maximumOdd) reasons.push('ODDS_OUTSIDE');
+    // Prematch is required even in cheap preselection, before fresh API verification.
+    if (prematchMinimum !== null && (prematchSupport === null || prematchSupport < prematchMinimum)) {
+        reasons.push('PREMATCH_BELOW_MS_MINIMUM');
+    }
     if (!skipModelThresholds) {
         if (v16Probability === null || v16Probability < policy.leadingWinner.v16Minimum) reasons.push('V16_BELOW_MINIMUM');
         if (v16Edge === null || v16Edge < policy.leadingWinner.v16EdgeLow || v16Edge > policy.leadingWinner.v16EdgeHigh) {
@@ -305,10 +314,11 @@ function winnerCheck(args, {
         market: expectedMarket,
         minute,
         odds,
+        prematchSupport,
         v16Probability,
         marketProbability,
         v16Edge,
-        thresholds: { v16: policy.leadingWinner.v16Minimum }
+        thresholds: { v16: policy.leadingWinner.v16Minimum, prematch: prematchMinimum }
     };
 }
 

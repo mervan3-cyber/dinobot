@@ -37,6 +37,7 @@ globalThis.api={botuCalistir,signalTracker,v24ShadowTracker,oldTelegramTracker,v
         sinyalOncesiCanlilikDogrula=async(_mac,groups)=>{
             if(options.finalMinute!==undefined)mac.dakika=options.finalMinute;
             if(options.finalOdd!==undefined)groups[0].oran=options.finalOdd;
+            if(options.finalAwayPre!==undefined)mac.prematch_p_away=options.finalAwayPre;
             return !options.finalFailure;
         };
         geminiYorumuYaz=async()=> '2.5 üstü ihtimalini destekliyor.';
@@ -55,7 +56,8 @@ const dino=(market,p=54)=>({[market]:p,MODEL_VARYANTI:'live_plus_prematch'});
 async function run(m,options={},freshP=54){api.setup(m,dino(Object.keys(m.canli_oranlar)[0]),dino(Object.keys(m.canli_oranlar)[0],freshP),options);await api.botuCalistir();}
 (async()=>{
     for(const [id,score,market,branch]of [[1,'0-0','1.5_UST','SNIPER'],[2,'1-0','1.5_UST','B'],[3,'0-1','2.5_UST','A'],[4,'0-1','MS2','MS']]) {
-        await run(mac(id,score,market));assert.equal(sends.length,id,api.logs().slice(-12).join('\n'));
+        const extra=branch==='MS'?{prematch_p_home:.4,prematch_p_away:.4}:{};
+        await run(mac(id,score,market,30,extra));assert.equal(sends.length,id,api.logs().slice(-12).join('\n'));
         const s=api.signalTracker.data.signals.find(x=>x.fixtureId===id);assert(s);assert.equal(s.matchedFilters[0],branch);
         assert.deepEqual(Array.from(s.signalSources),['V24']);assert(s.entryAudit.eventScore.status==='approve');
         assert(sends.at(-1).text.includes('Model:</b> V24'));assert(!sends.at(-1).text.includes('Öncelikli modelimiz'));
@@ -98,6 +100,20 @@ async function run(m,options={},freshP=54){api.setup(m,dino(Object.keys(m.canli_
     assert.equal(sends.length,priorWins+3,'Each destination replies to its own winning signal');
     for(const original of fanout){const win=sends.slice(priorWins).find(s=>String(s.channel)===String(original.channel));assert(win);assert.equal(JSON.parse(win.options.reply_parameters).message_id,sends.indexOf(original)+1);}
     await run(mac(13));await new Promise(setImmediate);assert.equal(sends.length,priorWins+3,'No duplicate send to any destination');
+    const msBefore=sends.length;
+    await run(mac(60,'0-1','MS2',30,{prematch_p_home:.6,prematch_p_away:.35999}));
+    assert.equal(sends.length,msBefore,'MS2 uses the away prematch, not the stronger home side');
+    await run(mac(61,'0-1','MS2',30,{prematch_p_away:null}));
+    assert.equal(sends.length,msBefore,'Missing MS prematch cannot send');
+    await run(mac(62,'0-1','MS2',30,{prematch_p_home:.4,prematch_p_away:.4}),{finalAwayPre:.35});
+    assert.equal(sends.length,msBefore,'Prematch below 36 at the final check cannot send');
+    assert(!api.signalTracker.data.signals.some(s=>s.fixtureId===62),'Rejected MS does not consume the shared signal lock');
+    await run(mac(62,'0-1','MS2',30,{prematch_p_home:.44,prematch_p_away:.36}));await new Promise(setImmediate);
+    assert.equal(sends.length,msBefore+3,'Exact 36 passes and fans out once to all three destinations');
+    const acceptedMs=api.signalTracker.data.signals.find(s=>s.fixtureId===62);
+    assert.equal(acceptedMs.prematchMarketSupport,36);assert.equal(acceptedMs.entryAudit.thresholds.prematch,36);
+    await run(mac(62,'0-1','MS2',30,{prematch_p_away:.8}));await new Promise(setImmediate);
+    assert.equal(sends.length,msBefore+3,'MS prematch update does not bypass the first signal lock');
     console.log('V24 real server flow (offline): all live arms and women, no V21/V22 sends, fresh/final gates, single fixture lock, legacy LAB settlement, no retired modules/timers/routes and byte-preserved archives passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{
     if(path.dirname(root)===os.tmpdir()&&path.basename(root).startsWith('v24-transition-server-'))fs.rmSync(root,{recursive:true,force:true});

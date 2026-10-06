@@ -100,6 +100,7 @@ const winner = (extra = {}, policy = tariff.POLICY) => tariff.winnerCheck({
     score: '0-1',
     minute: 25,
     odds: 1.75,
+    prematchSupport: 36,
     v16Probability: 60,
     eventScoreStatus: 'approve',
     ...extra

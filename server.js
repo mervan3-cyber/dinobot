@@ -66,7 +66,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-banko-coupon-lab-2026-10-05';
+const BUILD_VERSION = 'mac-yakala-v24-ms-pre36-2026-10-06';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -7614,7 +7614,7 @@ couponLab.load();
 bankoCoupon.load();
 addSystemLog('> 🎫 BANKO KUPON LAB: ayrı panel · tarama/sonuç manuel · tarih seçimi · başlangıç bütçesi 2000 (panelden değişir) · seçilen maça isteğe bağlı ön kontrol · Telegram YOK.');
 const couponLabStartupStatus = couponLab.status();
-addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 aynı | maç başına tek kayıt | Telegram YOK.`);
+addSystemLog(`> 🔵 V24 ANA LAB: ${DINO_V24_SHADOW_ENABLED ? 'AÇIK' : 'KAPALI'} | 25–70 | Sniper 0-0/1.5 ÜST pre>=75 V16>=72 | B tam 1 gol V16>=65, pre 70/32/30/25 | A tam 2 gol V16>=65, pre 52/25/25 | MS 25–44 pre>=36 V16>=60 EDGE 0..+5 | maç başına tek kayıt | Telegram YOK.`);
 addSystemLog(`> 🛡️ V24 HAFTA SONU LAB: Quiet + Seçici + V24/V25 Ortak hafta sonu; Gemini her gün aynı taze veriden ayrı geçmiş toplar; Guard ve yeni filtre deneyleri emekli; V25 ${v25Runtime.MODEL.version} (${v25Runtime.MODEL.trainedThrough} sonuna kadar kilitli); V24 Ana hafta sonunda da çalışır, ek API çağrısı yok.`);
 addSystemLog(`> 🎯 V24 ODAK LAB: 7 kol | Sniper 1.5 + B 1.5/B 2.5 mevcut ve reaksiyon + B 2.5 pre>=52 + A 2.5 | yeni dönem B 2.5 pre32/pre52 kıyası | her kol bağımsız ilk kayıt | 1-1 B 2.5 reaksiyon dışı | Telegram YOK.`);
 addSystemLog(`> 🎟️ İY/MS KUPON LAB: ${couponLabStartupStatus.enabled ? 'AÇIK' : 'KAPALI'} | yalnız İY/MS, maç başına tek ana aday | ana tarama ${couponLabStartupStatus.scanTime} | yarın ${couponLabStartupStatus.includeTomorrow ? 'DAHİL' : 'HARİÇ'} | ${COUPON_BOOKMAKER_NAME} marketi | seçilen maça ${couponLabStartupStatus.finalCheckMinutes} dk kala tek kontrol | Telegram YOK | bütçe ${couponLabStartupStatus.api.limit}.`);

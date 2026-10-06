@@ -32,5 +32,5 @@ for(const policy of Object.values(tariff.POLICIES)){
 assert.equal(over({minute:25}).eligible,true);assert.equal(over({minute:70}).eligible,true);assert.equal(over({minute:71}).eligible,false);
 assert.equal(tariff.POLICY.maximumSignalsPerFixture,1);assert.equal(tariff.POLICY.womenExcluded,false);
 assert.deepEqual(tariff.POLICY.priority,['SNIPER','B','A','MS']);
-assert.equal(tariff.winnerCheck({market:'MS2',score:'0-1',minute:25,odds:1.75,v16Probability:60,eventScoreStatus:'approve'}).eligible,true,'MS minimum60 unchanged');
+assert.equal(tariff.winnerCheck({market:'MS2',score:'0-1',minute:25,odds:1.75,prematchSupport:36,v16Probability:60,eventScoreStatus:'approve'}).eligible,true,'MS V16 minimum60 unchanged with approved pre36');
 console.log('PASS: B V16 minimum65 and Sniper pre75 boundaries; B pre/A/MS/edge/events/priority and inherited LAB policies preserved.');

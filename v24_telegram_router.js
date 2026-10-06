@@ -49,6 +49,7 @@ function createV24Router({ delivery, channel, baselineTracker, v16Model, v18Mode
             v18Probability: selected.score18?.v18Probability, eventScoreStatus: eventScore.status
         }, { requireEventScore: true }) : tariff.winnerCheck({
             market: group.market, score: mac.skor, minute: mac.dakika, odds: Number(group.oran),
+            prematchSupport: prematchSupport(mac, group.market),
             v16Probability: selected.score16?.selectorProbability, eventScoreStatus: eventScore.status
         }, { requireEventScore: true });
         if (!policy.eligible || policy.branch !== selected.policy.branch) return null;

@@ -162,10 +162,7 @@ function createV24Lab({
         const market = tariff.leadingWinnerMarket(mac?.skor);
         if (!market) return false;
         return tariff.winnerCheck({
-            market,
-            score: mac?.skor,
-            minute: mac?.dakika,
-            odds: oddsValue(mac, market),
+            ...modelInput(mac, dino, market),
             v16Probability: 100,
             eventScoreStatus: 'approve'
         }, { policy, requireEventScore: false, skipModelThresholds: true }).eligible;
@@ -198,16 +195,14 @@ function createV24Lab({
 
         const winnerMarket = tariff.leadingWinnerMarket(mac?.skor);
         if (winnerMarket) {
+            const args = modelInput(mac, dino, winnerMarket);
             const score16 = v16Model.scoreMarket(mac, winnerMarket, dino, liveOnlyDino, context);
             const check = tariff.winnerCheck({
-                market: winnerMarket,
-                score: mac?.skor,
-                minute: mac?.dakika,
-                odds: oddsValue(mac, winnerMarket),
+                ...args,
                 v16Probability: score16?.selectorProbability,
                 eventScoreStatus: eventScore.status
             }, { policy, requireEventScore });
-            if (check.eligible) candidates.push({ kind: 'winner', market: winnerMarket, score16, policy: check });
+            if (check.eligible) candidates.push({ kind: 'winner', market: winnerMarket, args, score16, policy: check });
         }
 
         const priority = branch => policy.priority.indexOf(branch);
