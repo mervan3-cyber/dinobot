@@ -3,7 +3,7 @@
 const { createV24Lab, eventScoreAudit } = require('./v24_lab');
 const tariff = require('./v24_tariff');
 const { MAX_AGE_MS } = require('./v23_events');
-const { shortAnalysis, VERSION } = require('./mac_yakala_telegram');
+const { briefStatsAnalysis, VERSION } = require('./mac_yakala_telegram');
 
 // LAB records never become a delivery queue. Only a newly selected, fresh
 // candidate can build a live payload, and delivery owns its own fixture lock.
@@ -59,7 +59,7 @@ function createV24Router({ delivery, channel, baselineTracker, v16Model, v18Mode
         const entryAudit = payload.analysis;
         return { ...payload, modelVariant: 'v24_main_live_fresh_only', tariffVersion: VERSION,
             sourcePolicies: { V24: { version: tariff.VERSION, matchedFilters: [policy.branch] } },
-            analysis: shortAnalysis(analysis, group.market), entryAudit };
+            analysis: briefStatsAnalysis(payload), entryAudit };
     }
     return { preselect, select, record };
 }

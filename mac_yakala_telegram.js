@@ -21,12 +21,54 @@ function shortAnalysis(value,market) {
         .split(/(?<=[.!?])\s+/)
         .map(sentence=>sentence.trim())
         .filter(Boolean);
-    const selected=sentences
-        .filter(sentence=>sentence.length<=180&&!/EDGE|value|Dino|karar motoru|kesin kazan|garanti|%/i.test(sentence))
-        .slice(0,2)
-        .join(' ');
+    const accepted=[];
+    for(const sentence of sentences) {
+        if(accepted.length===2)break;
+        if(/EDGE|value|Dino|karar motoru|kesin kazan|garanti|%/i.test(sentence))continue;
+        // Limit the whole paragraph, not each sentence independently.
+        if([...accepted,sentence].join(' ').length<=180)accepted.push(sentence);
+    }
+    const selected=accepted.join(' ');
     const marketLabel=String(market||'').replace('_UST',' ÜST');
-    return selected||`Canlı veriler ve giriş skoru üzerinden ${marketLabel} seçimi değerlendirildi.`;
+    const fallback=`Canlı veriler ve giriş skoru üzerinden ${marketLabel} seçimi değerlendirildi.`;
+    return selected||(fallback.length<=180?fallback:'Seçilen market canlı giriş verileriyle değerlendirildi.');
+}
+function briefStatsAnalysis(record) {
+    // Use only the accepted entry snapshot, never Gemini's unverified numbers.
+    const count=value=>{
+        if(!['number','string'].includes(typeof value)||String(value).trim()==='')return null;
+        const n=Number(value);
+        return Number.isSafeInteger(n)&&n>=0&&n<=1000?n:null;
+    };
+    const stats=side=>{
+        const source=record?.liveStats?.[side]||{};
+        const shots=count(source.shots),sot=count(source.shotsOnGoal);
+        return {shots,shotsOnGoal:sot!==null&&shots!==null&&sot>shots?null:sot,corners:count(source.corners)};
+    };
+    const home=stats('home'),away=stats('away'),market=String(record?.market||'');
+    const isWinner=market==='MS1'||market==='MS2';
+    const side=market==='MS1'?'Ev sahibi':'Deplasman';
+    const selected=isWinner?(market==='MS1'?home:away):Object.fromEntries(
+        Object.keys(home).map(field=>[field,home[field]!==null&&away[field]!==null?home[field]+away[field]:null])
+    );
+    const labels={shots:'şut',shotsOnGoal:'isabetli şut',corners:'korner'};
+    const numbers=Object.entries(labels).filter(([field])=>selected[field]!==null)
+        .map(([field,label])=>`${selected[field]} ${label}`);
+    const summary=numbers.length
+        ? `${isWinner?side+':':'Toplam'} ${numbers.join(', ')}.`
+        : `${isWinner?'Seçilen tarafın':'Canlı'} şut/isabet/korner verisi eksik.`;
+    let context='Seçim giriş skoru üzerinden değerlendirildi.';
+    if(isWinner)context=`${market}: ${side.toLocaleLowerCase('tr-TR')} galibiyeti seçildi.`;
+    else {
+        const line=/^(\d+\.5)_UST$/.exec(market);
+        const score=/^\s*(\d+)\s*[-:]\s*(\d+)\s*$/.exec(String(record?.score||''));
+        if(line&&Number(line[1])<=9.5&&score) {
+            const needed=Math.floor(Number(line[1]))+1-Number(score[1])-Number(score[2]);
+            if(needed>0&&needed<=2)context=`${line[1]} ÜST için ${needed} gol daha gerekiyor.`;
+        }
+    }
+    // Fixed, neutral wording: no pressure/tempo claims or invented missing fields.
+    return shortAnalysis(`${summary} ${context}`,market);
 }
 function formatSignal(record) {
     const models=[...new Set(record.signalSources)].sort((a,b)=>a==='V22'?-1:b==='V22'?1:a.localeCompare(b));
@@ -163,4 +205,4 @@ class TelegramDelivery {
         return count;
     }
 }
-module.exports={VERSION,WIN_TEXT,FOOTER,shortAnalysis,formatSignal,createRouter,TelegramDelivery};
+module.exports={VERSION,WIN_TEXT,FOOTER,shortAnalysis,briefStatsAnalysis,formatSignal,createRouter,TelegramDelivery};
