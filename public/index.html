@@ -1835,7 +1835,7 @@
                 <span class="test-lab-rule">B · tam 1 gol · V16 ≥ %65 · Pre: 1.5 %70 · 2.5 %32 · 3.5 %30 · 4.5 %25</span>
                 <span class="test-lab-rule">A · tam 2 gol · V16 ≥ %65 · Pre: 2.5 %52 · 3.5/4.5 %25</span>
                 <span class="test-lab-rule">ÜST · 25–70 · oran 1.50–4.00 · Dino ≥ %45 · V18 ≥ %50 · gereken gol en fazla 2</span>
-                <span class="test-lab-rule">MS · 25–44 · öndeki taraf · oran 1.50–2.50 · V16 ≥ %60 · V16 EDGE %0…+5</span>
+                <span class="test-lab-rule">MS · 25–44 · öndeki taraf · oran 1.50–2.50 · Pre ≥ %36 · V16 ≥ %60 · V16 EDGE %0…+5</span>
             </div>
             <div class="v18-arm-card v24" style="margin:14px 0;border-color:#7e57c2;">
                 <div class="v18-arm-title"><span>🎯 V24 Odak LAB · 7 bağımsız kol</span><span class="mini-badge bg-info" id="testlab-v24-focus-mode-badge">YALNIZ LAB</span></div>
@@ -2454,7 +2454,7 @@
             document.getElementById("tariff-minimum-odd").textContent = "1.50";
             document.getElementById("tariff-primary-count").textContent = String(enabledModels.length);
             document.getElementById("tariff-follow-count").textContent = "Maç başına tek";
-            document.getElementById("tariff-primary-rules").textContent = "V24 Ana: Sniper / B / A / MS. Güncel eşikler korunur; kadınlar açık. ÜST 25–70, MS 25–44; olay/skor ve taze doğrulama zorunlu.";
+            document.getElementById("tariff-primary-rules").textContent = "V24 Ana: Sniper / B / A / MS. Kadınlar açık. ÜST 25–70, MS 25–44 ve pre ≥ %36; olay/skor ve taze doğrulama zorunlu.";
             document.getElementById("tariff-follow-rules").textContent = "Maçın ilk uygun V24 sinyali paylaşılır; kollar aynı maç kilidini kullanır. Eski Telegram yalnız LAB. Geçmiş kayıtlar yeniden gönderilmez; V17/V20 emekli.";
         }
 
@@ -3415,6 +3415,11 @@
                 const edgeText = Number.isFinite(v25Edge)
                     ? `${baseEdgeText} · V25 ${v25Edge >= 0 ? "+" : ""}${v25Edge.toFixed(1)} ortak filtre`
                     : baseEdgeText;
+                // Read the entry-time threshold: do not relabel old MS records or comparison LABs.
+                const msPrematchMinimum = testLabNumber(signal?.analysis?.thresholds?.prematch);
+                const prematchText = isOver
+                    ? formatPercent(testLabNumber(signal.prematchMarketSupport))
+                    : `${formatPercent(testLabNumber(signal.prematchMarketSupport))} · ${Number.isFinite(msPrematchMinimum) ? `min %${msPrematchMinimum}` : "yalnız veri"}`;
                 const values = [
                     isOver ? "ÜST" : "MS",
                     formatDateTime(signal.sentAt),
@@ -3426,9 +3431,7 @@
                     marketDisplayName(signal.market),
                     probabilityWithV25,
                     edgeText,
-                    isOver
-                        ? formatPercent(testLabNumber(signal.prematchMarketSupport))
-                        : `${formatPercent(testLabNumber(signal.prematchMarketSupport))} · yalnız veri`,
+                    prematchText,
                     `${eventText}${reactionText}`,
                     Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
