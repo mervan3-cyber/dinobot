@@ -13,6 +13,7 @@ const { spawn } = require('child_process');
 const { SignalTracker } = require('./signal_tracker');
 const { TelegramDelivery, VERSION: TELEGRAM_VERSION } = require('./mac_yakala_telegram');
 const { createV24Router } = require('./v24_telegram_router');
+const { deliveryCheck, withDeliveryView } = require('./v24_delivery_audit');
 const { createLegacyTelegramLab } = require('./legacy_telegram_lab');
 const { createPanelAuth } = require('./panel_auth');
 const { SharingSettings } = require('./sharing_settings');
@@ -66,7 +67,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // =========================================================
 
 const app = express();
-const BUILD_VERSION = 'mac-yakala-v24-ms-pre36-2026-10-06';
+const BUILD_VERSION = 'mac-yakala-v24-delivery-sync-2026-10-07';
 
 app.use(express.json({limit:'64kb'}));
 app.use(createPanelAuth({password:process.env.PANEL_ADMIN_PASSWORD || ''}));
@@ -5281,6 +5282,13 @@ function gecerliGolOlaylariniAyikla(events) {
 
 
 async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
+    // Persisted later on the existing candidate row; no extra history store/API.
+    const reject = (code) => {
+        mac._v24FinalGateAudit = deliveryCheck({status:'blocked', stage:'final-live', codes:[code],
+            checkedAt:new Date().toISOString(), minute:mac.dakika, score:mac.skor});
+        return false;
+    };
+    mac._v24FinalGateAudit = null;
     try {
         if (STALE_GOAL_GUARD.enabled) {
             addSystemLog(
@@ -5320,7 +5328,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             addSystemLog(
                 `> ⛔ ${mac.mac_isim}: sinyal öncesi canlılık reddedildi (${dakika}' / ${status}).`
             );
-            return false;
+            return reject('FINAL_NOT_LIVE');
         }
 
         const latestHome = latest.goals?.home;
@@ -5333,7 +5341,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             addSystemLog(
                 `> ⛔ ${mac.mac_isim}: sinyal öncesi güncel skor alınamadı.`
             );
-            return false;
+            return reject('FINAL_SCORE_UNAVAILABLE');
         }
 
         const latestScore = `${latestHome}-${latestAway}`;
@@ -5341,17 +5349,19 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             addSystemLog(
                 `> ⛔ ${mac.mac_isim}: skor ${mac.skor} → ${latestScore} değişti; eski model sonucu gönderilmedi.`
             );
+            mac._v24FinalGateAudit = deliveryCheck({status:'blocked', stage:'final-live', codes:['FINAL_SCORE_CHANGED'],
+                checkedAt:new Date().toISOString(), minute:latest.fixture.status.elapsed, score:latestScore});
             return false;
         }
 
-        if (Number(latest.fixture.id) !== fixtureId) return false;
+        if (Number(latest.fixture.id) !== fixtureId) return reject('FINAL_FIXTURE_MISMATCH');
         const currentMinute = Number(latest.fixture.status.elapsed);
         const currentOdds = parseLiveOdds(oddsResult.value).get(fixtureId);
         if (!currentOdds || Object.keys(currentOdds).length === 0) {
             addSystemLog(
                 `> ⛔ ${mac.mac_isim}: ikinci kontrolde canlı oranlar kapandı veya alınamadı.`
             );
-            return false;
+            return reject('FINAL_ODDS_UNAVAILABLE');
         }
 
         for (const firsat of Array.isArray(firsatlar) ? firsatlar : []) {
@@ -5375,7 +5385,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: ${firsat.market} ikinci kontrolde kapandı veya oran ${currentOdd || '-'} ile kuralın ${ruleMinimumOdd.toFixed(2)}-${ruleMaximumOdd?.toFixed(2) || '∞'} aralığı dışında kaldı.`
                 );
-                return false;
+                return reject('FINAL_ODDS_OUTSIDE');
             }
             if (
                 Number.isFinite(selectedOdd) &&
@@ -5384,7 +5394,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: ${firsat.market} oranı ${selectedOdd} → ${currentOdd} değişti; eski V16 kararı gönderilmedi.`
                 );
-                return false;
+                return reject('FINAL_ODDS_DRIFT');
             }
             firsat.oran = currentOdd; // Recheck the frozen model against the actual final odds.
         }
@@ -5402,7 +5412,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: olay akışında ${goalEvents.length} gol, fixture skorunda ${officialGoalCount} gol var; sağlayıcı akışı tutarsız.`
                 );
-                return false;
+                return reject('FINAL_EVENTS_AHEAD');
             }
 
             const lastGoalMinute = goalEvents.reduce((latestMinute, event) => {
@@ -5419,7 +5429,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
                 addSystemLog(
                     `> ⛔ ${mac.mac_isim}: son gol ${lastGoalMinute}', güncel dakika ${currentMinute}'; ${STALE_GOAL_GUARD.recentGoalCooldownMinutes} dakikalık gol soğuma süresi dolmadı.`
                 );
-                return false;
+                return reject('FINAL_RECENT_GOAL');
             }
         } else {
             addSystemLog(
@@ -5435,6 +5445,9 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
             `> ✅ ${mac.mac_isim}: ikinci skor + oran + olay doğrulaması geçti (${mac.dakika}' / ${latestScore}).`
         );
 
+        mac._v24FinalGateAudit = deliveryCheck({status:'approved', stage:'final-live', codes:[],
+            reason:'İkinci skor, oran ve olay kontrolü geçti.', checkedAt:new Date().toISOString(),
+            minute:mac.dakika, score:latestScore});
         return true;
 
     } catch (error) {
@@ -5443,7 +5456,7 @@ async function sinyalOncesiCanlilikDogrula(mac, firsatlar = []) {
         addSystemLog(
             `> ⛔ ${mac.mac_isim}: sinyal öncesi canlılık doğrulanamadı (${error.message}).`
         );
-        return false;
+        return reject('FINAL_VERIFICATION_UNAVAILABLE');
     }
 }
 
@@ -5578,8 +5591,6 @@ async function botuCalistir() {
             candidateAuditRows.push(...degerlendirme.auditRecords);
 
             const firsatlar = []; // No V19/Legacy V17 Telegram selection.
-            const initialTelegram = telegramRouter.select({mac,dino,liveOnlyDino});
-            const initialTelegramSources = new Set(initialTelegram.flatMap(group=>group.choices.map(s=>s.source)));
             // Remaining lab branches and independent Telegram models share the fresh data check.
             const labGolgeOnAdayi = labGolgeOnAdayiMi({
                 mac,
@@ -5637,7 +5648,8 @@ async function botuCalistir() {
                 ilkGonderilecekFirsatlar.push(firsat);
             }
 
-            // Lab-only qualification must not add a new Telegram source after recheck.
+            // The initial scan schedules the shared check; only the fresh V24
+            // policy (not a LAB result or an initial-source set) can authorize delivery.
             if (
                 ilkGonderilecekFirsatlar.length === 0 &&
                 !labGolgeOnAdayi &&
@@ -5716,7 +5728,7 @@ async function botuCalistir() {
             // Telegram'dan bağımsız iki Test Lab kolu aynı taze fixture,
             // altı temel istatistik, canlı oran ve ikinci Python sonucunu kullanır.
             // Son Telegram canlılık beklemesi bu gölge kayıtlarını etkilemez.
-            tazeLabGolgeKayitlariniOlustur({
+            const freshLabResults = tazeLabGolgeKayitlariniOlustur({
                 mac,
                 dino: freshDino,
                 liveOnlyDino: freshLiveOnlyDino,
@@ -5724,24 +5736,57 @@ async function botuCalistir() {
             });
             // Live V24 fixture locks are independent of the prospective LAB trackers.
             const groups = telegramRouter.select({mac,dino:freshDino,liveOnlyDino:freshLiveOnlyDino});
+            if (!groups.length && freshLabResults.v24.record) {
+                const availability = telegramRouter.availability(mac, new Date().toISOString());
+                if (!availability.eligible) {
+                    const check = deliveryCheck({status:'blocked',stage:'routing',codes:availability.codes,
+                        checkedAt:new Date().toISOString(), minute:mac.dakika, score:mac.skor});
+                    for (const record of freshEvaluation.auditRecords.filter(r=>r.market===freshLabResults.v24.record.market)) {
+                        record.liveDeliveryCheck = check; record.decision = 'v24_final_rejected'; record.decisionDetail = check.reason;
+                    }
+                    addSystemLog(`> ⛔ ${mac.mac_isim}: V24 TG ${check.reason}`);
+                }
+            }
             for (const group of groups) {
-                group.choices = group.choices.filter(s=>initialTelegramSources.has(s.source));
-                if (!group.choices.length) continue;
-                const choice = group.choices[0];
-                const analysisInput = {...group, sinyal_kaynaklari:group.choices.map(s=>s.source),
-                    dino_yuzde:choice.policy.probabilities?.dino ?? choice.policy.v16Probability, prematch_destek_yuzde:choice.args?.prematchSupport};
-                const yorum = await geminiYorumuYaz(mac, analysisInput);
+                const auditDelivery = (check) => {
+                    const normalized = deliveryCheck({...check, checkedAt:check.checkedAt || new Date().toISOString(),
+                        minute:check.minute ?? mac.dakika, score:check.score ?? mac.skor, odds:group.oran});
+                    for (const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
+                        record.liveDeliveryCheck = normalized;
+                        record.decision = normalized.status === 'sent' ? 'sent' : normalized.status === 'uncertain'
+                            ? 'telegram_uncertain' : normalized.status === 'declined' ? 'telegram_failed' : 'v24_final_rejected';
+                        record.decisionDetail = normalized.reason;
+                    }
+                    if (normalized.status !== 'sent') addSystemLog(`> ⛔ ${mac.mac_isim}: V24 TG ${normalized.reason}`);
+                };
+                // V24 already produces the accepted-entry short stats comment in
+                // the router. Do not await an unused Gemini comment before final checks.
                 // The final minute, odds and event/score audit must still satisfy the frozen V24 choice.
-                if (!await sinyalOncesiCanlilikDogrula(mac,[group])) continue;
-                if (!telegramMacHalaUygunMu(mac)) continue;
-                const payload = telegramRouter.record(mac,group,yorum,new Date().toISOString());
-                if (!payload) continue;
+                if (!await sinyalOncesiCanlilikDogrula(mac,[group])) {
+                    auditDelivery(mac._v24FinalGateAudit || {status:'blocked',stage:'final-live',codes:['FINAL_REJECTED']});
+                    continue;
+                }
+                if (!telegramMacHalaUygunMu(mac)) {
+                    auditDelivery({status:'blocked',stage:'final-live',codes:['FINAL_NOT_LIVE']});
+                    continue;
+                }
+                const assessed = telegramRouter.recordWithAudit(mac,group,'',new Date().toISOString());
+                const payload = assessed.payload;
+                if (!payload) {
+                    auditDelivery({status:'blocked',stage:'final-v24',codes:assessed.codes});
+                    continue;
+                }
                 const sent = await telegramDelivery.publish(kanalID,payload);
                 if (sent) void sharingDelivery.publish(telegramDelivery.findSent(kanalID,payload)).catch(()=>addSystemLog('> ⚠️ Ek paylaşım hatası; ana sinyal korundu.'));
-                for (const record of freshEvaluation.auditRecords.filter(r=>r.market===group.market)) {
-                    record.decision = sent ? 'sent' : 'telegram_failed';
-                    record.decisionDetail = sent ? 'V24 Telegram gönderimi başarılı.' : 'Telegram gönderilmedi; lab kaydı korundu.';
-                }
+                const intent = telegramDelivery.data.entries.slice().reverse().find(e=>e.payload?.sentAt===payload.sentAt &&
+                    Number(e.payload.fixtureId)===Number(payload.fixtureId) && e.payload.market===payload.market && String(e.requestedChannel)===String(kanalID));
+                const receiptConfirmed = intent?.status === 'sent' && Number.isInteger(intent.messageId) && intent.messageId > 0;
+                const status = sent || receiptConfirmed ? 'sent' : intent?.status === 'declined' ? 'declined' :
+                    ['sending','uncertain'].includes(intent?.status) ? 'uncertain' : 'blocked';
+                auditDelivery({status,stage:'telegram',codes:[sent ? 'TELEGRAM_SENT' : receiptConfirmed
+                    ? 'TELEGRAM_RECEIPT_TRACKER_FAILED' : status==='declined'
+                    ? 'TELEGRAM_DECLINED' : status==='uncertain' ? 'TELEGRAM_UNCERTAIN' : telegramDelivery.disabled
+                        ? 'DELIVERY_DISABLED' : 'TELEGRAM_NOT_ATTEMPTED']});
                 if (sent) { onaylanan++; addSystemLog(`> ✅ MAÇ YAKALA: ${payload.signalSources.join(' + ')} | ${payload.match} | ${payload.market} | ${payload.minute}'`); }
             }
         }
@@ -6513,7 +6558,7 @@ app.get(
             },
             v24Shadow: {
                 ...v24Lab.metadata(testLabDonemineGoreSec(v24ShadowTracker, selection.date)),
-                signals: v24ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v24ShadowTracker, selection.date))
+                signals: v24AnaPaylasimGorunumu(v24ShadowTracker.list(req.query.limit, testLabDonemineGoreSec(v24ShadowTracker, selection.date)))
             },
             v24WeekendQuiet: {
                 ...v24WeekendQuietLab.metadata(testLabDonemineGoreSec(v24WeekendQuietTracker, selection.date)),
@@ -6563,10 +6608,19 @@ app.post(
 );
 
 
+function v24AnaPaylasimGorunumu(signals) {
+    return withDeliveryView(signals, {sharedSignals:signalTracker.data.signals, entries:telegramDelivery.data.entries,
+        candidates:candidateTracker.data.records, channel:kanalID});
+}
+
 function labHistorySignals(req, tracker) {
-    if (req.query.scope === 'test-lab') return testLabDonemineGoreSec(tracker, null, req.query.cohort);
+    if (req.query.scope === 'test-lab') {
+        const selected = testLabDonemineGoreSec(tracker, null, req.query.cohort);
+        return tracker === v24ShadowTracker ? v24AnaPaylasimGorunumu(selected) : selected;
+    }
     const signals = tracker.list(100000);
-    return tracker === v21ShadowTracker ? v21History.select(signals, req.query.cohort) : signals;
+    return tracker === v21ShadowTracker ? v21History.select(signals, req.query.cohort) :
+        tracker === v24ShadowTracker ? v24AnaPaylasimGorunumu(signals) : signals;
 }
 
 function v24LabForTracker(tracker) {
