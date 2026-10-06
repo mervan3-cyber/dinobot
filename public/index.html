@@ -3394,6 +3394,8 @@
                     : eventScore.status === "reject"
                         ? "❌ Uyumsuz"
                         : "⚪ Veri yok";
+                const deliveryView = signal.deliveryView;
+                const eventWithDelivery = `${eventText}${deliveryView ? ` · TG: ${deliveryView.label}` : ""}`;
                 const focusArmLabel = signal?.analysis?.focusArmLabel || null;
                 const reaction = signal?.analysis?.reaction || null;
                 const reactionText = reaction?.status === "approve"
@@ -3432,12 +3434,15 @@
                     probabilityWithV25,
                     edgeText,
                     prematchText,
-                    `${eventText}${reactionText}`,
+                    `${eventWithDelivery}${reactionText}`,
                     Number.isFinite(testLabNumber(signal.odds)) ? Number(signal.odds).toFixed(3) : "-"
                 ];
                 for (const value of values) {
                     const cell = document.createElement("td");
                     cell.textContent = String(value);
+                    if (deliveryView && value === `${eventWithDelivery}${reactionText}`) {
+                        cell.title = `${deliveryView.reason}${deliveryView.checkedAt ? ` Son kontrol: ${formatDateTime(deliveryView.checkedAt)}` : ""}`;
+                    }
                     if (value === probabilityWithV25 || value === edgeText) {
                         cell.style.whiteSpace = "normal";
                         cell.style.minWidth = "170px";
@@ -3573,7 +3578,7 @@
             setTestLabModeBadge("testlab-v24-mode-badge", data?.v24Shadow, "fresh");
             const v24Start = document.getElementById("testlab-v24-start-note");
             if (v24Start) v24Start.textContent = data?.v24Shadow?.startedAt
-                ? `V24 Ana Telegram’da aktif · LAB başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · Geçmiş LAB kayıtları mesaj olarak gönderilmez.`
+                ? `V24 Ana Telegram’da aktif · LAB başlangıcı: ${formatDateTime(data.v24Shadow.startedAt)} · LAB kaydı teslim onayı değildir. Olay/skor sütununda TG durumu; üzerine gelince son kontrol nedeni. Geçmiş LAB kayıtları mesaj olarak gönderilmez.`
                 : "İlk uygun canlı V24 kaydı bekleniyor; geçmiş sonuçlar aktarılmaz.";
             for (const id of ["SNIPER", "A", "B"]) {
                 const element = document.getElementById(`testlab-v24-filter-${id}`);
@@ -3763,6 +3768,8 @@
                 fresh_recheck_superseded: ["♻️ Taze modelle yenilendi", "neutral"],
                 fresh_stats_validation_failed: ["🛡️ Taze stats reddi", "loss"],
                 telegram_failed: ["❌ Telegram hatası", "loss"],
+                telegram_uncertain: ["⚠️ Teslim belirsiz", "pending"],
+                v24_final_rejected: ["🛡️ V24 son kontrol reddi", "loss"],
                 model_error: ["❌ Model hatası", "loss"]
             };
             const selected = labels[decision] || [decision || "Bilinmiyor", "neutral"];
