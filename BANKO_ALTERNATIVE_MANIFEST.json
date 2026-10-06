@@ -1,0 +1,1115 @@
+{
+  "patch": "banko-alternative-2026-10-06",
+  "generatedAt": "2026-10-06T08:35:51.667Z",
+  "requires": "Banko Coupon installed (2026-10-05 or newer)",
+  "cumulativeBankoSettingsAndPauseResume": true,
+  "featureScope": "Read-only panel alternatives on every analysis; server and all Banko runtime/model code byte-identical to prior pause/resume release",
+  "panelVersion": "20261006banko4",
+  "runtimeVersion": "banko-pause-resume-v1-2026-10-06",
+  "storageSchemaVersion": "banko-coupon-lab-v1-2026-10-05",
+  "modelVersion": "banko-model-lab-v2-2026-10-06",
+  "dataPolicy": {
+    "minimumHistoryMatches": 8,
+    "minimumVenueMatches": 3,
+    "minimumPhaseMatches": 10
+  },
+  "alternatives": {
+    "allAnalyses": true,
+    "distinctOutcome": true,
+    "existingSavedEligibilityAndSettings": true,
+    "rank": "modelProbability desc, dataScore desc, betId asc, selection asc",
+    "maximumBackup": 1,
+    "noForcedPas": true,
+    "noFrozenPickCouponOrResultMutation": true,
+    "noProviderCalls": true,
+    "noServerWrites": true,
+    "noRandomRegeneration": true,
+    "noOddsRefresh": true
+  },
+  "defaultApiLimit": 2000,
+  "liveReserve": 1500,
+  "noProductionApiOrTelegramCalls": true,
+  "noSecretsOrRuntimeStores": true,
+  "tests": {
+    "scripts": 45,
+    "passed": 45,
+    "sourceReport": "banko-tests-2026-10-06-alternative-final-source.json",
+    "extraAlternativesIncludedIn": "banko_panel.test.js",
+    "mockBrowserProof": "banko-alternative-preview-2026-10-06.jpg"
+  },
+  "files": [
+    {
+      "path": "banko_model.js",
+      "sha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d",
+      "previousSha256": "ccc75a5f160ba74e7905650dc2e18200e51ddc76b64673715f1b90d51573e295"
+    },
+    {
+      "path": "banko_coupon.js",
+      "sha256": "0504a90f5ba6eee067f88cad2e878f31afc82fb123018d8b497250719017615f",
+      "previousSha256": "57031a0d62a038db4bf62f1e450272d4f8db6d38007856f23656d3583a24d696"
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "804231533924135f5cf41126ae90cf8666acebb64a55fe313809fc59181f8755",
+      "previousSha256": "a6e0f28693b4477b0f4e12d4341e1d4bb6a0c8ecf6776d82ed3fc06e986d124c"
+    },
+    {
+      "path": "public/banko_coupon.css",
+      "sha256": "d2c50a1b9ee6c835aacb8a5b40e261bb2e3fd36d98d65098bfd5a4fc1b96d079",
+      "previousSha256": "7857694751be2a73a20722c5785e346deed9b4936690f1f6c520a71e1592f369"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "6179b7d01c91649422158c5e1b04491299ecea5d753ba6453e1b59069d5b2d99",
+      "previousSha256": "8144704ef1f1599a174abca33ca9b669deeaca570ec73add68899ff91eca94ee"
+    },
+    {
+      "path": "index.html",
+      "sha256": "6179b7d01c91649422158c5e1b04491299ecea5d753ba6453e1b59069d5b2d99",
+      "previousSha256": "8144704ef1f1599a174abca33ca9b669deeaca570ec73add68899ff91eca94ee"
+    },
+    {
+      "path": "banko_model.test.js",
+      "sha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416",
+      "previousSha256": "8b428c12a466c43a0baf22d325d966ac32b948778554f47dee8880f82c1a5655"
+    },
+    {
+      "path": "banko_coupon.test.js",
+      "sha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919",
+      "previousSha256": "17d5ca6aafd64158d08347b9cbe3aa9324139b379f05a490b068e7952a25c016"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "48c84c4e158b51f6ab8b576f4a82a44f9b47a83dbc30fa2df876e2f5b8222869",
+      "previousSha256": "12330b5a1cea90465b0468e0c90698c1a0d1c9fef0c3d9de341162e4df95c1b4"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3",
+      "previousSha256": null
+    },
+    {
+      "path": "banko_alternative_panel.test.js",
+      "sha256": "3fc40a7fc956a111e0ac219afadc0f04d5e9505ccc5875db3d671dc862308eeb",
+      "previousSha256": null
+    },
+    {
+      "path": "README_BANKO_PAUSE_RESUME_2026_10_06.md",
+      "sha256": "25102dd7d6c5d1e43b260a34eb17daeb92d582138817053e5f94e2a1351a4222",
+      "previousSha256": null
+    },
+    {
+      "path": "README_BANKO_ALTERNATIVE_2026_10_06.md",
+      "sha256": "23907baa7470ce3c6ce7d43e4cf50e53ae387a158084a2e440a2856c46411901",
+      "previousSha256": null
+    }
+  ],
+  "unchangedFromPause": [
+    {
+      "path": "active_tariff.js",
+      "sha256": "feb0a51bb6c522fc42cc103c934fecf8522ae2d12615bae40a300a01393a35ed"
+    },
+    {
+      "path": "adaptive_scan.js",
+      "sha256": "664df26966abd68b8771607dbfa54c0744f02e063e042bb09e7b1f45b3a1a76a"
+    },
+    {
+      "path": "adaptive_scan.test.js",
+      "sha256": "1c00679bb732cdf14e2e1e0a3e7816b0d74f99df31ce5c17aa3d33f1bbf22864"
+    },
+    {
+      "path": "adaptive_scan_panel.test.js",
+      "sha256": "ea5dbf01eb0946e24bf00548967d6436003606d8063ff8c92b00306eccf30917"
+    },
+    {
+      "path": "adaptive_scan_server.test.js",
+      "sha256": "2775b9cf826b3789fb399fc674f7c090b9b5910a647eb03f9ee8f7abb0a5c587"
+    },
+    {
+      "path": "banko_coupon.js",
+      "sha256": "0504a90f5ba6eee067f88cad2e878f31afc82fb123018d8b497250719017615f"
+    },
+    {
+      "path": "banko_coupon.test.js",
+      "sha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d"
+    },
+    {
+      "path": "banko_model.test.js",
+      "sha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "a61e1b24256313e19638274aaa6fbe4f528d76f250926575199b35a9c6d3ed03"
+    },
+    {
+      "path": "candidate_pagination.test.js",
+      "sha256": "ab30748bf6cb335d1a0e8bc6f17185c3dc8466425355a8cbc3c1a5e6971fe76d"
+    },
+    {
+      "path": "candidate_tracker.js",
+      "sha256": "2446f558999a0e3edee810cd0a760d327d7c1a46f6010c1c6c2e06f302f0b105"
+    },
+    {
+      "path": "core_shadow_tariff.js",
+      "sha256": "06e2487553990119a857a92d86af11ec8b5dabee285b4a802d1db335fae8a437"
+    },
+    {
+      "path": "core_shadow_tariff.test.js",
+      "sha256": "3147d62d70a70bee587650bb8e275332d3d505197c4c01bf8b7c86f607650e82"
+    },
+    {
+      "path": "coupon_htft_panel.test.js",
+      "sha256": "57def1613f755ee9a06fe6d91f503be5d53144e616391b111018f4c0209caa61"
+    },
+    {
+      "path": "coupon_htft_safety.test.js",
+      "sha256": "0ebede74befe0e1af40b73ce49d59c95d7c1c1c9e98a5ffc5fc69d41f23007ef"
+    },
+    {
+      "path": "coupon_lab.js",
+      "sha256": "acb8271cac3b593decae934b9cae2e9c29cfbce06b1bfde443cde13fa283e448"
+    },
+    {
+      "path": "coupon_lab.test.js",
+      "sha256": "1aadd5b4a1534c130f3f3d1336f2b3505553850c09ea9e62618c00534bc03067"
+    },
+    {
+      "path": "coupon_lab_contract.test.js",
+      "sha256": "f999fcc55a9d468ee3aa3ae3359ac94fdfa9d1d83b15a070834934e1f15cb062"
+    },
+    {
+      "path": "deployment_evaluation.json",
+      "sha256": "43754c4f46c225aa004a35421b611086288bf97ca23349129306eb58f5dc5ae2"
+    },
+    {
+      "path": "dino_live_models_all.json",
+      "sha256": "a1f96568a751a9317089d5501b582f254dd5cdf41f8b43acf3077b31d71bf64a"
+    },
+    {
+      "path": "dino_selector_v18.js",
+      "sha256": "52c2139bdf69666d062a7c796375485f6b14b7349443fe1aadacdff2db529aaa"
+    },
+    {
+      "path": "dino_selector_v18.json",
+      "sha256": "9f1f932bcc1ef2610d0e171d65e001baee34da6af591a522ae0c5346039d1b36"
+    },
+    {
+      "path": "dino_selector_v18.test.js",
+      "sha256": "a4503e4a3338b9a51479ed5d1b22937e744d830ce6aebdd57ceba566dcdc643c"
+    },
+    {
+      "path": "dino_selector_v2.js",
+      "sha256": "53cd934ebdef859baf2523dd9bd5731e59f062378b17cde3dedcf2ed787042bf"
+    },
+    {
+      "path": "dino_selector_v2.json",
+      "sha256": "86c33f353f58f61c021f3b9910918a37fcde5d97178f79dc9e42b3eb553fb14e"
+    },
+    {
+      "path": "early_over_server.test.js",
+      "sha256": "bc2b5033e1d412ce11d5079e4d4de74fea3075545e3e43f86033b6e131f74c8c"
+    },
+    {
+      "path": "early_over_win.js",
+      "sha256": "a10098b6d01d32b4eab5f308ca2b3f40c84445287e55f0f7d2a8f7109bde9d2d"
+    },
+    {
+      "path": "early_over_win.test.js",
+      "sha256": "479e1000f069689417038fc2ad9deae11734c02a4a83fa465fb56025f70b535a"
+    },
+    {
+      "path": "grok_only.js",
+      "sha256": "35ebba37a1b0e2b30338a0fb6b66fdc414bb875a0f0781967903b8eb322230a7"
+    },
+    {
+      "path": "hybrid_tariff.js",
+      "sha256": "a9002e632e99fc0d6e47b3124093d0072ef4a2542dc93ee66d6b266f401d1c21"
+    },
+    {
+      "path": "hybrid_tariff.test.js",
+      "sha256": "608afd11fb73ae11356fa45fbaa44e328f86799ca1320c8ba6f8d067d4d6d846"
+    },
+    {
+      "path": "independent_lab.js",
+      "sha256": "1cd218434d25264b3d4ecc5d5f3587e8d8229ca4c45a21ed1321f905f69b09fb"
+    },
+    {
+      "path": "independent_lab.test.js",
+      "sha256": "4eb39fc959310696f270b9c4a9c6aa16cd0f20a0e29ee80bbf6a03d1e6f21e77"
+    },
+    {
+      "path": "legacy_telegram_lab.js",
+      "sha256": "201acb939e12c1477f8184cb7f0f4ce7a2f6a4647d94e8690366a73131831cdf"
+    },
+    {
+      "path": "MAC_YAKALA_PACKAGE_MANIFEST.json",
+      "sha256": "990933ca78a75bb010a7a782a82694a3ba71c37b5226fcf7c2ac89b99dd70bb6"
+    },
+    {
+      "path": "mac_yakala_telegram.js",
+      "sha256": "543c7adfe052890cc52ff714bf93c087f367362f513bfad8784a42d31d10e84d"
+    },
+    {
+      "path": "mac_yakala_telegram.test.js",
+      "sha256": "d07912a83a5e439a719313b842ca409ffd6047b37c25de2edbf71d92ebcc6eec"
+    },
+    {
+      "path": "market_tariff.js",
+      "sha256": "1eb00e442faeb6290f79a81f0d1045f4b68e669baff8b697e1264c285ecfcbff"
+    },
+    {
+      "path": "market_tariff.test.js",
+      "sha256": "8a6c21584c9a0d6c8c3569c8c8cc6f11b1eef6e19b9baa9c285d23f7a2ff6bec"
+    },
+    {
+      "path": "market_tariff_v18.json",
+      "sha256": "3f329fd4ce2cd38af79672eb07991a2943c345abc9224c1771c4c02a9b45f2b3"
+    },
+    {
+      "path": "market_tariff_v18_b.json",
+      "sha256": "4faf4db5efe26e7908057ad5e574f3da3e594e842c90b48c9a524dfc53b8556e"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "26bcdde664cd4b61204b778ae99e40d07dc69793069fa63b88884acc29405e12"
+    },
+    {
+      "path": "package.json",
+      "sha256": "077674a9d2968ba1d8178652119fcf373ec3188967581a1af3fd11063cb1f685"
+    },
+    {
+      "path": "panel_auth.js",
+      "sha256": "375ad36417622c6c8453196f50dbfea1f9c90b6fd0702f3f01bfab5b7f323bf9"
+    },
+    {
+      "path": "prematch_odds.js",
+      "sha256": "8eb22f88c67137c010a200815d1304695f3a69a520213deb85d1ca4c55bca274"
+    },
+    {
+      "path": "public/coupon_lab_panel.js",
+      "sha256": "8a789c91a0467119d8de5fd0c7a59ec478f8dc60c41f37aae312353673550726"
+    },
+    {
+      "path": "public/v23_filter_panel.js",
+      "sha256": "a4575167f8485a119981ad85d23fb2aad2bb8bce89e4ef802818e5529762f9d4"
+    },
+    {
+      "path": "README_BANKO_PAUSE_RESUME_2026_10_06.md",
+      "sha256": "25102dd7d6c5d1e43b260a34eb17daeb92d582138817053e5f94e2a1351a4222"
+    },
+    {
+      "path": "README_UPDATE.md",
+      "sha256": "4f267a011f4c8b89076e4585e2991d785e9325b414c86cb0a0232c67a35a48ba"
+    },
+    {
+      "path": "README_UPDATE_BANKO_2026_10_06.md",
+      "sha256": "9cd6e64b6282654078ac466c1b814b75f637045b67c4c01810fdac04382b0e28"
+    },
+    {
+      "path": "server.ai-backup.js",
+      "sha256": "1603e0f2ee86d90122a19d6c9959b94b8f6d416c619b291fe1aac275a442a494"
+    },
+    {
+      "path": "server.js",
+      "sha256": "038af579c44d2148e8f629b890a3bd8d72b4db5af15f6bcabfa51190bc5c613b"
+    },
+    {
+      "path": "shadow_power.js",
+      "sha256": "85432e9a6d68f6a600e927a952a763ff42154c06008d68fd7fc4b615742113ed"
+    },
+    {
+      "path": "sharing.test.js",
+      "sha256": "930f69a815de417fa23aefbc2a81bfc04d25834e6a91a0c4531be01793f1d45b"
+    },
+    {
+      "path": "sharing_delivery.js",
+      "sha256": "6022e9b9142e55eaeafdcc239918a32bad403e82d9f3cde9596be765ff05f039"
+    },
+    {
+      "path": "sharing_group.test.js",
+      "sha256": "1fb2dd6b2d421fa8d5f8d2faf94ab9c871f3679c5e289bf5ebcb98f223e17d8a"
+    },
+    {
+      "path": "sharing_settings.js",
+      "sha256": "30b990b7a797dbccd1400948e65fbb961e8947a3ed0416546d8aee9add086d34"
+    },
+    {
+      "path": "signal_tracker.js",
+      "sha256": "c442335ea29ba4f934c7e4ce37e9e60806cbc3d48b123ce382764a51b339cebc"
+    },
+    {
+      "path": "test_lab_panel_contract.test.js",
+      "sha256": "0bc6956a08bcc63a372715a5eb02747326b211bcb6fae84e25eb68014be2bc81"
+    },
+    {
+      "path": "test_lab_server_contract.test.js",
+      "sha256": "1155fe422e41f98fd0c8932db7c9ef80b77fad3f2c14856cfbdff3471853104d"
+    },
+    {
+      "path": "test_lab_tracker.test.js",
+      "sha256": "c226a4c9a52f7932d0e4c6508fe2567321337999e861fbc47ee05574df6341fa"
+    },
+    {
+      "path": "training_report.json",
+      "sha256": "368169315ac6eab1bc68a0221ad26a5a6d42bc404c47acbbd9c0468348e3ae16"
+    },
+    {
+      "path": "v18_shadow_tracker.test.js",
+      "sha256": "771f08e1845ddebd178aaa9b5c2ac117e2a98693d6bf9dcd69fd367ee0cea9a8"
+    },
+    {
+      "path": "v20_data_quality.test.js",
+      "sha256": "7cb2247cb2328074078a11f6fda1d222d0a9acd6cabc184774c7fff6be98268f"
+    },
+    {
+      "path": "v20_features.js",
+      "sha256": "8265a07cf15faae760e69899bc4b550f657e20311fbad67ed4af91959c2b3d79"
+    },
+    {
+      "path": "v20_model.json",
+      "sha256": "2e18e9f7411a98283aa887475d8353ee0da271a92d66fd395d598ffa7fca0e72"
+    },
+    {
+      "path": "V20_PACKAGE_MANIFEST.json",
+      "sha256": "586bbdb5c137d8d1a5d476c2e206f4add91b18ba19a489c39ea0a5446c57cfe2"
+    },
+    {
+      "path": "v20_panel_contract.test.js",
+      "sha256": "ac191e73bd07519bb4886af98bf4f7637a6bd6f3aa04512c89414d701c8e3b5e"
+    },
+    {
+      "path": "v20_policy.json",
+      "sha256": "c048706da28d1b0a1ceb3f436f3d59fbdd21c3e523efe1e62296cfe624f9eb17"
+    },
+    {
+      "path": "v20_selector.js",
+      "sha256": "1bf0e6a0d56972839dbf50bf337f64c513a8e3fb62136f7e3241579a9a6799c6"
+    },
+    {
+      "path": "v20_selector.test.js",
+      "sha256": "6033b75ee2f7c9712f5146f15fb4756728eb85562d50dd7511f9ed6bf317d729"
+    },
+    {
+      "path": "v21_history.js",
+      "sha256": "add97f1b58978fab03cdda8aaa69b3b50d03fc556bbe66136ddd11701f188cab"
+    },
+    {
+      "path": "v21_history.test.js",
+      "sha256": "fbc9ecf4987dc06dcfe919a03c7a485e7e9c60a235d8539f604c9f8b8413c59d"
+    },
+    {
+      "path": "V21_PACKAGE_MANIFEST.json",
+      "sha256": "5420d74f2d6eff44673341f2f049f35e362c76cd1a2ad651fd5f195b55011557"
+    },
+    {
+      "path": "v21_server_flow.test.js",
+      "sha256": "e7e0536fa9b311cc3a1c5f8f78d16af872327516a251aa7f0305ea7e2b851d53"
+    },
+    {
+      "path": "v21_tariff.js",
+      "sha256": "a68f21231557bc3bd55b4d39865db1bf5fc16aca86aa0cf30ffa5aef14c747be"
+    },
+    {
+      "path": "v21_tariff.test.js",
+      "sha256": "b93c5627e4bf9dbd41bbcddf08da16b529eae527fcb383ff6a02180f2d9e12e5"
+    },
+    {
+      "path": "v22_lab.js",
+      "sha256": "0652f2ea22150cf05bbcad38310e45ba4369f15450a188fab649681760c0f96d"
+    },
+    {
+      "path": "v22_lab.test.js",
+      "sha256": "133318323e0870928761f9ff24d62d3651cf6839f7002ecc98dd2fb9152bcbc8"
+    },
+    {
+      "path": "V22_PACKAGE_MANIFEST.json",
+      "sha256": "5e0dc44eb6bdf1ba49847f1a1ba58309662843a647884ff2fc8745b424b43a3c"
+    },
+    {
+      "path": "v22_panel.test.js",
+      "sha256": "3ca4c2bc90ab03bce5b9f83a8aac2a1ba657826f590558134a27a1cb812e0191"
+    },
+    {
+      "path": "v22_server_flow.test.js",
+      "sha256": "df095446aeb4602936f0181addc1cf8735005500138cb9bce8c5cce516ab3142"
+    },
+    {
+      "path": "v22_tariff.js",
+      "sha256": "4de08bb4c512d2ef275e55cf843d0c24b9b4858efa2a121fa1a38775c6864766"
+    },
+    {
+      "path": "v22_tariff.test.js",
+      "sha256": "c04fdd0b7961c0ec347855b11d1b64b9773e9e3f97fd282de0a665353049e6ff"
+    },
+    {
+      "path": "V23_ADAPTIVE_PATCH_MANIFEST.json",
+      "sha256": "c89aa242c66dbe6f5a66697b5a78445058757de37257d7f2c3a53953b2128dd2"
+    },
+    {
+      "path": "v23_archive.js",
+      "sha256": "7aa2e7211afed19f244c62f31caea7989ed5a0dedd3ecee4a7ef5d718bf4a0c6"
+    },
+    {
+      "path": "v23_archive.test.js",
+      "sha256": "a2247255d911dfd5168a9ffd6cc7a2d8530a6a64fe518c502ac28d23ac154227"
+    },
+    {
+      "path": "V23_ARCHIVE_PATCH_MANIFEST.json",
+      "sha256": "593e9f3c9a138213f0be0ea2a40cb2895105d3f39e0236970423b75ffb0ece55"
+    },
+    {
+      "path": "v23_controls.js",
+      "sha256": "7b345740b7295e1e92095812673dc94cb2231112006fb501ca94149b731d85ff"
+    },
+    {
+      "path": "v23_controls.test.js",
+      "sha256": "87627e398d8c27d24543d347d1e9ef1a43b2780cbfa2c3e3c11318e62e9087fa"
+    },
+    {
+      "path": "V23_DATAFIX_PATCH_MANIFEST.json",
+      "sha256": "52f376551bb838500a61b75f3b052a8dd65ec33a98347bfcdc39e723f7d184a5"
+    },
+    {
+      "path": "v23_entry_gate.js",
+      "sha256": "0d00bcb5b2aae25bd684282a9e8c2fd26ff253c50dc347ab9a631151a745335a"
+    },
+    {
+      "path": "v23_events.js",
+      "sha256": "09420afdbe51eccf662757773ed46be59c1a36e6344ca787e2e66dc9203f5a98"
+    },
+    {
+      "path": "v23_events.test.js",
+      "sha256": "9d660a00e62cb5347653b2683f1091fb0c69b48c5a1d6b5ba7c39179f1f17f73"
+    },
+    {
+      "path": "v23_export.js",
+      "sha256": "ab3a4727a26a20729d7518479e3fed6eaffa3de1dcd7d52d0bfb44b131f32695"
+    },
+    {
+      "path": "v23_filter_lab.js",
+      "sha256": "a58d905b91d11910833eba3575ca357ba97d61b50a5df54cea0a0e76fd332ef8"
+    },
+    {
+      "path": "v23_filter_lab.test.js",
+      "sha256": "7630182ad854dbb796200434394ac6772be4eeb17800ca31972598b951e6800d"
+    },
+    {
+      "path": "v23_goal_lab.js",
+      "sha256": "9bc4d522d66684fe45787b574ac7dcdaa15ba40a46de6e90f4e2b16f3a194c23"
+    },
+    {
+      "path": "v23_goal_lab.test.js",
+      "sha256": "215018bcfba7e50b02b97281e07b8bcb79b960b23b9bba5c881588e114681c59"
+    },
+    {
+      "path": "v23_goal_policy.js",
+      "sha256": "a8115ef75b6acb696cee12ff37d90b8ecdd296f8459636d05b0c75cf71bfcf43"
+    },
+    {
+      "path": "v23_goal_policy.test.js",
+      "sha256": "ccb8dc3d131e857009b787df4d2a158a39ad1b020c0b6a7f6268433717ef6672"
+    },
+    {
+      "path": "v23_goal_profile.js",
+      "sha256": "05ff90868fac26397c30ccdbb89d466c98c624cebd997dac8688ea78091a41ff"
+    },
+    {
+      "path": "v23_goal_profile.test.js",
+      "sha256": "8a5798d673681f0274f43a778d35ad22d38748f701c0f275db1025e4c084be7b"
+    },
+    {
+      "path": "v23_history_collector.test.js",
+      "sha256": "eb7d895dba2f613cb943c729f9bdce1d1ca635ec0a7af318f72f8f1bc42d9150"
+    },
+    {
+      "path": "v23_live_lab.js",
+      "sha256": "c0ea1ffcdb8d8e14413a97a37d775bd0d1245bff64caedb1c29bf5354d63ef2a"
+    },
+    {
+      "path": "v23_live_lab.test.js",
+      "sha256": "478d49247a3bb41ed25132971668f0ce870dfed0b124dbcbd875db941db9f0d7"
+    },
+    {
+      "path": "V23_LIVE_PATCH_MANIFEST.json",
+      "sha256": "a38b937c4cc7b8201786dab610575d963dc4794ce1823d4a2385344a0474627b"
+    },
+    {
+      "path": "V23_PACKAGE_MANIFEST.json",
+      "sha256": "2ca4a3275c23f481d887f15474e8e014df3052322f59cee9683cdc5c26c8a32f"
+    },
+    {
+      "path": "v23_panel.test.js",
+      "sha256": "9c11976e1100b020715cbf09ad51ac95671962220daec50a74f0e344cdf3ca32"
+    },
+    {
+      "path": "v23_ready_flow.test.js",
+      "sha256": "7bdfac4466afca581911181b9e179332b9cdda546382c2093407727a359267c7"
+    },
+    {
+      "path": "V23_READY_PATCH_MANIFEST.json",
+      "sha256": "48c83f313be74f305303f763e1f7d71651655d6efa6d91eb600883dc3eddcdba"
+    },
+    {
+      "path": "v23_server_flow.test.js",
+      "sha256": "d98aeb1346104175863d78802a96f80260feadea34cdcc17b270c23c3affa6cd"
+    },
+    {
+      "path": "v24_b65_sniper75.test.js",
+      "sha256": "27959b4e7b1ce26e553e85b417652aeec64ab55c73c8231d10e03e1393151ed7"
+    },
+    {
+      "path": "v24_focus_lab.js",
+      "sha256": "4823ff26abac5dd4f440defecc84b9cd7daca442a352091dfd5bfc6e06f92664"
+    },
+    {
+      "path": "v24_focus_lab.test.js",
+      "sha256": "51338bac5f0689e176fe535e200fbc81ca100d256a5a9393067a9fc142928c62"
+    },
+    {
+      "path": "v24_focus_panel.test.js",
+      "sha256": "8636d95222ff1aabdc4d061eaf26c8305b065562e08ade342c8f75d2f6c7519f"
+    },
+    {
+      "path": "v24_lab.js",
+      "sha256": "edc6b56b826441f5866eca4f1dec97cbe2c352c5465b656d91647b1e7712bce2"
+    },
+    {
+      "path": "v24_lab.test.js",
+      "sha256": "c8214b7240e260c5ed8638d595295458ff5aa650a349c7025b1648c6017e2c2f"
+    },
+    {
+      "path": "v24_live_transition.test.js",
+      "sha256": "8a12bc81b9c52eaea564e5599838541a16a85e2b37236ca67175fc19bba035b4"
+    },
+    {
+      "path": "v24_tariff.js",
+      "sha256": "33b398688dfa3b89b8d0b5a8256a2b80cf2c618dc57c61845bc3f07e6a7742d0"
+    },
+    {
+      "path": "v24_tariff.test.js",
+      "sha256": "1a55175e8cab13ab6a15a7ce9eef3cb5650f2e86a91d83121aae404f47c6e2fe"
+    },
+    {
+      "path": "v24_telegram_router.js",
+      "sha256": "dbc6c06236f9b9bebca64365282effcf543da40aed2f6d0d59276100192a3f38"
+    },
+    {
+      "path": "v24_transition_server_flow.test.js",
+      "sha256": "40f8c5e5602bcfb34faf3ee40cc12906fdc77d8fa17d388b1ce26547123b298b"
+    },
+    {
+      "path": "v25_lean_runtime.json",
+      "sha256": "0f2bda7c5314587da4e4713788b3078859f2c9eff288ed4dd8f45a921680dadd"
+    },
+    {
+      "path": "v25_runtime.js",
+      "sha256": "cefa705dccb9df04a9f5274728abcc45fecc36cd263f6858d1ec61d957a99760"
+    },
+    {
+      "path": "v25_runtime.test.js",
+      "sha256": "6c4cfd47d3fdd5beb0d2a5ad561cb53198b041de90f033623220efae91771a55"
+    },
+    {
+      "path": "x_publisher.js",
+      "sha256": "3576ebcfa2216cce49300cf4be02caab07ebf4a2e93f601b886d7b3bfcc7a4d2"
+    }
+  ],
+  "unchangedFiles": [
+    {
+      "path": "active_tariff.js",
+      "sha256": "feb0a51bb6c522fc42cc103c934fecf8522ae2d12615bae40a300a01393a35ed"
+    },
+    {
+      "path": "adaptive_scan.js",
+      "sha256": "664df26966abd68b8771607dbfa54c0744f02e063e042bb09e7b1f45b3a1a76a"
+    },
+    {
+      "path": "adaptive_scan.test.js",
+      "sha256": "1c00679bb732cdf14e2e1e0a3e7816b0d74f99df31ce5c17aa3d33f1bbf22864"
+    },
+    {
+      "path": "adaptive_scan_panel.test.js",
+      "sha256": "ea5dbf01eb0946e24bf00548967d6436003606d8063ff8c92b00306eccf30917"
+    },
+    {
+      "path": "adaptive_scan_server.test.js",
+      "sha256": "2775b9cf826b3789fb399fc674f7c090b9b5910a647eb03f9ee8f7abb0a5c587"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "a61e1b24256313e19638274aaa6fbe4f528d76f250926575199b35a9c6d3ed03"
+    },
+    {
+      "path": "candidate_pagination.test.js",
+      "sha256": "ab30748bf6cb335d1a0e8bc6f17185c3dc8466425355a8cbc3c1a5e6971fe76d"
+    },
+    {
+      "path": "candidate_tracker.js",
+      "sha256": "2446f558999a0e3edee810cd0a760d327d7c1a46f6010c1c6c2e06f302f0b105"
+    },
+    {
+      "path": "core_shadow_tariff.js",
+      "sha256": "06e2487553990119a857a92d86af11ec8b5dabee285b4a802d1db335fae8a437"
+    },
+    {
+      "path": "core_shadow_tariff.test.js",
+      "sha256": "3147d62d70a70bee587650bb8e275332d3d505197c4c01bf8b7c86f607650e82"
+    },
+    {
+      "path": "coupon_htft_panel.test.js",
+      "sha256": "57def1613f755ee9a06fe6d91f503be5d53144e616391b111018f4c0209caa61"
+    },
+    {
+      "path": "coupon_htft_safety.test.js",
+      "sha256": "0ebede74befe0e1af40b73ce49d59c95d7c1c1c9e98a5ffc5fc69d41f23007ef"
+    },
+    {
+      "path": "coupon_lab.js",
+      "sha256": "acb8271cac3b593decae934b9cae2e9c29cfbce06b1bfde443cde13fa283e448"
+    },
+    {
+      "path": "coupon_lab.test.js",
+      "sha256": "1aadd5b4a1534c130f3f3d1336f2b3505553850c09ea9e62618c00534bc03067"
+    },
+    {
+      "path": "coupon_lab_contract.test.js",
+      "sha256": "f999fcc55a9d468ee3aa3ae3359ac94fdfa9d1d83b15a070834934e1f15cb062"
+    },
+    {
+      "path": "deployment_evaluation.json",
+      "sha256": "43754c4f46c225aa004a35421b611086288bf97ca23349129306eb58f5dc5ae2"
+    },
+    {
+      "path": "dino_live_models_all.json",
+      "sha256": "a1f96568a751a9317089d5501b582f254dd5cdf41f8b43acf3077b31d71bf64a"
+    },
+    {
+      "path": "dino_selector_v18.js",
+      "sha256": "52c2139bdf69666d062a7c796375485f6b14b7349443fe1aadacdff2db529aaa"
+    },
+    {
+      "path": "dino_selector_v18.json",
+      "sha256": "9f1f932bcc1ef2610d0e171d65e001baee34da6af591a522ae0c5346039d1b36"
+    },
+    {
+      "path": "dino_selector_v18.test.js",
+      "sha256": "a4503e4a3338b9a51479ed5d1b22937e744d830ce6aebdd57ceba566dcdc643c"
+    },
+    {
+      "path": "dino_selector_v2.js",
+      "sha256": "53cd934ebdef859baf2523dd9bd5731e59f062378b17cde3dedcf2ed787042bf"
+    },
+    {
+      "path": "dino_selector_v2.json",
+      "sha256": "86c33f353f58f61c021f3b9910918a37fcde5d97178f79dc9e42b3eb553fb14e"
+    },
+    {
+      "path": "early_over_server.test.js",
+      "sha256": "bc2b5033e1d412ce11d5079e4d4de74fea3075545e3e43f86033b6e131f74c8c"
+    },
+    {
+      "path": "early_over_win.js",
+      "sha256": "a10098b6d01d32b4eab5f308ca2b3f40c84445287e55f0f7d2a8f7109bde9d2d"
+    },
+    {
+      "path": "early_over_win.test.js",
+      "sha256": "479e1000f069689417038fc2ad9deae11734c02a4a83fa465fb56025f70b535a"
+    },
+    {
+      "path": "grok_only.js",
+      "sha256": "35ebba37a1b0e2b30338a0fb6b66fdc414bb875a0f0781967903b8eb322230a7"
+    },
+    {
+      "path": "hybrid_tariff.js",
+      "sha256": "a9002e632e99fc0d6e47b3124093d0072ef4a2542dc93ee66d6b266f401d1c21"
+    },
+    {
+      "path": "hybrid_tariff.test.js",
+      "sha256": "608afd11fb73ae11356fa45fbaa44e328f86799ca1320c8ba6f8d067d4d6d846"
+    },
+    {
+      "path": "independent_lab.js",
+      "sha256": "1cd218434d25264b3d4ecc5d5f3587e8d8229ca4c45a21ed1321f905f69b09fb"
+    },
+    {
+      "path": "independent_lab.test.js",
+      "sha256": "4eb39fc959310696f270b9c4a9c6aa16cd0f20a0e29ee80bbf6a03d1e6f21e77"
+    },
+    {
+      "path": "legacy_telegram_lab.js",
+      "sha256": "201acb939e12c1477f8184cb7f0f4ce7a2f6a4647d94e8690366a73131831cdf"
+    },
+    {
+      "path": "MAC_YAKALA_PACKAGE_MANIFEST.json",
+      "sha256": "990933ca78a75bb010a7a782a82694a3ba71c37b5226fcf7c2ac89b99dd70bb6"
+    },
+    {
+      "path": "mac_yakala_telegram.js",
+      "sha256": "543c7adfe052890cc52ff714bf93c087f367362f513bfad8784a42d31d10e84d"
+    },
+    {
+      "path": "mac_yakala_telegram.test.js",
+      "sha256": "d07912a83a5e439a719313b842ca409ffd6047b37c25de2edbf71d92ebcc6eec"
+    },
+    {
+      "path": "market_tariff.js",
+      "sha256": "1eb00e442faeb6290f79a81f0d1045f4b68e669baff8b697e1264c285ecfcbff"
+    },
+    {
+      "path": "market_tariff.test.js",
+      "sha256": "8a6c21584c9a0d6c8c3569c8c8cc6f11b1eef6e19b9baa9c285d23f7a2ff6bec"
+    },
+    {
+      "path": "market_tariff_v18.json",
+      "sha256": "3f329fd4ce2cd38af79672eb07991a2943c345abc9224c1771c4c02a9b45f2b3"
+    },
+    {
+      "path": "market_tariff_v18_b.json",
+      "sha256": "4faf4db5efe26e7908057ad5e574f3da3e594e842c90b48c9a524dfc53b8556e"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "26bcdde664cd4b61204b778ae99e40d07dc69793069fa63b88884acc29405e12"
+    },
+    {
+      "path": "package.json",
+      "sha256": "077674a9d2968ba1d8178652119fcf373ec3188967581a1af3fd11063cb1f685"
+    },
+    {
+      "path": "panel_auth.js",
+      "sha256": "375ad36417622c6c8453196f50dbfea1f9c90b6fd0702f3f01bfab5b7f323bf9"
+    },
+    {
+      "path": "prematch_odds.js",
+      "sha256": "8eb22f88c67137c010a200815d1304695f3a69a520213deb85d1ca4c55bca274"
+    },
+    {
+      "path": "public/coupon_lab_panel.js",
+      "sha256": "8a789c91a0467119d8de5fd0c7a59ec478f8dc60c41f37aae312353673550726"
+    },
+    {
+      "path": "public/v23_filter_panel.js",
+      "sha256": "a4575167f8485a119981ad85d23fb2aad2bb8bce89e4ef802818e5529762f9d4"
+    },
+    {
+      "path": "README_UPDATE.md",
+      "sha256": "4f267a011f4c8b89076e4585e2991d785e9325b414c86cb0a0232c67a35a48ba"
+    },
+    {
+      "path": "server.ai-backup.js",
+      "sha256": "1603e0f2ee86d90122a19d6c9959b94b8f6d416c619b291fe1aac275a442a494"
+    },
+    {
+      "path": "server.js",
+      "sha256": "038af579c44d2148e8f629b890a3bd8d72b4db5af15f6bcabfa51190bc5c613b"
+    },
+    {
+      "path": "shadow_power.js",
+      "sha256": "85432e9a6d68f6a600e927a952a763ff42154c06008d68fd7fc4b615742113ed"
+    },
+    {
+      "path": "sharing.test.js",
+      "sha256": "930f69a815de417fa23aefbc2a81bfc04d25834e6a91a0c4531be01793f1d45b"
+    },
+    {
+      "path": "sharing_delivery.js",
+      "sha256": "6022e9b9142e55eaeafdcc239918a32bad403e82d9f3cde9596be765ff05f039"
+    },
+    {
+      "path": "sharing_group.test.js",
+      "sha256": "1fb2dd6b2d421fa8d5f8d2faf94ab9c871f3679c5e289bf5ebcb98f223e17d8a"
+    },
+    {
+      "path": "sharing_settings.js",
+      "sha256": "30b990b7a797dbccd1400948e65fbb961e8947a3ed0416546d8aee9add086d34"
+    },
+    {
+      "path": "signal_tracker.js",
+      "sha256": "c442335ea29ba4f934c7e4ce37e9e60806cbc3d48b123ce382764a51b339cebc"
+    },
+    {
+      "path": "test_lab_panel_contract.test.js",
+      "sha256": "0bc6956a08bcc63a372715a5eb02747326b211bcb6fae84e25eb68014be2bc81"
+    },
+    {
+      "path": "test_lab_server_contract.test.js",
+      "sha256": "1155fe422e41f98fd0c8932db7c9ef80b77fad3f2c14856cfbdff3471853104d"
+    },
+    {
+      "path": "test_lab_tracker.test.js",
+      "sha256": "c226a4c9a52f7932d0e4c6508fe2567321337999e861fbc47ee05574df6341fa"
+    },
+    {
+      "path": "training_report.json",
+      "sha256": "368169315ac6eab1bc68a0221ad26a5a6d42bc404c47acbbd9c0468348e3ae16"
+    },
+    {
+      "path": "v18_shadow_tracker.test.js",
+      "sha256": "771f08e1845ddebd178aaa9b5c2ac117e2a98693d6bf9dcd69fd367ee0cea9a8"
+    },
+    {
+      "path": "v20_data_quality.test.js",
+      "sha256": "7cb2247cb2328074078a11f6fda1d222d0a9acd6cabc184774c7fff6be98268f"
+    },
+    {
+      "path": "v20_features.js",
+      "sha256": "8265a07cf15faae760e69899bc4b550f657e20311fbad67ed4af91959c2b3d79"
+    },
+    {
+      "path": "v20_model.json",
+      "sha256": "2e18e9f7411a98283aa887475d8353ee0da271a92d66fd395d598ffa7fca0e72"
+    },
+    {
+      "path": "V20_PACKAGE_MANIFEST.json",
+      "sha256": "586bbdb5c137d8d1a5d476c2e206f4add91b18ba19a489c39ea0a5446c57cfe2"
+    },
+    {
+      "path": "v20_panel_contract.test.js",
+      "sha256": "ac191e73bd07519bb4886af98bf4f7637a6bd6f3aa04512c89414d701c8e3b5e"
+    },
+    {
+      "path": "v20_policy.json",
+      "sha256": "c048706da28d1b0a1ceb3f436f3d59fbdd21c3e523efe1e62296cfe624f9eb17"
+    },
+    {
+      "path": "v20_selector.js",
+      "sha256": "1bf0e6a0d56972839dbf50bf337f64c513a8e3fb62136f7e3241579a9a6799c6"
+    },
+    {
+      "path": "v20_selector.test.js",
+      "sha256": "6033b75ee2f7c9712f5146f15fb4756728eb85562d50dd7511f9ed6bf317d729"
+    },
+    {
+      "path": "v21_history.js",
+      "sha256": "add97f1b58978fab03cdda8aaa69b3b50d03fc556bbe66136ddd11701f188cab"
+    },
+    {
+      "path": "v21_history.test.js",
+      "sha256": "fbc9ecf4987dc06dcfe919a03c7a485e7e9c60a235d8539f604c9f8b8413c59d"
+    },
+    {
+      "path": "V21_PACKAGE_MANIFEST.json",
+      "sha256": "5420d74f2d6eff44673341f2f049f35e362c76cd1a2ad651fd5f195b55011557"
+    },
+    {
+      "path": "v21_server_flow.test.js",
+      "sha256": "e7e0536fa9b311cc3a1c5f8f78d16af872327516a251aa7f0305ea7e2b851d53"
+    },
+    {
+      "path": "v21_tariff.js",
+      "sha256": "a68f21231557bc3bd55b4d39865db1bf5fc16aca86aa0cf30ffa5aef14c747be"
+    },
+    {
+      "path": "v21_tariff.test.js",
+      "sha256": "b93c5627e4bf9dbd41bbcddf08da16b529eae527fcb383ff6a02180f2d9e12e5"
+    },
+    {
+      "path": "v22_lab.js",
+      "sha256": "0652f2ea22150cf05bbcad38310e45ba4369f15450a188fab649681760c0f96d"
+    },
+    {
+      "path": "v22_lab.test.js",
+      "sha256": "133318323e0870928761f9ff24d62d3651cf6839f7002ecc98dd2fb9152bcbc8"
+    },
+    {
+      "path": "V22_PACKAGE_MANIFEST.json",
+      "sha256": "5e0dc44eb6bdf1ba49847f1a1ba58309662843a647884ff2fc8745b424b43a3c"
+    },
+    {
+      "path": "v22_panel.test.js",
+      "sha256": "3ca4c2bc90ab03bce5b9f83a8aac2a1ba657826f590558134a27a1cb812e0191"
+    },
+    {
+      "path": "v22_server_flow.test.js",
+      "sha256": "df095446aeb4602936f0181addc1cf8735005500138cb9bce8c5cce516ab3142"
+    },
+    {
+      "path": "v22_tariff.js",
+      "sha256": "4de08bb4c512d2ef275e55cf843d0c24b9b4858efa2a121fa1a38775c6864766"
+    },
+    {
+      "path": "v22_tariff.test.js",
+      "sha256": "c04fdd0b7961c0ec347855b11d1b64b9773e9e3f97fd282de0a665353049e6ff"
+    },
+    {
+      "path": "V23_ADAPTIVE_PATCH_MANIFEST.json",
+      "sha256": "c89aa242c66dbe6f5a66697b5a78445058757de37257d7f2c3a53953b2128dd2"
+    },
+    {
+      "path": "v23_archive.js",
+      "sha256": "7aa2e7211afed19f244c62f31caea7989ed5a0dedd3ecee4a7ef5d718bf4a0c6"
+    },
+    {
+      "path": "v23_archive.test.js",
+      "sha256": "a2247255d911dfd5168a9ffd6cc7a2d8530a6a64fe518c502ac28d23ac154227"
+    },
+    {
+      "path": "V23_ARCHIVE_PATCH_MANIFEST.json",
+      "sha256": "593e9f3c9a138213f0be0ea2a40cb2895105d3f39e0236970423b75ffb0ece55"
+    },
+    {
+      "path": "v23_controls.js",
+      "sha256": "7b345740b7295e1e92095812673dc94cb2231112006fb501ca94149b731d85ff"
+    },
+    {
+      "path": "v23_controls.test.js",
+      "sha256": "87627e398d8c27d24543d347d1e9ef1a43b2780cbfa2c3e3c11318e62e9087fa"
+    },
+    {
+      "path": "V23_DATAFIX_PATCH_MANIFEST.json",
+      "sha256": "52f376551bb838500a61b75f3b052a8dd65ec33a98347bfcdc39e723f7d184a5"
+    },
+    {
+      "path": "v23_entry_gate.js",
+      "sha256": "0d00bcb5b2aae25bd684282a9e8c2fd26ff253c50dc347ab9a631151a745335a"
+    },
+    {
+      "path": "v23_events.js",
+      "sha256": "09420afdbe51eccf662757773ed46be59c1a36e6344ca787e2e66dc9203f5a98"
+    },
+    {
+      "path": "v23_events.test.js",
+      "sha256": "9d660a00e62cb5347653b2683f1091fb0c69b48c5a1d6b5ba7c39179f1f17f73"
+    },
+    {
+      "path": "v23_export.js",
+      "sha256": "ab3a4727a26a20729d7518479e3fed6eaffa3de1dcd7d52d0bfb44b131f32695"
+    },
+    {
+      "path": "v23_filter_lab.js",
+      "sha256": "a58d905b91d11910833eba3575ca357ba97d61b50a5df54cea0a0e76fd332ef8"
+    },
+    {
+      "path": "v23_filter_lab.test.js",
+      "sha256": "7630182ad854dbb796200434394ac6772be4eeb17800ca31972598b951e6800d"
+    },
+    {
+      "path": "v23_goal_lab.js",
+      "sha256": "9bc4d522d66684fe45787b574ac7dcdaa15ba40a46de6e90f4e2b16f3a194c23"
+    },
+    {
+      "path": "v23_goal_lab.test.js",
+      "sha256": "215018bcfba7e50b02b97281e07b8bcb79b960b23b9bba5c881588e114681c59"
+    },
+    {
+      "path": "v23_goal_policy.js",
+      "sha256": "a8115ef75b6acb696cee12ff37d90b8ecdd296f8459636d05b0c75cf71bfcf43"
+    },
+    {
+      "path": "v23_goal_policy.test.js",
+      "sha256": "ccb8dc3d131e857009b787df4d2a158a39ad1b020c0b6a7f6268433717ef6672"
+    },
+    {
+      "path": "v23_goal_profile.js",
+      "sha256": "05ff90868fac26397c30ccdbb89d466c98c624cebd997dac8688ea78091a41ff"
+    },
+    {
+      "path": "v23_goal_profile.test.js",
+      "sha256": "8a5798d673681f0274f43a778d35ad22d38748f701c0f275db1025e4c084be7b"
+    },
+    {
+      "path": "v23_history_collector.test.js",
+      "sha256": "eb7d895dba2f613cb943c729f9bdce1d1ca635ec0a7af318f72f8f1bc42d9150"
+    },
+    {
+      "path": "v23_live_lab.js",
+      "sha256": "c0ea1ffcdb8d8e14413a97a37d775bd0d1245bff64caedb1c29bf5354d63ef2a"
+    },
+    {
+      "path": "v23_live_lab.test.js",
+      "sha256": "478d49247a3bb41ed25132971668f0ce870dfed0b124dbcbd875db941db9f0d7"
+    },
+    {
+      "path": "V23_LIVE_PATCH_MANIFEST.json",
+      "sha256": "a38b937c4cc7b8201786dab610575d963dc4794ce1823d4a2385344a0474627b"
+    },
+    {
+      "path": "V23_PACKAGE_MANIFEST.json",
+      "sha256": "2ca4a3275c23f481d887f15474e8e014df3052322f59cee9683cdc5c26c8a32f"
+    },
+    {
+      "path": "v23_panel.test.js",
+      "sha256": "9c11976e1100b020715cbf09ad51ac95671962220daec50a74f0e344cdf3ca32"
+    },
+    {
+      "path": "v23_ready_flow.test.js",
+      "sha256": "7bdfac4466afca581911181b9e179332b9cdda546382c2093407727a359267c7"
+    },
+    {
+      "path": "V23_READY_PATCH_MANIFEST.json",
+      "sha256": "48c83f313be74f305303f763e1f7d71651655d6efa6d91eb600883dc3eddcdba"
+    },
+    {
+      "path": "v23_server_flow.test.js",
+      "sha256": "d98aeb1346104175863d78802a96f80260feadea34cdcc17b270c23c3affa6cd"
+    },
+    {
+      "path": "v24_b65_sniper75.test.js",
+      "sha256": "27959b4e7b1ce26e553e85b417652aeec64ab55c73c8231d10e03e1393151ed7"
+    },
+    {
+      "path": "v24_focus_lab.js",
+      "sha256": "4823ff26abac5dd4f440defecc84b9cd7daca442a352091dfd5bfc6e06f92664"
+    },
+    {
+      "path": "v24_focus_lab.test.js",
+      "sha256": "51338bac5f0689e176fe535e200fbc81ca100d256a5a9393067a9fc142928c62"
+    },
+    {
+      "path": "v24_focus_panel.test.js",
+      "sha256": "8636d95222ff1aabdc4d061eaf26c8305b065562e08ade342c8f75d2f6c7519f"
+    },
+    {
+      "path": "v24_lab.js",
+      "sha256": "edc6b56b826441f5866eca4f1dec97cbe2c352c5465b656d91647b1e7712bce2"
+    },
+    {
+      "path": "v24_lab.test.js",
+      "sha256": "c8214b7240e260c5ed8638d595295458ff5aa650a349c7025b1648c6017e2c2f"
+    },
+    {
+      "path": "v24_live_transition.test.js",
+      "sha256": "8a12bc81b9c52eaea564e5599838541a16a85e2b37236ca67175fc19bba035b4"
+    },
+    {
+      "path": "v24_tariff.js",
+      "sha256": "33b398688dfa3b89b8d0b5a8256a2b80cf2c618dc57c61845bc3f07e6a7742d0"
+    },
+    {
+      "path": "v24_tariff.test.js",
+      "sha256": "1a55175e8cab13ab6a15a7ce9eef3cb5650f2e86a91d83121aae404f47c6e2fe"
+    },
+    {
+      "path": "v24_telegram_router.js",
+      "sha256": "dbc6c06236f9b9bebca64365282effcf543da40aed2f6d0d59276100192a3f38"
+    },
+    {
+      "path": "v24_transition_server_flow.test.js",
+      "sha256": "40f8c5e5602bcfb34faf3ee40cc12906fdc77d8fa17d388b1ce26547123b298b"
+    },
+    {
+      "path": "v25_lean_runtime.json",
+      "sha256": "0f2bda7c5314587da4e4713788b3078859f2c9eff288ed4dd8f45a921680dadd"
+    },
+    {
+      "path": "v25_runtime.js",
+      "sha256": "cefa705dccb9df04a9f5274728abcc45fecc36cd263f6858d1ec61d957a99760"
+    },
+    {
+      "path": "v25_runtime.test.js",
+      "sha256": "6c4cfd47d3fdd5beb0d2a5ad561cb53198b041de90f033623220efae91771a55"
+    },
+    {
+      "path": "x_publisher.js",
+      "sha256": "3576ebcfa2216cce49300cf4be02caab07ebf4a2e93f601b886d7b3bfcc7a4d2"
+    }
+  ]
+}
