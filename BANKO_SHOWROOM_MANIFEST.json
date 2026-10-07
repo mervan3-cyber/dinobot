@@ -1,0 +1,153 @@
+{
+  "version": "banko-showroom-paper-v1-2026-10-08",
+  "createdAt": "2026-10-07T22:31:25.127Z",
+  "requires": "Existing Banko / V24 installation; not a full bot",
+  "files": [
+    {
+      "path": "banko_coupon.js",
+      "sha256": "034e5cbdee5c4a0b2fdc6a966e4f3ec77b1fa8a5bb00a8aea598f78a1de25e55",
+      "priorSha256": "2d013e0765660bb01a910b2df7253ca4ff5bdb77cdd87848a103840074a72388"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "c3b657e22f0893372063e4412ee77d6e81cc4a30162b3006ec7aeadf48cb5b00",
+      "priorSha256": "c3b657e22f0893372063e4412ee77d6e81cc4a30162b3006ec7aeadf48cb5b00"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d",
+      "priorSha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d"
+    },
+    {
+      "path": "public/banko_choices.js",
+      "sha256": "b98a6051ffdce8641212eade9d120d2f81ed95fbb76079c36ebe07399d91d9db",
+      "priorSha256": "b98a6051ffdce8641212eade9d120d2f81ed95fbb76079c36ebe07399d91d9db"
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "9564bde52b5659faa3a005e75ba48ab600c0ce01fdfb796d462f0ddfbf0636c5",
+      "priorSha256": "8a227767e6b17b6b8351edb37739526db0699f7761b72d6676c8fa2c8b87fd0d"
+    },
+    {
+      "path": "public/banko_coupon.css",
+      "sha256": "39601060dc2116254e843a56fa52520624d05bebc4a1fe65dd3f9672dee418ed",
+      "priorSha256": "39601060dc2116254e843a56fa52520624d05bebc4a1fe65dd3f9672dee418ed"
+    },
+    {
+      "path": "public/banko_showroom.js",
+      "sha256": "a79d654fae8742930164ed5387fca0bb22eaaae5c7c497ad805824f03e4249fb",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_showroom_panel.js",
+      "sha256": "0ecf430a41248e56250e56b015b58cf7b79dfec92648735ee9ea79de9a513f73",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_showroom.css",
+      "sha256": "daa52b8261fe3a2dfa8c298767c35c35f156408840a18447e5a759daf893efb3",
+      "priorSha256": null
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "18ef6597e1e9ee79860ac80c2a31aa75130261b2dcda8ada8113da4487a87f2d",
+      "priorSha256": "45ec0ee5951f0619c0e8d2763fd382a77172625f6cddac0eb7a279e3b540820e"
+    },
+    {
+      "path": "index.html",
+      "sha256": "18ef6597e1e9ee79860ac80c2a31aa75130261b2dcda8ada8113da4487a87f2d",
+      "priorSha256": "45ec0ee5951f0619c0e8d2763fd382a77172625f6cddac0eb7a279e3b540820e"
+    },
+    {
+      "path": "package.json",
+      "sha256": "e4aa177c7ee02fd4ba126a22c4b6c7614d654ed84d9b75fce162903ed27989c4",
+      "priorSha256": "ca3065587f5aef3182d31c97a215b5ce340ed2667311eaebd62fe52432bbc9fa"
+    },
+    {
+      "path": "banko_model.test.js",
+      "sha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416",
+      "priorSha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416"
+    },
+    {
+      "path": "banko_coupon.test.js",
+      "sha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919",
+      "priorSha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "383b4d35222a6a5342fdf09f3d8792f701b714d50002e6344180fc3dbc0e653a",
+      "priorSha256": "e4fb8d5833a243b476b5f6c742da678f6d7a4846e767fe77275950eaaa32b917"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3",
+      "priorSha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3"
+    },
+    {
+      "path": "banko_alternative_panel.test.js",
+      "sha256": "1f76547aad11bab15e224d92e44f26d5a8a67f1e6916b6732242923bb25dd1f8",
+      "priorSha256": "1f76547aad11bab15e224d92e44f26d5a8a67f1e6916b6732242923bb25dd1f8"
+    },
+    {
+      "path": "banko_manual_tracking.test.js",
+      "sha256": "daf816e41fc1a1022b10f19d9735460c60fd3f4eae7046b25edd88b13b18e025",
+      "priorSha256": "daf816e41fc1a1022b10f19d9735460c60fd3f4eae7046b25edd88b13b18e025"
+    },
+    {
+      "path": "banko_manual_panel.test.js",
+      "sha256": "485c3e4a4a7589a55381ab4150bb1b870f351dbd97eaaaf35ad369b24350137a",
+      "priorSha256": "485c3e4a4a7589a55381ab4150bb1b870f351dbd97eaaaf35ad369b24350137a"
+    },
+    {
+      "path": "banko_showroom.test.js",
+      "sha256": "06789ab1cb53ecfe07fd79b38be7d43f151035978ecf6fd4bfb080b927bd7429",
+      "priorSha256": null
+    },
+    {
+      "path": "README_BANKO_SHOWROOM_2026_10_08.md",
+      "sha256": "12c57dd5e6cdb25766964742b4a455ed6fd3cc724e4e31fd7bc6662fd3853275",
+      "priorSha256": null
+    }
+  ],
+  "changedFiles": [
+    "README_BANKO_SHOWROOM_2026_10_08.md",
+    "banko_coupon.js",
+    "banko_panel.test.js",
+    "banko_showroom.test.js",
+    "index.html",
+    "package.json",
+    "public/banko_coupon_panel.js",
+    "public/banko_showroom.css",
+    "public/banko_showroom.js",
+    "public/banko_showroom_panel.js",
+    "public/index.html"
+  ],
+  "sourceTests": {
+    "scripts": 53,
+    "passed": 53,
+    "failed": 0
+  },
+  "newDependencies": false,
+  "manualLegLimit": null,
+  "pngLegsPerPage": 5,
+  "pngWidth": 1080,
+  "serverRendering": false,
+  "newProviderRequests": 0,
+  "automaticTelegram": false,
+  "logos": false,
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false,
+  "preserved": [
+    "server.js",
+    "banko_model.js",
+    "banko_routes.js",
+    "live scan",
+    "V24",
+    "Telegram",
+    "early win",
+    "shared signals",
+    "model/thresholds",
+    "non-Banko HTML"
+  ]
+}

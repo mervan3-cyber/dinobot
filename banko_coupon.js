@@ -1,9 +1,10 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),M=require('./banko_model');
 const C=require('./public/banko_choices');
+const S=require('./public/banko_showroom');
 // Storage schema stays v1 so existing sessions, frozen picks and API usage remain readable.
 const VERSION='banko-coupon-lab-v1-2026-10-05';
-const RUNTIME_VERSION='banko-manual-tracking-v1-2026-10-07';
+const RUNTIME_VERSION='banko-showroom-paper-v1-2026-10-08';
 class LiveDispatchDeferred extends Error {constructor(){super('Banko isteği canlı işlem için gönderilmeden ertelendi.');}}
 const DEFAULTS=Object.freeze({enabled:true,dailyLimit:2000,maxCandidates:30,maxCoupons:1,minLegOdd:1.40,maxLegOdd:2.20,
     minCouponOdd:1.95,maxCouponOdd:2.40,minSingleOdd:1.80,maxSingleOdd:2.20,minModelProbability:65,minEdgePP:0,
@@ -65,7 +66,7 @@ class BankoCoupon {
         const backup=C.alternative(row,session.settings),createdAt=this.now().toISOString(),result=row.marketResults?.[market.key];
         const entry={id:'banko-manual-'+crypto.randomUUID(),date:session.date,sessionId:session.id,fixtureId:row.fixtureId,match:row.match,kickoff:row.kickoff,league:row.league,
             pick:JSON.parse(JSON.stringify(market)),settings:JSON.parse(JSON.stringify(session.settings)),origin:market.key===row.pick?.key?'main':market.key===backup?.key?'backup':'analysis',
-            tag,playedOdd,priceCheck,createdAt,timing:Date.parse(row.kickoff)>this.now().getTime()?'prematch':'retrospective',
+            tag,playedOdd,priceCheck,createdAt,timing:Date.parse(row.kickoff)>this.now().getTime()?'prematch':'retrospective',showroomSnapshot:S.snapshotFor(row),
             priceHistory:[],result:result&&['won','lost'].includes(result.status)?{...result,profitUnits:playedOdd===null?null:result.status==='won'?playedOdd-1:-1}:{status:'pending'}};
         this.data.manualSelections.push(entry);try{this.save();}catch(e){this.data.manualSelections.pop();throw e;}
         return {selection:JSON.parse(JSON.stringify(entry)),alreadySaved:false};
@@ -227,8 +228,11 @@ class BankoCoupon {
     }
     status(date=dayKey(this.now()),sessionId=null){validDay(date);const sessions=this.data.sessions.filter(s=>s.date===date),session=sessionId?sessions.find(s=>s.id===sessionId):sessions.at(-1)||null,coupons=session?.coupons||[];
         const manual=(this.data.manualSelections||[]).filter(l=>l.date===date);
+        // Old manual records resolve ONLY their original revision; no API call, model rerun or store mutation.
+        const sessionsById=new Map(this.data.sessions.map(s=>[s.id,s]));
+        const showroomManual=manual.map(l=>({...JSON.parse(JSON.stringify(l)),showroomContext:S.normalizeContext(l.showroomSnapshot||S.snapshotFor(sessionsById.get(l.sessionId)?.candidates?.find(r=>r.fixtureId===l.fixtureId)))}));
         return {success:true,version:VERSION,runtimeVersion:RUNTIME_VERSION,date,day:dayKey(this.now()),busy:this.busy,storageError:this.storageError,settings:JSON.parse(JSON.stringify(this.data.settings)),api:{used:this.usage[dayKey(this.now())]||0,limit:this.data.settings.dailyLimit,reserve:this.reserve,remaining:M.finite(this.getQuotaRemaining())},job:this.data.latestJob,
-            manualSelections:JSON.parse(JSON.stringify(manual)),trackingSummary:this.trackingSummary(session,manual),
+            manualSelections:showroomManual,trackingSummary:this.trackingSummary(session,manual),
             availableDates:[...new Set(this.data.sessions.map(s=>s.date))].sort().reverse(),sessions:sessions.map(s=>({id:s.id,createdAt:s.createdAt,status:s.status,couponCount:s.coupons.length})),session:session?JSON.parse(JSON.stringify(session)):null,discovery:this.data.discoveries[date]||null,
             summary:{candidates:session?.candidates.length||0,coupons:coupons.length,won:coupons.filter(c=>c.result.status==='won').length,lost:coupons.filter(c=>c.result.status==='lost').length,pending:coupons.filter(c=>c.result.status==='pending').length,profitUnits:coupons.filter(c=>c.result.status!=='pending').reduce((sum,c)=>sum+(c.result.profitUnits||0),0)},
             disclaimer:'Banko bir mod adıdır, garanti değildir. Ham model yüzdeleri kalibrasyonsuz LAB tahminidir. Tarama ve sonuçlar manuel; yalnız seçilen maçların kontrolü isteğe bağlı otomatiktir. Telegram gönderimi yok.'};
