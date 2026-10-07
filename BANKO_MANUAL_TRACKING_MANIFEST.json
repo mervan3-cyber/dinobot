@@ -1,0 +1,133 @@
+{
+  "version": "banko-manual-tracking-v1-2026-10-07",
+  "createdAt": "2026-10-07T09:06:48.753Z",
+  "requires": "Existing Banko + V24 bot installation; not a full bot",
+  "files": [
+    {
+      "path": "banko_coupon.js",
+      "sha256": "2d013e0765660bb01a910b2df7253ca4ff5bdb77cdd87848a103840074a72388",
+      "priorSha256": "0504a90f5ba6eee067f88cad2e878f31afc82fb123018d8b497250719017615f"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "c3b657e22f0893372063e4412ee77d6e81cc4a30162b3006ec7aeadf48cb5b00",
+      "priorSha256": "a61e1b24256313e19638274aaa6fbe4f528d76f250926575199b35a9c6d3ed03"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d",
+      "priorSha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d"
+    },
+    {
+      "path": "public/banko_choices.js",
+      "sha256": "b98a6051ffdce8641212eade9d120d2f81ed95fbb76079c36ebe07399d91d9db",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "8a227767e6b17b6b8351edb37739526db0699f7761b72d6676c8fa2c8b87fd0d",
+      "priorSha256": "804231533924135f5cf41126ae90cf8666acebb64a55fe313809fc59181f8755"
+    },
+    {
+      "path": "public/banko_coupon.css",
+      "sha256": "39601060dc2116254e843a56fa52520624d05bebc4a1fe65dd3f9672dee418ed",
+      "priorSha256": "d2c50a1b9ee6c835aacb8a5b40e261bb2e3fd36d98d65098bfd5a4fc1b96d079"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "45ec0ee5951f0619c0e8d2763fd382a77172625f6cddac0eb7a279e3b540820e",
+      "priorSha256": "a9fbb7d7240d4a6f74747b09d02f1836e5a9765f9e2e289f79de9c38c807c2ee"
+    },
+    {
+      "path": "index.html",
+      "sha256": "45ec0ee5951f0619c0e8d2763fd382a77172625f6cddac0eb7a279e3b540820e",
+      "priorSha256": "a9fbb7d7240d4a6f74747b09d02f1836e5a9765f9e2e289f79de9c38c807c2ee"
+    },
+    {
+      "path": "package.json",
+      "sha256": "ca3065587f5aef3182d31c97a215b5ce340ed2667311eaebd62fe52432bbc9fa",
+      "priorSha256": "077674a9d2968ba1d8178652119fcf373ec3188967581a1af3fd11063cb1f685"
+    },
+    {
+      "path": "banko_model.test.js",
+      "sha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416",
+      "priorSha256": "12c1671d7c0a1fba051b954d4419c4494a1cc6688010bc7ad3ddd53312e1f416"
+    },
+    {
+      "path": "banko_coupon.test.js",
+      "sha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919",
+      "priorSha256": "02d261507dd7efadb6da84ee186d322521188df16941fb0523aff50f1888f919"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "e4fb8d5833a243b476b5f6c742da678f6d7a4846e767fe77275950eaaa32b917",
+      "priorSha256": "48c84c4e158b51f6ab8b576f4a82a44f9b47a83dbc30fa2df876e2f5b8222869"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3",
+      "priorSha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3"
+    },
+    {
+      "path": "banko_alternative_panel.test.js",
+      "sha256": "1f76547aad11bab15e224d92e44f26d5a8a67f1e6916b6732242923bb25dd1f8",
+      "priorSha256": "3fc40a7fc956a111e0ac219afadc0f04d5e9505ccc5875db3d671dc862308eeb"
+    },
+    {
+      "path": "banko_manual_tracking.test.js",
+      "sha256": "daf816e41fc1a1022b10f19d9735460c60fd3f4eae7046b25edd88b13b18e025",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_manual_panel.test.js",
+      "sha256": "485c3e4a4a7589a55381ab4150bb1b870f351dbd97eaaaf35ad369b24350137a",
+      "priorSha256": null
+    },
+    {
+      "path": "README_BANKO_MANUAL_TRACKING_2026_10_07.md",
+      "sha256": "86bff0f471da5a34d37963fabcf2c70bfa5de836d616077fa5b467ce0f5bda38",
+      "priorSha256": null
+    }
+  ],
+  "changedFiles": [
+    "banko_alternative_panel.test.js",
+    "banko_coupon.js",
+    "banko_panel.test.js",
+    "banko_routes.js",
+    "index.html",
+    "package.json",
+    "public/banko_coupon.css",
+    "public/banko_coupon_panel.js",
+    "public/index.html",
+    "README_BANKO_MANUAL_TRACKING_2026_10_07.md",
+    "banko_manual_panel.test.js",
+    "banko_manual_tracking.test.js",
+    "public/banko_choices.js"
+  ],
+  "sourceTests": {
+    "scripts": 52,
+    "passed": 52,
+    "failed": 0
+  },
+  "manualSelectionLimit": null,
+  "automaticCouponLegs": "Existing 1–2 logic unchanged",
+  "manualOnly": "Tracking; no real slip or wager creation",
+  "newDependencies": false,
+  "modelAndThresholdsUnchanged": true,
+  "defaultDailyLimit": 2000,
+  "defaultLiveReserve": 1500,
+  "preserved": [
+    "server.js",
+    "banko_model.js",
+    "V24",
+    "Telegram",
+    "early win",
+    "shared signal logic",
+    "non-Banko HTML"
+  ],
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false,
+  "realProviderCalls": 0,
+  "realTelegramCalls": 0
+}

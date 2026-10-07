@@ -1,0 +1,55 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),path=require('path'),C=require('./public/banko_choices'),M=require('./banko_model');
+const {BankoCoupon,DEFAULTS,VERSION}=require('./banko_coupon');
+const clone=x=>JSON.parse(JSON.stringify(x)),settings=clone(DEFAULTS);
+function market(id,value,p=.8,odd=1.5){return {key:id+'|'+value,betId:id,selection:value,market:'Test',spec:M.specFor(id,value),odd,modelProbability:p,dataScore:80,edgePP:p*100-100/odd,eligible:true,reasons:[],modelVersion:M.VERSION};}
+for(const [teamId,cleanId] of [[16,28],[17,27]])for(const [direction,yes] of [['Over','No'],['Under','Yes']]){
+    const a=market(teamId,direction+' 0.5'),b=market(cleanId,yes);assert(C.sameOutcome(a,b));
+    for(let h=0;h<7;h++)for(let away=0;away<7;away++)assert.equal(M.predicate(a.spec,h,away),M.predicate(b.spec,h,away));
+    assert(!C.sameOutcome(a,{...b,spec:{...b.spec,period:'first'}}));
+}
+assert(C.sameOutcome(market(5,'Under 0.5'),market(10,'0:0')));assert(!C.sameOutcome(market(5,'Under 2.5'),market(17,'Under 2.5')));
+const goal=market(17,'Over 0.5',.8),same=market(27,'No',.85),different=market(5,'Over 1.5',.75),snapshot=JSON.stringify([goal,same,different]);
+assert.equal(C.alternative({pick:goal,markets:[goal,same,different]},settings).key,different.key);assert.equal(JSON.stringify([goal,same,different]),snapshot);
+assert.equal(C.alternative({pick:goal,markets:[goal,same]},settings),null);assert.equal(C.alternative({pick:null,markets:[different]},settings),null);
+assert.match(C.marketLabel(market(20,'Draw/Away')),/İLK YARI.*X2/);assert.match(C.marketLabel(market(26,'Under 2.5')),/İKİNCİ YARI.*TOPLAM/);assert.match(C.marketLabel(market(17,'Under 2.5')),/MAÇ.*DEPLASMAN.*takım golü/);
+let now=new Date('2099-10-05T08:00:00Z'),halfMissing=true,calls=[];
+const row=(id)=>({fixtureId:id,match:'Home '+id+' - Away',kickoff:'2099-10-05T19:00:00Z',oddsUpdatedAt:now.toISOString(),capturedAt:now.toISOString(),league:'Test',pick:market(5,'Over 1.5'),markets:[market(5,'Over 1.5'),market(8,'Yes',.77,1.6),market(20,'Draw/Away',.7,1.6),{...market(5,'Under 2.5',.4,2),eligible:false,reasons:['Deneysel ham model alt sınırı altında']},market(80,'Over 2.5')]});
+const rows=[row(1),row(2),row(3)],session={id:'session-1',date:'2099-10-05',status:'complete',createdAt:now.toISOString(),settings,candidates:rows,coupons:[{id:'c1',originalOdd:2.25,legs:[1,2].map(id=>({fixtureId:id,match:rows[id-1].match,kickoff:rows[id-1].kickoff,pick:clone(rows[id-1].pick),result:{status:'pending'}})),check:{status:'waiting',history:[]},result:{status:'pending'}}]};
+fs.mkdirSync(path.join(__dirname,'test-temp'),{recursive:true});
+const dir=fs.mkdtempSync(path.join(__dirname,'test-temp/banko-manual-'));
+const b=new BankoCoupon({directory:dir,now:()=>now,apiGet:async(url,config)=>{config.dinoBeforeAttempt();calls.push(url);const ids=new URL(url,'https://mock.invalid').searchParams.get('ids').split('-').map(Number);return {data:{errors:[],response:ids.map(id=>({fixture:{id,status:{short:'FT'}},score:{fulltime:{home:2,away:0},halftime:halfMissing?null:{home:1,away:0}}}))}};},getQuotaRemaining:()=>6000});
+b.data.sessions=[clone(session)];b.save();
+const couponFrozen=JSON.stringify(b.data.sessions[0].coupons[0].legs.map(l=>l.pick));
+const input=(id,key='5|Over 1.5',odd=1.5)=>({date:session.date,sessionId:session.id,fixtureId:id,marketKey:key,playedOdd:odd,tag:'Üç maçlı kupon'});
+assert(b.previewSelection(input(1)).eligible);assert(!b.previewSelection(input(1,'5|Over 1.5',1.2)).eligible);
+assert.throws(()=>b.addSelection(input(1,'5|Over 1.5',1.2)));assert.throws(()=>b.addSelection(input(1,'80|Over 2.5')));assert.throws(()=>b.addSelection({...input(1),fixtureId:'1'}));
+assert.throws(()=>b.addSelection({...input(1),playedOdd:NaN}));assert.throws(()=>b.addSelection({...input(1),tag:'x'.repeat(81)}));
+const first=b.addSelection(input(1)).selection;b.addSelection(input(2));b.addSelection(input(3));assert.equal(b.data.manualSelections.length,3,'Three selections allowed under a common label');
+assert(b.addSelection(input(1)).alreadySaved);assert.equal(b.data.manualSelections.length,3);assert.equal(calls.length,0,'Saving/price preview has no API calls');
+const backup=b.addSelection(input(1,'8|Yes')).selection;assert.equal(backup.origin,'backup');
+assert.throws(()=>b.addSelection(input(1,'5|Under 2.5')));const other=b.addSelection({...input(1,'5|Under 2.5',null),allowRejected:true}).selection;assert.equal(other.origin,'analysis');assert(!other.priceCheck.eligible);assert.equal(other.playedOdd,null);
+assert(C.priceCheck(rows[0],rows[0].pick,settings,1.3,now).edgePP<100*rows[0].pick.modelProbability-100/1.5);
+const quoteOnly={...market(5,'Over 1.5',.8,1.1),eligible:false,reasons:['Ayak oran aralığı dışında','Deneysel model/piyasa farkı sınırın altında']};assert(C.priceCheck(rows[0],quoteOnly,settings,1.5,now).eligible,'Repricing fixes only price gates, never missing-data/model gates');
+assert(!C.priceCheck(rows[0],{...quoteOnly,reasons:[...quoteOnly.reasons,'Yetersiz veri']},settings,1.5,now).eligible);
+const revision={...clone(session),id:'session-2',coupons:[]};b.data.sessions.push(revision);assert.equal(b.status(session.date,'session-2').manualSelections.length,5,'Day selections survive revision changes');
+b.updateSelectionPrice({id:first.id,playedOdd:1.7,tag:'Düzeltilmiş oran'});assert.equal(b.data.manualSelections[0].priceHistory.length,1);assert.equal(b.data.manualSelections[0].pick.odd,1.5);
+const beforeBusy=JSON.stringify(b.data.manualSelections);b.busy=true;assert.throws(()=>b.addSelection(input(1)));assert.throws(()=>b.updateSelectionPrice({id:first.id,playedOdd:1.8}));assert.equal(JSON.stringify(b.data.manualSelections),beforeBusy);b.busy=false;
+(async()=>{
+    now=new Date('2099-10-05T22:00:00Z');b.start('results',session.date,session.id);await b.task;assert.equal(b.data.latestJob.status,'complete',b.data.latestJob.message);
+    assert.equal(calls.length,1,'Coupons, manual picks and all eligible markets share one unique fixture batch');
+    assert.equal(b.data.manualSelections[0].result.status,'won');assert(Math.abs(b.data.manualSelections[0].result.profitUnits-.7)<1e-10);assert.equal(b.data.manualSelections.find(l=>l.id===backup.id).result.status,'lost');assert.equal(b.data.manualSelections.find(l=>l.id===other.id).result.profitUnits,null);
+    const tracked=b.data.sessions[0].candidates[0].marketResults;assert.equal(tracked['20|Draw/Away'].status,'pending','Missing HT score never guessed from FT');assert.equal(tracked['8|Yes'].status,'lost');
+    assert.equal(b.status(session.date,session.id).trackingSummary.model.main.won,3);assert.equal(b.status(session.date,session.id).trackingSummary.model.backup.lost,3);
+    assert.equal(JSON.stringify(b.data.sessions[0].coupons[0].legs.map(l=>l.pick)),couponFrozen,'Frozen model picks unchanged');
+    halfMissing=false;b.start('results',session.date,session.id);await b.task;assert.equal(calls.length,2);assert.equal(b.data.sessions[0].candidates[0].marketResults['20|Draw/Away'].status,'lost');
+    b.start('results',session.date,session.id);await b.task;assert.equal(calls.length,2,'No repeat API calls once all tracked results are settled');
+    const late=b.addSelection({...input(2,'8|Yes'),allowRejected:true}).selection;assert.equal(late.timing,'retrospective');assert.equal(late.result.status,'lost');assert.equal(b.status(session.date,session.id).trackingSummary.manual.retrospective,1);
+    const loaded=new BankoCoupon({directory:dir,now:()=>now});loaded.load();assert.equal(loaded.storageError,null);assert.equal(loaded.data.manualSelections.length,6);assert.equal(loaded.data.manualSelections[0].playedOdd,1.7);
+    const legacy=clone(b.data);delete legacy.manualSelections;fs.writeFileSync(path.join(dir,'dino_banko_coupon_v1.json'),JSON.stringify(legacy));const old=new BankoCoupon({directory:dir,now:()=>now});old.load();assert.equal(old.storageError,null);assert.deepEqual(old.data.manualSelections,[]);assert.equal(old.data.version,VERSION);
+    const bad=clone(legacy);bad.manualSelections={};fs.writeFileSync(path.join(dir,'dino_banko_coupon_v1.json'),JSON.stringify(bad));const corrupt=new BankoCoupon({directory:dir});corrupt.load();assert(corrupt.storageError);
+    const routes={};require('./banko_routes').registerBankoRoutes({get:(p,f)=>routes['GET '+p]=f,post:(p,f)=>routes['POST '+p]=f},{banko:b,apiReady:()=>false});const res={status(n){this.code=n;return this;},json(v){this.body=v;return this;}};
+    routes['POST /api/banko-coupon/price-preview']({body:input(1)},res);assert(res.body.success,'Local price route does not require provider credentials');
+    assert.equal(calls.length,2);assert(!fs.readFileSync('banko_coupon.js','utf8').includes('sendMessage'));
+    console.log('Banko manual: semantic aliases, distinct backups, precise periods, real-price gates, explicit rejected consent, 3+ labelled selections, immutable picks, revision/restart preservation, shared manual-results batch, missing-HT safety, retrospective separation and local authenticated routes passed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
