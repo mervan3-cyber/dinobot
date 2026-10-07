@@ -1,0 +1,97 @@
+{
+  "version": "panel-workspace-v1-2026-10-08",
+  "createdAt": "2026-10-07T23:46:45.383Z",
+  "requires": "Existing current V24 + Banko + Paper Showroom installation, not a full bot",
+  "files": [
+    {
+      "path": "index.html",
+      "sha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511",
+      "priorSha256": "18ef6597e1e9ee79860ac80c2a31aa75130261b2dcda8ada8113da4487a87f2d"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511",
+      "priorSha256": "18ef6597e1e9ee79860ac80c2a31aa75130261b2dcda8ada8113da4487a87f2d"
+    },
+    {
+      "path": "public/panel_theme.js",
+      "sha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_workspace.js",
+      "sha256": "f754c8869be99afad52de7b710074c398fc4bb19f2cd2b080c7664fc5263e421",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_workspace.css",
+      "sha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "007c345a23fe001b65aa1509bc9e484185a1e19f29bdebc41c5ec165f20771ea",
+      "priorSha256": "9564bde52b5659faa3a005e75ba48ab600c0ce01fdfb796d462f0ddfbf0636c5"
+    },
+    {
+      "path": "package.json",
+      "sha256": "18b7b5afbd751a98648400d8c46a9781ef9bef6c355ea511833696b3031f4ecb",
+      "priorSha256": "e4aa177c7ee02fd4ba126a22c4b6c7614d654ed84d9b75fce162903ed27989c4"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "4d257515957b6b093f6ab9bc5af546cabc7071198c6a67e9a3bf18d9add09632",
+      "priorSha256": "383b4d35222a6a5342fdf09f3d8792f701b714d50002e6344180fc3dbc0e653a"
+    },
+    {
+      "path": "panel_workspace.test.js",
+      "sha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e",
+      "priorSha256": null
+    },
+    {
+      "path": "README_PANEL_WORKSPACE_2026_10_08.md",
+      "sha256": "81be484fe8d949349c7256951e25107018fb7e8b9bcae818dd1e65edcb8b92f5",
+      "priorSha256": null
+    }
+  ],
+  "changedFiles": [
+    "README_PANEL_WORKSPACE_2026_10_08.md",
+    "banko_panel.test.js",
+    "index.html",
+    "package.json",
+    "panel_workspace.test.js",
+    "public/banko_coupon_panel.js",
+    "public/index.html",
+    "public/panel_theme.js",
+    "public/panel_workspace.css",
+    "public/panel_workspace.js"
+  ],
+  "tests": {
+    "scripts": 54,
+    "passed": 54,
+    "failed": 0
+  },
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "defaultTheme": "light",
+  "preferenceStorage": "Browser localStorage only",
+  "primaryViews": 6,
+  "frontendOnly": true,
+  "newDependencies": false,
+  "newProviderRequests": 0,
+  "newPollingTimers": 0,
+  "backendFilesIncluded": false,
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false,
+  "preserved": [
+    "all backend/model/Telegram source files",
+    "all original DOM IDs",
+    "auth and request guards",
+    "all existing API wrappers and polling",
+    "Banko route/action semantics",
+    "Paper showroom renderer and output modules"
+  ]
+}
