@@ -1,5 +1,6 @@
 (function(){
     'use strict';
+    const C=window.BankoChoices;
     const $=id=>document.getElementById(id),el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);if(className)n.className=className;return n;};
     const num=(n,d=2)=>typeof n==='number'&&Number.isFinite(n)?n.toFixed(d):'—';
     const dt=v=>{const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',dateStyle:'short',timeStyle:'short'});};
@@ -9,32 +10,51 @@
     const marketNames={1:'Maç sonucu',3:'2Y sonucu',5:'Toplam gol',6:'İY gol',7:'İY/MS',8:'KG Var/Yok',10:'Kesin skor',11:'En gollü yarı',12:'Çifte şans',13:'İY sonucu',16:'Ev takım golü',17:'Dep. takım golü',20:'İY çifte şans',26:'2Y gol',27:'Ev gol yememe',28:'Dep. gol yememe',31:'İY kesin skor',34:'İY KG',35:'2Y KG',45:'Toplam korner'};
     const statNames={'Total Shots':'Toplam şut','Shots on Goal':'İsabetli şut','Shots insidebox':'Ceza içi şut','Shots outsidebox':'Ceza dışı şut','Corner Kicks':'Korner','Yellow Cards':'Sarı kart','Red Cards':'Kırmızı kart',expected_goals:'xG'};
     const optionalStats=new Set(['Yellow Cards','Red Cards','expected_goals']);
-    const marketLabel=m=>{if(!m)return 'Seçim yok';const total=/^(Over|Under) (\d+(?:\.\d+)?)$/.exec(m.selection);const selection=total?`${total[2]} ${total[1]==='Over'?'ÜST':'ALT'}`:m.spec?.code?m.spec.code.replace(/X/g,m.spec.kind==='htft'?'0':'X'):({Home:'1',Draw:'X',Away:'2',Yes:'Var',No:'Yok'})[m.selection]||m.selection;return `${marketNames[m.betId]||m.market} · ${selection}`;};
+    const marketLabel=C.marketLabel;
     let latest=null,dirty=false,fetching=false,page=0,sessionId=null,candidateSerial=0;
     const openAlternatives=new Set();
+    const selectionDrafts=new Map();
     // Read-only choices from the saved scan. Never refresh odds, relax eligibility or replace a frozen pick.
-    const outcomeKey=m=>m?.spec&&typeof m.spec==='object'?JSON.stringify(Object.keys(m.spec).filter(k=>k!=='family').sort().map(k=>[k,m.spec[k]])):null;
-    function alternative(row,settings){
-        const main=outcomeKey(row.pick);if(!main)return null;
-        const eligible=(row.markets||[]).filter(m=>{
-            const key=outcomeKey(m);
-            if(!key||key===main||m.key&&m.key===row.pick.key||m.eligible!==true||!Array.isArray(m.reasons)||m.reasons.length)return false;
-            if(!Number.isFinite(m.modelProbability)||m.modelProbability<0||m.modelProbability>1||!Number.isFinite(m.odd)||m.odd<=1||!Number.isFinite(m.dataScore)||!Number.isFinite(m.edgePP))return false;
-            // Recheck the scan's own saved settings, not subsequently edited panel settings.
-            if(settings){
-                if(m.odd<settings.minLegOdd||m.odd>settings.maxLegOdd||m.modelProbability*100<settings.minModelProbability||m.edgePP<settings.minEdgePP)return false;
-                if(Array.isArray(settings.marketFamilies)&&!settings.marketFamilies.includes(m.spec.family))return false;
-            }
-            return true;
-        });
-        eligible.sort((a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||(Number(a.betId)||0)-(Number(b.betId)||0)||String(a.selection).localeCompare(String(b.selection)));
-        return eligible[0]||null;
-    }
+    const alternative=C.alternative;
     const integerIds=['dailyLimit','maxCandidates','maxCoupons','precheckMinutes','maxOddsAgeHours'];
     const numericIds=[...integerIds,'minLegOdd','maxLegOdd','minCouponOdd','maxCouponOdd','minSingleOdd','maxSingleOdd','minModelProbability','minEdgePP'];
     const booleanIds=['enabled','autoPrecheck','women','predictionContext'];
-    function table(heads,rows){const wrap=el('div',undefined,'table-wrap'),t=el('table'),head=el('thead'),tr=el('tr');heads.forEach(h=>tr.appendChild(el('th',h)));head.appendChild(tr);t.appendChild(head);const body=el('tbody');rows.forEach(values=>{const r=el('tr');values.forEach(v=>r.appendChild(el('td',v)));body.appendChild(r);});t.appendChild(body);wrap.appendChild(t);return wrap;}
+    function table(heads,rows){const wrap=el('div',undefined,'table-wrap'),t=el('table'),head=el('thead'),tr=el('tr');heads.forEach(h=>tr.appendChild(el('th',h)));head.appendChild(tr);t.appendChild(head);const body=el('tbody');rows.forEach(values=>{const r=el('tr');values.forEach(v=>{const cell=el('td');if(v&&typeof v.setAttribute==='function')cell.appendChild(v);else cell.textContent=String(v??'');r.appendChild(cell);});body.appendChild(r);});t.appendChild(body);wrap.appendChild(t);return wrap;}
     function note(text,error=false){return el('div',text,'banko-note'+(error?' error':''));}
+    const origins={main:'Ana tahmin',backup:'Gerçek yedek',analysis:'Diğer analiz marketi'};
+    function enteredOdd(input){if(input.value.trim()==='')return null;const n=Number(input.value.replace(',','.'));if(!Number.isFinite(n)||n<=1||n>1000)throw Error('Oran 1’den büyük, en fazla 1000 olmalı.');return n;}
+    function priceForm(row,pick){
+        if(!pick?.spec||pick.spec.kind==='corners'||!Number.isFinite(pick.modelProbability))return note('Bu marketin seçim/sonuçlandırma kuralı doğrulanmadı; takibe eklenmez.');
+        const box=el('div',undefined,'banko-selection-form'),key=JSON.stringify([latest?.session?.id,row.fixtureId,pick.key]);
+        box.dataset.bankoMarket=pick.key;
+        const draft=selectionDrafts.get(key)||{odd:'',tag:'',confirmed:false};selectionDrafts.set(key,draft);
+        const odd=el('input'),tag=el('input'),price=el('label','Oynayacağın / oynadığın oran'),group=el('label','Kupon etiketi (isteğe bağlı)'),message=el('p',undefined,'banko-price-check');
+        odd.type='text';odd.inputMode='decimal';odd.placeholder='API '+num(pick.odd)+' · boşsa yalnız takip';odd.value=draft.odd;odd.setAttribute('aria-label',row.match+' · girilen oran');
+        tag.type='text';tag.maxLength=80;tag.placeholder='Örn. üç maçlı deneme';tag.value=draft.tag;tag.setAttribute('aria-label',row.match+' · kupon etiketi');price.appendChild(odd);group.appendChild(tag);
+        const accept=el('label',undefined,'banko-manual-consent'),checkbox=el('input'),save=el('button','SEÇİMLERİME EKLE');checkbox.type='checkbox';checkbox.checked=draft.confirmed;accept.append(checkbox,el('span','Şart dışı / eski kaydı yalnız manuel takip için ekliyorum; model onayı değildir.'));save.type='button';save.dataset.bankoSelection=pick.key;
+        const update=()=>{draft.odd=odd.value;draft.tag=tag.value;draft.confirmed=checkbox.checked;try{
+            const entered=enteredOdd(odd),check=C.priceCheck(row,pick,latest?.session?.settings||latest.settings,entered??pick.odd,new Date());
+            accept.hidden=check.eligible;message.textContent=(entered===null?'Oran girilmedi; API fiyatı referans. ':'Girilen oran '+num(entered)+'. ')+(check.eligible?'Kayıtlı şartlarla fiyat kontrolü geçti. ':check.reasons.join(' · '))+` Ham fark ${num(check.edgePP,1)} puan. Yeni veri/oran/kadro kontrolü yapılmadı.`;
+            message.className='banko-price-check'+(check.eligible?'':' banko-price-warning');save.disabled=!!latest?.busy||!!latest?.storageError||(!check.eligible&&!checkbox.checked);
+        }catch(e){message.textContent=e.message;accept.hidden=true;save.disabled=true;}};
+        odd.oninput=tag.oninput=checkbox.onchange=update;
+        save.onclick=async()=>{save.disabled=true;try{const response=await apiFetch('/api/banko-coupon/selection',{method:'POST',body:JSON.stringify({date:day(),sessionId:latest?.session?.id,fixtureId:row.fixtureId,marketKey:pick.key,playedOdd:enteredOdd(odd),tag:tag.value,allowRejected:checkbox.checked})});if(typeof showToast==='function')showToast(response.alreadySaved?'Bu sürümde aynı seçim zaten kayıtlı.':'Seçim kaydedildi; Telegram’a gönderilmedi.');await fetchFull();}catch(e){message.textContent=e.message;update();if(typeof showToast==='function')showToast(e.message,true);}};
+        box.append(price,group,message,accept,save);update();return box;
+    }
+    function renderTracking(data){
+        const summary=data.trackingSummary,manual=$('banko-manual-list');if(!manual)return;manual.replaceChildren();
+        const count=s=>`${s?.won||0} K / ${s?.lost||0} Y / ${s?.pending||0} bekleyen`;
+        $('banko-manual-summary').textContent=summary?`${summary.manual.total} tekil seçim · ${count(summary.manual)} · ${summary.manual.records} kayıt. Maç başladıktan sonra eklenen: ${summary.manual.retrospective}.`:'Henüz kayıt yok';
+        $('banko-model-tracking').textContent=summary?`Seçili tarama · Ana: ${count(summary.model.main)} · Yedek: ${count(summary.model.backup)} · Tüm uygun marketler: ${count(summary.model.all)}. ${summary.disclaimer}`:'';
+        for(const entry of data.manualSelections||[]){
+            const card=el('article',undefined,'banko-manual-card'),head=el('strong',entry.match+' · '+marketLabel(entry.pick));
+            card.append(head,el('p',`${origins[entry.origin]||'Manuel'} · ${entry.timing==='prematch'?'Maç öncesi kaydedildi':'Geçmiş / başlamış maç kaydı'} · ${dt(entry.createdAt)} · sürüm ${entry.sessionId.slice(-8)}`));
+            card.appendChild(el('p',`${labels[entry.result.status]||'Sonuç bekliyor'}${entry.result.score?' · API normal süre '+entry.result.score:''} · API oranı ${num(entry.pick.odd)} · Girilen oran ${entry.playedOdd===null?'Yok':num(entry.playedOdd)}${entry.tag?' · Kupon etiketi: '+entry.tag:''}`));
+            if(entry.result.reason)card.appendChild(note(entry.result.reason));if(entry.priceCheck&&!entry.priceCheck.eligible)card.appendChild(note('Yalnız manuel takip · '+entry.priceCheck.reasons.join(' · '),true));
+            const odd=el('input'),tag=el('input'),save=el('button','ORAN / ETİKETİ KAYDET'),fields=el('div',undefined,'banko-manual-edit');odd.type='text';odd.inputMode='decimal';odd.value=entry.playedOdd===null?'':String(entry.playedOdd);odd.placeholder='Girilen oran';odd.setAttribute('aria-label',entry.match+' · kayıt oranı');tag.value=entry.tag||'';tag.placeholder='Kupon etiketi';tag.maxLength=80;tag.setAttribute('aria-label',entry.match+' · kayıt etiketi');save.type='button';save.disabled=!!data.busy||!!data.storageError;
+            save.onclick=async()=>{save.disabled=true;try{await apiFetch('/api/banko-coupon/selection-price',{method:'POST',body:JSON.stringify({id:entry.id,playedOdd:enteredOdd(odd),tag:tag.value})});await fetchFull();}catch(e){if(typeof showToast==='function')showToast(e.message,true);}finally{save.disabled=!!latest?.busy;}};fields.append(odd,tag,save);card.appendChild(fields);manual.appendChild(card);
+        }
+    }
     function controls(data){
         if(!$('banko-date').value)$('banko-date').value=data.day||today();
         $('banko-status').textContent=data.storageError||`${data.job?.status==='waiting-live'&&data.busy?'⏸ Canlı taramayı bekliyor':data.busy?'İşlem sürüyor':'Hazır'} · ${data.job?.message||'Tarih seçip manuel oluşturabilirsiniz.'}${data.busy?` · ${data.job?.processed||0}/${data.job?.total||0}`:''}`;
@@ -63,18 +83,20 @@
                 backup.appendChild(el('p',`Kayıt oranı ${num(pick.odd)} · Ham model %${num(pick.modelProbability*100,1)} · Veri puanı ${pick.dataScore}/100 · Model − piyasa farkı ${num(pick.edgePP,1)} yüzde puan.`));
                 backup.appendChild(el('p','Ana seçimden sonra, aynı veri/oran/model şartlarını geçen en yüksek ham model puanlı farklı seçenek. Aynı tahminin farklı adla tekrarı değildir.'));
                 backup.appendChild(el('small',`Kaydedilmiş analiz · Oran güncellemesi ${dt(row.oddsUpdatedAt)}. Canlı yenileme veya yeni maç önü kontrolü yapılmadı; ham yüzde doğrulanmış başarı oranı değildir.`));
+                backup.appendChild(priceForm(row,pick));
             }else backup.appendChild(el('p',row.pick?'Ana tahmin dışındaki marketlerde aynı koşulları geçen ikinci seçim yok; eşikler düşürülmedi.':'Bu maç PAS; ana seçim şartlarını geçmediği için yedek tahmin zorlanmadı.'));
             backup.appendChild(el('small','Ana tahmin, kayıtlı kupon ve sonuç takibi değişmez. Yedek seçenek ayrı bir bahistir, ana tahminin sigortası değildir.'));
         };
         const setVisible=visible=>{backup.hidden=!visible;button.setAttribute('aria-expanded',String(visible));button.textContent=visible?'Yedeği gizle':'↻ Alternatif tahmin';if(visible){showBackup();details.open=true;openAlternatives.add(stateKey);}else openAlternatives.delete(stateKey);};
         button.onclick=event=>{event?.preventDefault();event?.stopPropagation();setVisible(backup.hidden);};
         summary.append(heading,button);details.append(summary,backup);setVisible(openAlternatives.has(stateKey));
+        if(row.pick){details.appendChild(el('h4','Ana seçim · '+marketLabel(row.pick)));details.appendChild(priceForm(row,row.pick));}
         const reasons=row.pick?[`Ham model %${num(row.pick.modelProbability*100,1)}; kalibre edilmiş başarı yüzdesi değildir. Veri puanı ${row.pick.dataScore}/100. Model − piyasa farkı ${num(row.pick.edgePP,1)} yüzde puan.`,...row.risks]:[...row.reasons,...row.risks];reasons.forEach(r=>details.appendChild(note(r)));
         if(row.apiPrediction?.advice)details.appendChild(el('p','API tavsiyesi (yalnız bağlam): '+row.apiPrediction.advice));
         details.appendChild(el('p',`Veri: ${dt(row.capturedAt)} · Oran güncellemesi: ${dt(row.oddsUpdatedAt)} · Beklenen gol ${num(row.expectedGoals?.home)} / ${num(row.expectedGoals?.away)}`));
         const grid=el('div',undefined,'banko-profile-grid');grid.append(profile(row.profiles?.home,row.home.name),profile(row.profiles?.away,row.away.name));details.appendChild(grid);
         const markets=el('details');markets.appendChild(el('summary',`Tüm marketleri aç (${row.markets.length}) · desteklenmeyenler yalnız analiz`));const listing=el('div');let count=80;
-        const more=el('button','SONRAKİ 80 MARKET');more.type='button';const fill=()=>{listing.replaceChildren(table(['Market / seçim','Oran','Ham model','Veri puanı','Durum / pas nedeni'],row.markets.slice(0,count).map(m=>[marketLabel(m),num(m.odd),m.modelProbability===null?'—':`%${num(m.modelProbability*100,1)}`,m.dataScore,m.eligible?'Aday':m.reasons.join(' · ')])));more.disabled=count>=row.markets.length;};more.onclick=()=>{count+=80;fill();};fill();markets.append(listing,more);details.appendChild(markets);return details;
+        const more=el('button','SONRAKİ 80 MARKET');more.type='button';const fill=()=>{listing.replaceChildren(table(['Market / seçim','Oran','Ham model','Veri puanı','Durum / pas nedeni','Manuel takip'],row.markets.slice(0,count).map(m=>{const action=el('details');action.appendChild(el('summary','Seçim / fiyat kontrolü'));let loaded=false;action.ontoggle=()=>{if(action.open&&!loaded){loaded=true;action.appendChild(priceForm(row,m));}};return [marketLabel(m),num(m.odd),m.modelProbability===null?'—':`%${num(m.modelProbability*100,1)}`,m.dataScore,m.eligible?'Aday':m.reasons.join(' · '),action];})));more.disabled=count>=row.markets.length;};more.onclick=()=>{count+=80;fill();};fill();markets.append(listing,more);details.appendChild(markets);return details;
     }
     function couponText(c){return ['🎫 MAÇ YAKALA · BANKO KUPON LAB',...c.legs.map((l,i)=>`${i+1}. ${l.match}\n${dt(l.kickoff)} · ${marketLabel(l.pick)} @ ${num(l.pick.odd)}`),`Toplam ilk kayıt oranı: ${num(c.originalOdd)}`,`Kontrol: ${labels[c.check.status]||c.check.status}`,...c.legs.flatMap(l=>[...(l.check?.warnings||[]),...(l.check?.reasons||[])]),'Analiz amaçlıdır; kesin kazanma garantisi yoktur. Güncel oranı ve kadroyu kontrol edin.'].join('\n\n');}
     function couponCard(c,index,session){const status=c.result.status==='pending'?c.check.status:c.result.status,card=el('article',undefined,'banko-coupon banko-'+status),head=el('div',undefined,'banko-coupon-head');head.append(el('h4',`Kupon ${index+1} · ${c.legs.length} maç · ${labels[status]||status}`),el('span',num(c.originalOdd),'banko-price'));card.appendChild(head);
@@ -91,7 +113,7 @@
         const archive=$('banko-archive');archive.replaceChildren(el('option','Kayıtlı tarihler'));archive.children[0].value='';data.availableDates.forEach(d=>{const n=el('option',d);n.value=d;archive.appendChild(n);});
         const coupons=$('banko-coupons');coupons.replaceChildren();if(!s)coupons.appendChild(note('Bu tarih için kupon yok. Önce ligleri getirebilir veya doğrudan manuel oluşturabilirsiniz.'));else{if(s.status==='running')coupons.appendChild(note(data.busy&&data.job?.sessionId===s.id&&data.job?.status==='waiting-live'?'⏸ Canlı işlem bekleniyor. Toplanan analizler korundu; aynı tarama otomatik devam edecek. Tekrar oluştur düğmesine basmanız gerekmiyor.':'Tarama sürüyor; kuponlar tamamlanınca oluşturulacak.'));else if(s.status!=='complete')coupons.appendChild(note(`Tarama ${s.status}: ${s.reason||'Henüz tamamlanmadı'}. Eksik tarama kupon onayı sayılmaz.`,true));if(s.reason)coupons.appendChild(note(s.reason));s.coupons.forEach((c,i)=>coupons.appendChild(couponCard(c,i,s)));}
         const leagueBox=$('banko-leagues');if(!dirty){leagueBox.replaceChildren();(data.discovery?.leagues||[]).forEach(l=>{const n=el('label'),input=el('input');input.type='checkbox';input.dataset.bankoLeague=String(l.id);input.checked=data.settings.allowedLeagueIds.includes(l.id);input.onchange=window.markBankoDirty;n.append(input,el('span',`${l.country} · ${l.name} (${l.matches})`));leagueBox.appendChild(n);});}
-        renderCandidates();
+        renderCandidates();renderTracking(data);
     }
     async function fetchFull(){if(fetching)return;fetching=true;try{render(await apiFetch('/api/banko-coupon?date='+encodeURIComponent(day())+(sessionId?'&session='+encodeURIComponent(sessionId):'')));}catch(e){$('banko-status').textContent=e.message;}finally{fetching=false;}}
     async function poll(){try{const data=await apiFetch('/api/banko-coupon?summary=1&date='+encodeURIComponent(day()));const changed=latest?.job?.id!==data.job?.id||latest?.job?.status!==data.job?.status;controls(data);if(changed&&(!data.busy||data.job?.status==='waiting-live'||latest?.job?.status==='waiting-live'))await fetchFull();else if(latest)latest.job=data.job;}catch(_){} }
