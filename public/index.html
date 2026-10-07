@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/panel_theme.js?v=20261008workspace1"></script>
     <title>Maç Yakala | Canlı Kontrol Merkezi</title>
     <style>
         :root {
@@ -1324,11 +1325,16 @@
     </style>
     <link rel="stylesheet" href="/banko_coupon.css?v=20261007banko5">
     <link rel="stylesheet" href="/banko_showroom.css?v=20261008paper1">
+    <link rel="stylesheet" href="/panel_workspace.css?v=20261008workspace1">
 </head>
 <body>
+    <div class="panel-theme-corner" role="group" aria-label="Panel teması">
+        <button type="button" data-panel-theme-choice="light" aria-pressed="true">Açık</button>
+        <button type="button" data-panel-theme-choice="dark" aria-pressed="false">Koyu</button>
+    </div>
     <div class="container" id="login-screen">
         <div class="brand-lockup" style="justify-content:center; margin-bottom:18px;">
-            <div class="brand-mark" aria-hidden="true">DN</div>
+            <div class="brand-mark" aria-hidden="true">MY</div>
             <div class="brand-copy">
                 <h1>Maç Yakala</h1>
                 <p>Yetkili kontrol merkezi</p>
@@ -1343,34 +1349,48 @@
     <div class="container hidden" id="dashboard">
         <header class="command-header">
             <div class="brand-lockup">
-                <div class="brand-mark" aria-hidden="true">DN</div>
+                <div class="brand-mark" aria-hidden="true">MY</div>
                 <div class="brand-copy">
                     <h1>Maç Yakala</h1>
                     <p>Canlı karar ve sinyal kontrol merkezi</p>
                 </div>
             </div>
+            <button id="panel-menu-toggle" type="button" aria-expanded="false" aria-controls="panel-view-nav">Menü</button>
             <div class="header-health">
                 <time class="istanbul-clock" id="istanbul-clock">--:--:-- TSİ</time>
                 <span class="connection-pill" id="connection-state">● Bağlanıyor…</span>
             </div>
         </header>
 
-        <nav class="command-nav" aria-label="Panel bölümleri">
-            <button type="button" class="active" data-target="section-overview" onclick="jumpToSection('section-overview', this)">Genel Bakış</button>
-            <button type="button" data-target="section-decision" onclick="jumpToSection('section-decision', this)">Son Karar</button>
-            <button type="button" data-target="section-signals" onclick="jumpToSection('section-signals', this)">Sinyaller</button>
-            <button type="button" data-target="section-v18-shadow" onclick="jumpToSection('section-v18-shadow', this)">Test Lab</button>
-            <button type="button" data-target="section-coupon-lab" onclick="jumpToSection('section-coupon-lab', this)">İY/MS LAB</button>
-            <button type="button" data-target="section-banko-coupon" onclick="jumpToSection('section-banko-coupon', this)">Banko Kupon</button>
-            <button type="button" data-target="section-coverage" onclick="jumpToSection('section-coverage', this)">Canlı Maçlar</button>
-            <button type="button" data-target="section-audit" onclick="jumpToSection('section-audit', this)">Denetim</button>
-            <button type="button" data-target="section-tariff" onclick="jumpToSection('section-tariff', this)">Telegram Tarifesi</button>
-            <button type="button" data-target="section-radar" onclick="jumpToSection('section-radar', this)">Sistem Radarı</button>
-            <button type="button" data-target="section-sharing" onclick="jumpToSection('section-sharing', this)">Paylaşım Ayarları</button>
-            <button type="button" onclick="logout()">Çıkış</button>
+        <nav class="command-nav" id="panel-view-nav" aria-label="Panel bölümleri">
+            <button type="button" class="active" data-panel-view="today" aria-current="page"><span class="panel-nav-title">Bugün</span><span class="panel-nav-caption">Durum ve kısa özet</span></button>
+            <button type="button" data-panel-view="signals"><span class="panel-nav-title">Sinyaller</span><span class="panel-nav-caption">Gerçek Telegram gönderimleri</span></button>
+            <button type="button" data-panel-view="live"><span class="panel-nav-title">Canlı maçlar</span><span class="panel-nav-caption">Kapsam ve istatistik</span></button>
+            <button type="button" data-panel-view="coupons"><span class="panel-nav-title">Kuponlar</span><span class="panel-nav-caption">Analiz, seçim ve showroom</span></button>
+            <button type="button" data-panel-view="lab"><span class="panel-nav-title">LAB / Denetim</span><span class="panel-nav-caption">Modeller ve aday kayıtları</span></button>
+            <button type="button" data-panel-view="system"><span class="panel-nav-title">Sistem</span><span class="panel-nav-caption">Paylaşım, program, günlük</span></button>
+            <button type="button" class="panel-logout" onclick="logout()">Oturumu kapat</button>
         </nav>
+        <div class="panel-page-heading">
+            <h2 id="panel-view-title" tabindex="-1">Bugün</h2>
+            <p id="panel-view-description">Sistem durumu, tarama ve seçili sinyal görünümünün kısa özeti.</p>
+            <div class="panel-tabs" id="panel-coupon-tabs" role="tablist" aria-label="Kupon sistemi" hidden>
+                <button type="button" role="tab" data-panel-coupon-tab="banko" aria-selected="true" aria-controls="section-banko-coupon">Banko</button>
+                <button type="button" role="tab" data-panel-coupon-tab="htft" aria-selected="false" aria-controls="section-coupon-lab">İY/MS LAB</button>
+            </div>
+            <div class="panel-tabs" id="panel-lab-tabs" role="tablist" aria-label="LAB bölümü" hidden>
+                <button type="button" role="tab" data-panel-lab-tab="models" aria-selected="true" aria-controls="section-v18-shadow">Modeller</button>
+                <button type="button" role="tab" data-panel-lab-tab="audit" aria-selected="false" aria-controls="section-audit">Tam-stat denetimi</button>
+            </div>
+            <div class="panel-tabs" id="panel-system-tabs" role="tablist" aria-label="Sistem bölümü" hidden>
+                <button type="button" role="tab" data-panel-system-tab="sharing" aria-selected="true" aria-controls="section-sharing">Paylaşım</button>
+                <button type="button" role="tab" data-panel-system-tab="schedule" aria-selected="false" aria-controls="section-schedule">Zamanlayıcı</button>
+                <button type="button" role="tab" data-panel-system-tab="tariff" aria-selected="false" aria-controls="section-tariff">V24 kuralları</button>
+                <button type="button" role="tab" data-panel-system-tab="radar" aria-selected="false" aria-controls="section-radar">Sistem radarı</button>
+            </div>
+        </div>
 
-        <section class="workspace-overview" id="section-sharing" style="margin-bottom:20px">
+        <section class="workspace-overview" id="section-sharing" data-panel-section style="margin-bottom:20px">
             <div class="control-card">
                 <h3>📣 Paylaşım Ayarları</h3>
                 <p>Ana Telegram kanalı mevcut kurallarıyla devam eder. Ek hedefler aynı sinyali kopyalar; karar ve tarama sayısını artırmaz. Anahtarlar yalnız sunucudaki .env dosyasından okunur. Live grup hedefi hazırdır; TELEGRAM_GROUP_CHAT_ID ile değiştirilebilir.</p>
@@ -1399,7 +1419,7 @@
                 <button type="button" onclick="fetchSharing()">Durumu yenile</button>
             </div>
         </section>
-        <section class="workspace-overview" id="section-overview">
+        <section class="workspace-overview" id="section-overview" data-panel-section>
             <div class="top-meta">
                 <div class="meta-item">
                     <span class="meta-label">Çalışan sürüm</span>
@@ -1417,10 +1437,10 @@
                     <span class="meta-value" id="next-run">-</span>
                     <span class="meta-subvalue" id="next-run-countdown">Sayaç bekliyor</span>
                 </div>
-                <div class="meta-item">
+                <div class="meta-item panel-secondary-meta">
                     <span class="meta-label">Karar güvenliği</span>
                     <span class="meta-value">Tam-stat + taze doğrulama</span>
-                    <span class="meta-subvalue">Telegram yalnız ÜST · oran 1.50+</span>
+                    <span class="meta-subvalue">Telegram V24 Ana · ÜST / MS · oran 1.50+</span>
                 </div>
             </div>
 
@@ -1500,10 +1520,11 @@
                     <small>Son taramadaki hazır maçlar</small>
                 </div>
             </div>
+            <div class="panel-quick-links"><button type="button" data-panel-shortcut="signals">Paylaşılan sinyaller</button><button type="button" data-panel-shortcut="coupons">Kuponlara geç</button></div>
         </section>
 
         <main class="dashboard-sections">
-        <div class="card" id="section-audit">
+        <div class="card" id="section-audit" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>🧪 Tam-Stat Aday Denetimi</h3>
@@ -1634,7 +1655,7 @@
             </div>
         </div>
 
-        <div class="card" id="section-decision">
+        <div class="card" id="section-decision" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>🧠 Son Makine Kararı</h3>
@@ -1663,7 +1684,7 @@
             <p class="muted" id="ml-note" style="margin-top:10px;">Canlı şut, isabet, korner, dakika ve skor verisi tamamlandığında model çalışır.</p>
         </div>
 
-        <div class="card" id="section-signals">
+        <div class="card" id="section-signals" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>📈 Paylaşılan Sinyal Takibi</h3>
@@ -1739,7 +1760,7 @@
             </div>
         </div>
 
-        <div class="card" id="section-v18-shadow" style="border-color:rgba(100,181,246,.48);">
+        <div class="card" id="section-v18-shadow" data-panel-section style="border-color:rgba(100,181,246,.48);">
             <div class="section-title">
                 <div>
                     <h3>🧪 Test Lab · Canlı Karşılaştırma</h3>
@@ -1750,7 +1771,8 @@
                     <button id="test-lab-refresh-btn" type="button" style="background:var(--success);" onclick="refreshTestLabResults()">Sonuçları Kontrol Et</button>
                 </div>
             </div>
-
+            <p class="panel-scope-note">Burası aday / LAB kaydıdır. Gerçek Telegram gönderimleri Sinyaller bölümünde izlenir.</p>
+            <div class="panel-lab-toolbar"><label for="panel-lab-model">Gösterilen model</label><select id="panel-lab-model"><option value="v24">V24 Ana</option><option value="v24gemini">Gemini V24</option><option value="v24focus">V24 Odak</option><option value="v24quiet">Weekend Quiet</option><option value="v24selective">Seçici Weekend</option><option value="v24v25">V24 + V25 Ortak</option><option value="oldtelegram">Eski Telegram</option><option value="v22">V22</option><option value="v21">V21</option><option value="all">Karşılaştırma · tüm modeller</option></select></div>
             <div class="history-filter">
                 <div class="history-filter-copy">
                     <strong>📅 Ortak test görünümü</strong>
@@ -1984,7 +2006,7 @@
             </div>
         </div>
 
-        <div class="card" id="section-coupon-lab">
+        <div class="card" id="section-coupon-lab" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>🎟️ İY/MS Kupon LAB · Maç Önü</h3>
@@ -2028,9 +2050,9 @@
             <p class="muted" id="coupon-lab-footnote">Ana tarama her gün bir kez çalışır. Seçilen maçlar başlangıçtan önce bir kez yeniden doğrulanır. Panel düğmesi otomatik saati beklemeden seçili gün kapsamını tarar; günlük bütçe ve genel API rezervi yine korunur.</p>
         </div>
 
-        <div class="card" id="section-banko-coupon">
-            <div class="section-title"><div><h3>🎫 Banko Kupon LAB · Manuel maç önü</h3><p class="muted" id="banko-status">Tarih seçip oluşturabilirsiniz.</p></div><span class="mini-badge bg-info">ÖZEL PANEL · TELEGRAM YOK</span></div>
-            <p class="muted">Otomatik Banko: tercihimiz iki farklı maç, ayak başına en az 1.40 ve toplam yaklaşık 2.00. Uygun tek maç 1.80–2.20 ise tekli de olabilir. Manuel listeniz iki maçla sınırlı değildir; iddaa'nın 3 maç şartı için de seçim kaydedebilirsiniz. “Banko” garanti değildir; ham model yüzdeleri henüz kalibre edilmemiş LAB tahminleridir.</p>
+        <div class="card" id="section-banko-coupon" data-panel-section>
+            <div class="section-title"><div><h3>🎫 Banko Kupon LAB · Manuel maç önü</h3><p class="muted" id="banko-status">Tarih seçip oluşturabilirsiniz.</p><p class="muted" id="banko-dirty" role="status" aria-live="polite">Ayarlar kaydedildi</p></div><span class="mini-badge bg-info">ÖZEL PANEL · TELEGRAM YOK</span></div>
+            <details class="panel-help"><summary>Banko nasıl çalışır?</summary><p class="muted">Otomatik Banko: tercihimiz iki farklı maç, ayak başına en az 1.40 ve toplam yaklaşık 2.00. Uygun tek maç 1.80–2.20 ise tekli de olabilir. Manuel listeniz iki maçla sınırlı değildir; iddaa'nın 3 maç şartı için de seçim kaydedebilirsiniz. “Banko” garanti değildir; ham model yüzdeleri henüz kalibre edilmemiş LAB tahminleridir.</p></details>
             <div class="banko-toolbar">
                 <label>Kupon tarihi (TSİ)<input type="date" id="banko-date" onchange="bankoDateChanged()"></label>
                 <button type="button" onclick="bankoSetDay(0)">BUGÜN</button><button type="button" onclick="bankoSetDay(1)">YARIN</button>
@@ -2038,7 +2060,7 @@
                 <button id="banko-scan" type="button" class="banko-primary" onclick="runBankoAction('scan')">SEÇİLİ GÜNE KUPON OLUŞTUR</button>
             </div>
             <div class="banko-toolbar"><label>Önceki sürümler<select id="banko-version" onchange="bankoVersionChanged()"><option>Son sürüm</option></select></label><label>Arşiv tarihi<select id="banko-archive" onchange="bankoArchiveChanged()"><option>Kayıtlı tarihler</option></select></label><button id="banko-check" type="button" onclick="runBankoAction('check')">MAÇ ÖNÜ KONTROL</button><button id="banko-results" type="button" onclick="runBankoAction('results')">SONUÇLARI GETİR · MANUEL</button></div>
-            <details class="banko-settings"><summary>⚙️ Banko ayarları · <span id="banko-dirty">Kaydedildi</span></summary>
+            <details class="banko-settings" id="panel-banko-settings" data-panel-banko-pane="settings" data-panel-open><summary>⚙️ Banko ayarları</summary>
                 <div class="banko-settings-grid">
                     <label><input type="checkbox" id="banko-setting-enabled" checked onchange="markBankoDirty()"> Banko modu açık</label>
                     <label><input type="checkbox" id="banko-setting-autoPrecheck" checked onchange="markBankoDirty()"> Otomatik Banko kuponlarının maçlarını kontrol et</label>
@@ -2074,9 +2096,10 @@
                 <button id="banko-save" type="button" onclick="saveBankoSettings()">BANKO AYARLARINI KAYDET</button>
             </details>
             <div class="metrics"><div class="metric info"><span class="metric-label">Seçili gün</span><span id="banko-count" class="metric-value">0 kupon</span></div><div class="metric warning"><span class="metric-label">Banko API / günlük tavan</span><span id="banko-api" class="metric-value">0 / 2000</span><small id="banko-reserve"></small></div><div class="metric info"><span class="metric-label">Kupon sonuçları · ilk kayıt fiyatı</span><span id="banko-results-summary">0 K / 0 Y / 0 bekleyen</span></div></div>
-            <div id="banko-coupons"></div>
-            <details class="banko-settings banko-manual"><summary>📌 Seçimlerim · ana / yedek / manuel analiz</summary><p id="banko-manual-summary" class="muted">Henüz kayıt yok.</p><p class="muted">Tüm sürümlerde bu gün için kaydettiğiniz seçimler korunur. Aynı etiketi verdiğiniz seçimler aşağıdaki Kuponlarım / Showroom bölümünde gruplanır; üç ve daha fazla maç da olabilir. Gerçek bahis kuponu oluşturulmaz veya Telegram'a gönderilmez. Oran boşsa yalnız sonuç takip edilir. Eski, başlamış veya şart dışı kayıtlar model onayı sayılmaz. Manuel listede otomatik kadro kontrolü yoktur; MAÇ ÖNÜ KONTROL mevcut otomatik Banko kuponlarını kontrol eder.</p><div id="banko-manual-list"></div></details>
-            <details class="banko-settings" id="banko-showroom-section">
+            <div class="panel-tabs" id="panel-banko-tabs" role="tablist" aria-label="Banko çalışma alanı"><button type="button" role="tab" data-panel-banko-tab="analysis" aria-selected="true" aria-controls="panel-banko-analysis">Analizler</button><button type="button" role="tab" data-panel-banko-tab="coupons" aria-selected="false" aria-controls="banko-coupons">Otomatik kuponlar</button><button type="button" role="tab" data-panel-banko-tab="manual" aria-selected="false" aria-controls="panel-banko-manual">Seçimlerim</button><button type="button" role="tab" data-panel-banko-tab="showroom" aria-selected="false" aria-controls="banko-showroom-section">Showroom</button><button type="button" role="tab" data-panel-banko-tab="settings" aria-selected="false" aria-controls="panel-banko-settings">Ayarlar</button></div>
+            <div id="banko-coupons" data-panel-banko-pane="coupons"></div>
+            <details class="banko-settings banko-manual" id="panel-banko-manual" data-panel-banko-pane="manual" data-panel-open><summary>📌 Seçimlerim · ana / yedek / manuel analiz</summary><p id="banko-manual-summary" class="muted">Henüz kayıt yok.</p><details class="panel-help"><summary>Manuel kayıt hakkında</summary><p class="muted">Tüm sürümlerde bu gün için kaydettiğiniz seçimler korunur. Aynı etiketi verdiğiniz seçimler aşağıdaki Kuponlarım / Showroom bölümünde gruplanır; üç ve daha fazla maç da olabilir. Gerçek bahis kuponu oluşturulmaz veya Telegram'a gönderilmez. Oran boşsa yalnız sonuç takip edilir. Eski, başlamış veya şart dışı kayıtlar model onayı sayılmaz. Manuel listede otomatik kadro kontrolü yoktur; MAÇ ÖNÜ KONTROL mevcut otomatik Banko kuponlarını kontrol eder.</p></details><div id="banko-manual-list"></div></details>
+            <details class="banko-settings" id="banko-showroom-section" data-panel-banko-pane="showroom" data-panel-open>
                 <summary>🗒️ Kuponlarım / Showroom · Kağıt tasarımı</summary>
                 <p id="banko-showroom-summary" class="muted">Henüz grup yok.</p>
                 <p class="muted">Aynı gün + aynı etiket tek grup olur. Paylaşmak istediğin gruplara tik koy; yalnız seçtiklerin gösterilir. Oynanan oranlar, özgün analizdeki son 5 / son 20 lig gol ortalamaları ve modelin beklediği toplam gol kullanılır. Eksik veri — görünür. İndirilen görselde sunucu IP'si bulunmaz; logolar ve otomatik Telegram gönderimi yoktur.</p>
@@ -2086,13 +2109,15 @@
                 <textarea id="banko-showroom-text" readonly hidden aria-label="Elle kopyalanacak showroom metni"></textarea>
                 <div id="banko-showroom-preview" class="banko-showroom-preview"></div>
             </details>
-            <details class="banko-settings"><summary>📊 Model takibi · yalnız seçili tarama</summary><p id="banko-model-tracking" class="muted"></p><p class="muted">SONUÇLARI GETİR düğmesi kuponlarla birlikte bu taramanın tüm uygun marketlerini ve seçili günün manuel listesini kontrol eder. Tam sonucu veya yarı skoru eksik olanlar bekler. Aynı maçın farklı marketleri bağımsız doğrulama örneği değildir; manuel tercihler model performansıyla birleştirilmez.</p></details>
-            <details class="banko-settings"><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><p class="muted">Her maçın yanındaki ↻ Alternatif tahmin, aynı kayıtta şartları geçen ikinci farklı seçeneği gösterir. Ek API harcamaz; ana seçim ve kayıtlı kupon değişmez. Uygun ikinci seçenek yoksa tahmin zorlanmaz.</p><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
+            <details class="banko-settings" data-panel-banko-pane="coupons"><summary>📊 Model takibi · yalnız seçili tarama</summary><p id="banko-model-tracking" class="muted"></p><p class="muted">SONUÇLARI GETİR düğmesi kuponlarla birlikte bu taramanın tüm uygun marketlerini ve seçili günün manuel listesini kontrol eder. Tam sonucu veya yarı skoru eksik olanlar bekler. Aynı maçın farklı marketleri bağımsız doğrulama örneği değildir; manuel tercihler model performansıyla birleştirilmez.</p></details>
+            <details class="banko-settings" id="panel-banko-analysis" data-panel-banko-pane="analysis" data-panel-open><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><p class="muted">Her maçın yanındaki ↻ Alternatif tahmin, aynı kayıtta şartları geçen ikinci farklı seçeneği gösterir. Ek API harcamaz; ana seçim ve kayıtlı kupon değişmez. Uygun ikinci seçenek yoksa tahmin zorlanmaz.</p><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
+            <details class="panel-help"><summary>İşleyiş ve kayıt kuralları</summary>
             <p class="muted">Canlı tarama/sonuç kontrolü sırasında Banko bekler; işlem bitince aynı tarama kaldığı yerden otomatik devam eder. Beklerken API isteği gönderilmez; tekrar oluştur düğmesine basmanız gerekmez. Sunucu yeniden başlatılırsa yarım kayıt korunur ama otomatik devam etmez; yeni manuel tarama gerekir.</p>
             <p class="muted">Her manuel oluşturma yeni, ayrı sürüm kaydeder; eski kupon değiştirilmez. Yeni veya yarım tarama eski kuponları silmez. Otomatik maç önü kontrol yalnız o günün son tamamlanmış sürümündeki seçilen maçlara uygulanır; eski sürümler elle kontrol edilebilir. Sonuçları kendiniz getirirsiniz; panelin durum yenilemesi API-Football taraması değildir. Otomatik Telegram gönderimi yok.</p>
+            </details>
         </div>
 
-        <div class="card" id="section-coverage">
+        <div class="card" id="section-coverage" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>📊 Canlı İstatistik Kapsamı</h3>
@@ -2152,7 +2177,7 @@
             </div>
         </div>
 
-        <div class="card" id="section-tariff">
+        <div class="card" id="section-tariff" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>🗺️ Telegram · V24 Ana</h3>
@@ -2184,7 +2209,7 @@
             </div>
         </div>
 
-        <div class="card" id="section-schedule">
+        <div class="card" id="section-schedule" data-panel-section>
             <h3 style="margin-bottom:10px;">⏰ Zamanlayıcı Programı (TSİ)</h3>
             <p class="muted" style="margin-bottom:12px;">Kapalıysa normal döngü gün boyu 10 dk; tam-stat hızlandırma açıksa uygun maç varken 5 dk olur. Açarsan yalnız aşağıdaki saatlerde çalışır. Sabit 5 dk ve tek sefer programları kendi kurallarını korur.</p>
             <div class="flex-between" style="margin-bottom:15px;">
@@ -2215,7 +2240,7 @@
             <button type="button" style="background:var(--success);" onclick="saveSchedule()">Tüm Programı Sunucuya İlet</button>
         </div>
 
-        <div class="card" id="section-radar">
+        <div class="card" id="section-radar" data-panel-section>
             <div class="section-title">
                 <div>
                     <h3>📡 Canlı Sistem Radarı</h3>
@@ -2244,7 +2269,7 @@
 <script src="/banko_choices.js?v=20261007banko5"></script>
 <script src="/banko_showroom.js?v=20261008paper1"></script>
 <script src="/banko_showroom_panel.js?v=20261008paper1"></script>
-<script src="/banko_coupon_panel.js?v=20261008paper1"></script>
+<script src="/banko_coupon_panel.js?v=20261008workspace1"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
@@ -2363,6 +2388,7 @@
         }
 
         function jumpToSection(sectionId, button) {
+            if (window.PanelWorkspace) return window.PanelWorkspace.openSection(sectionId);
             const section = document.getElementById(sectionId);
             if (!section) return;
             document.querySelectorAll(".command-nav button").forEach(item => item.classList.remove("active"));
@@ -2371,6 +2397,7 @@
         }
 
         function setupNavigationObserver() {
+            if (document.getElementById('panel-view-nav')) return;
             if (!("IntersectionObserver" in window)) return;
             const sections = document.querySelectorAll("[id^='section-']");
             const observer = new IntersectionObserver(entries => {
@@ -4100,5 +4127,6 @@
         setInterval(updateIstanbulClock, 1000);
         setInterval(updateNextRunCountdown, 1000);
     </script>
+    <script src="/panel_workspace.js?v=20261008workspace1"></script>
 </body>
 </html>

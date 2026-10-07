@@ -13,6 +13,7 @@
     const marketLabel=C.marketLabel;
     let latest=null,dirty=false,fetching=false,page=0,sessionId=null,candidateSerial=0;
     const openAlternatives=new Set();
+    const openCandidates=new Set();
     const selectionDrafts=new Map();
     // Read-only choices from the saved scan. Never refresh odds, relax eligibility or replace a frozen pick.
     const alternative=C.alternative;
@@ -75,6 +76,7 @@
     function candidate(row){const details=el('details',undefined,'banko-analysis'),summary=el('summary'),heading=el('span',`${row.match} · ${row.league} · ${dt(row.kickoff)} · ${row.pick?marketLabel(row.pick)+' @ '+num(row.pick.odd):'PAS'}`,'banko-analysis-title');
         const button=el('button','↻ Alternatif tahmin','banko-alternative-button'),backup=el('section',undefined,'banko-alternative');
         const stateKey=JSON.stringify([latest?.session?.id,row.id||row.fixtureId]),backupId='banko-alternative-'+(++candidateSerial);
+        details.open=openCandidates.has(stateKey);details.ontoggle=()=>{if(details.open)openCandidates.add(stateKey);else openCandidates.delete(stateKey);};
         button.type='button';button.dataset.bankoAlternative=String(row.fixtureId);button.title='Aynı kayıttaki uygun ikinci seçeneği gösterir; API harcamaz ve kuponu değiştirmez.';
         button.setAttribute('aria-controls',backupId);button.setAttribute('aria-label',`${row.match} · alternatif tahmin`);backup.id=backupId;backup.setAttribute('aria-live','polite');backup.hidden=true;
         const showBackup=()=>{const pick=alternative(row,latest?.session?.settings);backup.replaceChildren();
@@ -91,7 +93,7 @@
         button.onclick=event=>{event?.preventDefault();event?.stopPropagation();setVisible(backup.hidden);};
         summary.append(heading,button);details.append(summary,backup);setVisible(openAlternatives.has(stateKey));
         if(row.pick){details.appendChild(el('h4','Ana seçim · '+marketLabel(row.pick)));details.appendChild(priceForm(row,row.pick));}
-        const reasons=row.pick?[`Ham model %${num(row.pick.modelProbability*100,1)}; kalibre edilmiş başarı yüzdesi değildir. Veri puanı ${row.pick.dataScore}/100. Model − piyasa farkı ${num(row.pick.edgePP,1)} yüzde puan.`,...row.risks]:[...row.reasons,...row.risks];reasons.forEach(r=>details.appendChild(note(r)));
+        const reasons=row.pick?[`Ham model %${num(row.pick.modelProbability*100,1)}; kalibre edilmiş başarı yüzdesi değildir. Veri puanı ${row.pick.dataScore}/100. Model − piyasa farkı ${num(row.pick.edgePP,1)} yüzde puan.`,...row.risks]:[...row.reasons,...row.risks];if(reasons.length)details.appendChild(note(reasons.join('\n')));
         if(row.apiPrediction?.advice)details.appendChild(el('p','API tavsiyesi (yalnız bağlam): '+row.apiPrediction.advice));
         details.appendChild(el('p',`Veri: ${dt(row.capturedAt)} · Oran güncellemesi: ${dt(row.oddsUpdatedAt)} · Beklenen gol ${num(row.expectedGoals?.home)} / ${num(row.expectedGoals?.away)}`));
         const grid=el('div',undefined,'banko-profile-grid');grid.append(profile(row.profiles?.home,row.home.name),profile(row.profiles?.away,row.away.name));details.appendChild(grid);
