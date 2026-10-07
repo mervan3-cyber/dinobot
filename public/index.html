@@ -1323,6 +1323,7 @@
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
     </style>
     <link rel="stylesheet" href="/banko_coupon.css?v=20261007banko5">
+    <link rel="stylesheet" href="/banko_showroom.css?v=20261008paper1">
 </head>
 <body>
     <div class="container" id="login-screen">
@@ -2074,7 +2075,17 @@
             </details>
             <div class="metrics"><div class="metric info"><span class="metric-label">Seçili gün</span><span id="banko-count" class="metric-value">0 kupon</span></div><div class="metric warning"><span class="metric-label">Banko API / günlük tavan</span><span id="banko-api" class="metric-value">0 / 2000</span><small id="banko-reserve"></small></div><div class="metric info"><span class="metric-label">Kupon sonuçları · ilk kayıt fiyatı</span><span id="banko-results-summary">0 K / 0 Y / 0 bekleyen</span></div></div>
             <div id="banko-coupons"></div>
-            <details class="banko-settings banko-manual"><summary>📌 Seçimlerim · ana / yedek / manuel analiz</summary><p id="banko-manual-summary" class="muted">Henüz kayıt yok.</p><p class="muted">Tüm sürümlerde bu gün için kaydettiğiniz seçimler korunur. Aynı kupon etiketini üç veya daha fazla seçime verebilirsiniz; liste gerçek bahis kuponu oluşturmaz veya Telegram'a göndermez. Oran boşsa yalnız sonuç takip edilir. Eski, başlamış veya şart dışı kayıtlar model onayı sayılmaz. Manuel listede otomatik kadro kontrolü yoktur; MAÇ ÖNÜ KONTROL mevcut otomatik Banko kuponlarını kontrol eder.</p><div id="banko-manual-list"></div></details>
+            <details class="banko-settings banko-manual"><summary>📌 Seçimlerim · ana / yedek / manuel analiz</summary><p id="banko-manual-summary" class="muted">Henüz kayıt yok.</p><p class="muted">Tüm sürümlerde bu gün için kaydettiğiniz seçimler korunur. Aynı etiketi verdiğiniz seçimler aşağıdaki Kuponlarım / Showroom bölümünde gruplanır; üç ve daha fazla maç da olabilir. Gerçek bahis kuponu oluşturulmaz veya Telegram'a gönderilmez. Oran boşsa yalnız sonuç takip edilir. Eski, başlamış veya şart dışı kayıtlar model onayı sayılmaz. Manuel listede otomatik kadro kontrolü yoktur; MAÇ ÖNÜ KONTROL mevcut otomatik Banko kuponlarını kontrol eder.</p><div id="banko-manual-list"></div></details>
+            <details class="banko-settings" id="banko-showroom-section">
+                <summary>🗒️ Kuponlarım / Showroom · Kağıt tasarımı</summary>
+                <p id="banko-showroom-summary" class="muted">Henüz grup yok.</p>
+                <p class="muted">Aynı gün + aynı etiket tek grup olur. Paylaşmak istediğin gruplara tik koy; yalnız seçtiklerin gösterilir. Oynanan oranlar, özgün analizdeki son 5 / son 20 lig gol ortalamaları ve modelin beklediği toplam gol kullanılır. Eksik veri — görünür. İndirilen görselde sunucu IP'si bulunmaz; logolar ve otomatik Telegram gönderimi yoktur.</p>
+                <div id="banko-showroom-groups" class="banko-showroom-groups"></div>
+                <div class="banko-showroom-actions"><button id="banko-showroom-open" type="button" disabled>SEÇİLİLERİ GÖSTER</button><button id="banko-showroom-png" type="button" disabled>SEÇİLİ PNG'LERİ İNDİR</button><button id="banko-showroom-copy" type="button" disabled>TELEGRAM METNİNİ KOPYALA</button></div>
+                <p id="banko-showroom-message" class="banko-showroom-message" role="status" aria-live="polite"></p>
+                <textarea id="banko-showroom-text" readonly hidden aria-label="Elle kopyalanacak showroom metni"></textarea>
+                <div id="banko-showroom-preview" class="banko-showroom-preview"></div>
+            </details>
             <details class="banko-settings"><summary>📊 Model takibi · yalnız seçili tarama</summary><p id="banko-model-tracking" class="muted"></p><p class="muted">SONUÇLARI GETİR düğmesi kuponlarla birlikte bu taramanın tüm uygun marketlerini ve seçili günün manuel listesini kontrol eder. Tam sonucu veya yarı skoru eksik olanlar bekler. Aynı maçın farklı marketleri bağımsız doğrulama örneği değildir; manuel tercihler model performansıyla birleştirilmez.</p></details>
             <details class="banko-settings"><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><p class="muted">Her maçın yanındaki ↻ Alternatif tahmin, aynı kayıtta şartları geçen ikinci farklı seçeneği gösterir. Ek API harcamaz; ana seçim ve kayıtlı kupon değişmez. Uygun ikinci seçenek yoksa tahmin zorlanmaz.</p><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
             <p class="muted">Canlı tarama/sonuç kontrolü sırasında Banko bekler; işlem bitince aynı tarama kaldığı yerden otomatik devam eder. Beklerken API isteği gönderilmez; tekrar oluştur düğmesine basmanız gerekmez. Sunucu yeniden başlatılırsa yarım kayıt korunur ama otomatik devam etmez; yeni manuel tarama gerekir.</p>
@@ -2231,7 +2242,9 @@
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
 <script src="/banko_choices.js?v=20261007banko5"></script>
-<script src="/banko_coupon_panel.js?v=20261007banko5"></script>
+<script src="/banko_showroom.js?v=20261008paper1"></script>
+<script src="/banko_showroom_panel.js?v=20261008paper1"></script>
+<script src="/banko_coupon_panel.js?v=20261008paper1"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;

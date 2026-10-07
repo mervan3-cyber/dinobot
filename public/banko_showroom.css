@@ -1,0 +1,81 @@
+#section-banko-coupon .banko-showroom-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin:12px 0; }
+#section-banko-coupon .banko-showroom-group { background:#15212c; border:1px solid #345064; border-radius:9px; padding:14px; overflow-wrap:anywhere; }
+#section-banko-coupon .banko-showroom-group p { margin:8px 0; }
+#section-banko-coupon .banko-showroom-group small { color:#b5c7d3; }
+#section-banko-coupon .banko-showroom-check { display:flex; gap:10px; align-items:center; }
+#section-banko-coupon .banko-showroom-check input { width:20px; height:20px; margin:0; flex-shrink:0; }
+#section-banko-coupon .banko-showroom-warning { color:#f9c879; font-size:12px; }
+#section-banko-coupon .banko-showroom-actions { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }
+#section-banko-coupon .banko-showroom-actions button { width:auto; }
+#section-banko-coupon .banko-showroom-message { color:#b6d6c4; margin:10px 0; }
+#section-banko-coupon .banko-showroom-message.error { color:#ffb3ad; }
+#section-banko-coupon #banko-showroom-text { width:100%; min-height:200px; margin:12px 0; }
+#section-banko-coupon .banko-showroom-preview { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr)); gap:22px; align-items:start; margin-top:18px; }
+#section-banko-coupon .banko-showroom-export { min-width:0; }
+#section-banko-coupon .banko-paper-poster { background:#fffdf9; color:#272b2c; color-scheme:light; font:14px/1.45 'Segoe UI',Arial,sans-serif; border:1px solid #deddd6; border-radius:14px; overflow:hidden; width:100%; max-width:620px; margin:0 auto; }
+#section-banko-coupon .banko-paper-poster * { box-sizing:border-box; }
+#section-banko-coupon .banko-paper-poster h3,#section-banko-coupon .banko-paper-poster h4,#section-banko-coupon .banko-paper-poster p { margin:0; color:inherit; }
+#section-banko-coupon .banko-paper-poster strong { font-weight:600; }
+#section-banko-coupon .banko-paper-header { display:flex; justify-content:space-between; gap:15px; align-items:flex-start; padding:25px 28px 20px; border-top:5px solid #a7432a; border-bottom:1px solid #deddd6; }
+#section-banko-coupon .banko-paper-brand { font-size:18px; font-weight:600; letter-spacing:.035em; }
+#section-banko-coupon .banko-paper-brand small { display:block; color:#636762; font-size:11px; font-weight:400; letter-spacing:.06em; margin-top:4px; }
+#section-banko-coupon .banko-paper-date { font-size:11px; color:#636762; text-align:right; }
+#section-banko-coupon .banko-paper-intro { display:flex; justify-content:space-between; align-items:baseline; gap:8px 15px; flex-wrap:wrap; padding:22px 28px; }
+#section-banko-coupon .banko-paper-intro h3 { font-size:27px; font-weight:600; letter-spacing:-.025em; }
+#section-banko-coupon .banko-paper-intro span { font-size:12px; color:#636762; overflow-wrap:anywhere; }
+#section-banko-coupon .banko-paper-match { padding:22px 28px 25px; border-top:1px solid #deddd6; }
+#section-banko-coupon .banko-paper-match-head { display:flex; gap:12px; align-items:baseline; }
+#section-banko-coupon .banko-paper-match-head > span { font-size:12px; color:#636762; flex-shrink:0; }
+#section-banko-coupon .banko-paper-match-head h4 { font-size:18px; font-weight:600; overflow-wrap:anywhere; }
+#section-banko-coupon .banko-paper-market-row { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:14px; }
+#section-banko-coupon .banko-paper-market { font-size:25px; font-weight:500; line-height:1.23; letter-spacing:-.02em; overflow-wrap:anywhere; }
+#section-banko-coupon .banko-paper-market > span,#section-banko-coupon .banko-paper-market > strong { display:block; }
+#section-banko-coupon .banko-paper-market > strong { margin-top:4px; font-size:31px; color:#a7432a; }
+#section-banko-coupon .banko-paper-leg-price { display:flex; flex-direction:column; align-items:flex-end; align-self:flex-start; gap:4px; padding-top:5px; flex-shrink:0; }
+#section-banko-coupon .banko-paper-leg-price > span { font-size:11px; color:#636762; }
+#section-banko-coupon .banko-paper-leg-price > strong { font-size:26px; color:#176344; background:#e9f4ed; border-radius:7px; padding:2px 10px; font-variant-numeric:tabular-nums; }
+#section-banko-coupon .banko-paper-expected { display:flex; justify-content:space-between; align-items:center; gap:12px; background:#f3eee5; border-radius:7px; padding:13px 15px; margin-top:16px; }
+#section-banko-coupon .banko-paper-expected > div { display:flex; flex-direction:column; gap:2px; }
+#section-banko-coupon .banko-paper-expected span { font-size:13px; }
+#section-banko-coupon .banko-paper-expected small { font-size:11px; color:#636762; }
+#section-banko-coupon .banko-paper-expected > strong { font-size:23px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+#section-banko-coupon .banko-paper-poster .banko-paper-stats-title { font-size:13px; font-weight:500; margin:17px 0 11px; }
+#section-banko-coupon .banko-paper-teams { display:grid; grid-template-columns:1fr 1fr; gap:23px; }
+#section-banko-coupon .banko-paper-team + .banko-paper-team { border-left:1px solid #deddd6; padding-left:23px; }
+#section-banko-coupon .banko-paper-team-label { display:flex; flex-direction:column; gap:2px; margin-bottom:7px; }
+#section-banko-coupon .banko-paper-team-label span { color:#636762; font-size:11px; }
+#section-banko-coupon .banko-paper-team-label strong { font-size:13px; overflow-wrap:anywhere; }
+#section-banko-coupon .banko-paper-poster table { width:100%; min-width:0; border-collapse:collapse; table-layout:fixed; background:transparent; font-size:13px; font-variant-numeric:tabular-nums; border:0; margin:0; }
+#section-banko-coupon .banko-paper-poster th,#section-banko-coupon .banko-paper-poster td { min-width:0; white-space:normal; overflow-wrap:anywhere; padding:6px 3px; text-align:right; color:#272b2c; background:transparent; border:0; }
+#section-banko-coupon .banko-paper-poster th:first-child { text-align:left; width:40%; }
+#section-banko-coupon .banko-paper-poster thead th { font-size:11px; color:#636762; font-weight:400; padding-top:0; }
+#section-banko-coupon .banko-paper-poster tbody th { font-size:12px; color:#636762; font-weight:400; }
+#section-banko-coupon .banko-paper-poster tbody tr { border-top:1px solid #deddd6; }
+#section-banko-coupon .banko-paper-total { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:15px; padding:22px 28px; border-top:1px solid #deddd6; background:#e9f4ed; color:#176344; }
+#section-banko-coupon .banko-paper-total > span { font-size:22px; font-weight:500; line-height:1.3; }
+#section-banko-coupon .banko-paper-total > strong { font-size:48px; line-height:1.15; letter-spacing:-.025em; font-variant-numeric:tabular-nums; }
+#section-banko-coupon .banko-paper-poster tr:hover { background:transparent; }
+@media(max-width:600px) {
+  #section-banko-coupon .banko-showroom-groups { grid-template-columns:1fr; }
+  #section-banko-coupon .banko-paper-header,#section-banko-coupon .banko-paper-intro,#section-banko-coupon .banko-paper-match,#section-banko-coupon .banko-paper-total { padding-left:16px; padding-right:16px; }
+  #section-banko-coupon .banko-paper-brand { font-size:16px; }
+  #section-banko-coupon .banko-paper-market-row { flex-direction:column; align-items:stretch; gap:8px; }
+  #section-banko-coupon .banko-paper-leg-price { flex-direction:row; align-items:baseline; align-self:stretch; gap:7px; }
+  #section-banko-coupon .banko-paper-leg-price > strong { font-size:24px; }
+  #section-banko-coupon .banko-paper-expected { padding-left:10px; padding-right:10px; }
+  #section-banko-coupon .banko-paper-expected > strong { font-size:20px; }
+  #section-banko-coupon .banko-paper-teams { gap:12px; }
+  #section-banko-coupon .banko-paper-team + .banko-paper-team { padding-left:12px; }
+  #section-banko-coupon .banko-paper-poster table { font-size:12px; }
+  #section-banko-coupon .banko-paper-poster th,#section-banko-coupon .banko-paper-poster td { padding-left:1px; padding-right:1px; }
+  #section-banko-coupon .banko-paper-poster th:first-child { width:35%; }
+  #section-banko-coupon .banko-paper-poster tbody th { font-size:11px; }
+  #section-banko-coupon .banko-paper-total > span { font-size:20px; }
+  #section-banko-coupon .banko-paper-total > strong { font-size:43px; }
+}
+@media(max-width:420px) {
+  #section-banko-coupon .banko-paper-teams { grid-template-columns:1fr; }
+  #section-banko-coupon .banko-paper-team + .banko-paper-team { border-left:0; padding-left:0; border-top:1px solid #deddd6; padding-top:12px; }
+  #section-banko-coupon .banko-paper-total { grid-template-columns:1fr; gap:8px; }
+  #section-banko-coupon .banko-paper-total > strong { text-align:right; }
+}
