@@ -3,7 +3,7 @@
     const $=id=>document.getElementById(id),stateKey='mac-yakala-panel-workspace-v1';
     const views={today:['Bugün','Sistem durumu, tarama ve seçili sinyal görünümünün kısa özeti.'],signals:['Sinyaller','Yalnız Telegram’da başarıyla paylaşılmış kayıtlar.'],live:['Canlı maçlar','Lig kapsamı ve gerçekten gelen canlı istatistikler.'],coupons:['Kuponlar','Maç önü analizleri, manuel seçimler ve paylaşım hazırlığı.'],lab:['LAB / Denetim','Aday kayıtları ve deneyler; Telegram gönderim listesi değildir.'],system:['Sistem','Paylaşım hedefleri, çalışma saatleri, salt okunur kurallar ve günlükler.']};
     const defaults={view:'today',coupon:'banko',banko:'analysis',lab:'models',model:'v24',system:'sharing'};
-    const values={view:Object.keys(views),coupon:['banko','htft'],banko:['analysis','coupons','manual','showroom','settings'],lab:['models','audit'],model:['v24','v24gemini','v24focus','v24quiet','v24selective','v24v25','oldtelegram','v22','v21','all'],system:['sharing','schedule','tariff','radar']};
+    const values={view:Object.keys(views),coupon:['banko','htft'],banko:['analysis','comparison','coupons','manual','showroom','settings'],lab:['models','audit'],model:['v24','v24gemini','v24focus','v24quiet','v24selective','v24v25','oldtelegram','v22','v21','all'],system:['sharing','schedule','tariff','radar']};
     let state={...defaults},ready=false;
     function normalize(value){const result={...defaults};for(const key of Object.keys(defaults))if(values[key].includes(value?.[key]))result[key]=value[key];return result;}
     try{state=normalize(JSON.parse(localStorage.getItem(stateKey)||'null'));}catch(_){}

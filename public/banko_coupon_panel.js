@@ -19,7 +19,7 @@
     const alternative=C.alternative;
     const integerIds=['dailyLimit','maxCandidates','maxCoupons','precheckMinutes','maxOddsAgeHours'];
     const numericIds=[...integerIds,'minLegOdd','maxLegOdd','minCouponOdd','maxCouponOdd','minSingleOdd','maxSingleOdd','minModelProbability','minEdgePP'];
-    const booleanIds=['enabled','autoPrecheck','women','predictionContext'];
+    const booleanIds=['enabled','autoPrecheck','women','predictionContext','allowFullMatchUnder','allowSecondHalfUnder','strengthLabEnabled'];
     function table(heads,rows){const wrap=el('div',undefined,'table-wrap'),t=el('table'),head=el('thead'),tr=el('tr');heads.forEach(h=>tr.appendChild(el('th',h)));head.appendChild(tr);t.appendChild(head);const body=el('tbody');rows.forEach(values=>{const r=el('tr');values.forEach(v=>{const cell=el('td');if(v&&typeof v.setAttribute==='function')cell.appendChild(v);else cell.textContent=String(v??'');r.appendChild(cell);});body.appendChild(r);});t.appendChild(body);wrap.appendChild(t);return wrap;}
     function note(text,error=false){return el('div',text,'banko-note'+(error?' error':''));}
     const origins={main:'Ana tahmin',backup:'Gerçek yedek',analysis:'Diğer analiz marketi'};
@@ -95,6 +95,7 @@
         if(row.pick){details.appendChild(el('h4','Ana seçim · '+marketLabel(row.pick)));details.appendChild(priceForm(row,row.pick));}
         const reasons=row.pick?[`Ham model %${num(row.pick.modelProbability*100,1)}; kalibre edilmiş başarı yüzdesi değildir. Veri puanı ${row.pick.dataScore}/100. Model − piyasa farkı ${num(row.pick.edgePP,1)} yüzde puan.`,...row.risks]:[...row.reasons,...row.risks];if(reasons.length)details.appendChild(note(reasons.join('\n')));
         if(row.apiPrediction?.advice)details.appendChild(el('p','API tavsiyesi (yalnız bağlam): '+row.apiPrediction.advice));
+        if(window.BankoStrengthPanel)details.appendChild(window.BankoStrengthPanel.card(row,latest?.session?.id));
         details.appendChild(el('p',`Veri: ${dt(row.capturedAt)} · Oran güncellemesi: ${dt(row.oddsUpdatedAt)} · Beklenen gol ${num(row.expectedGoals?.home)} / ${num(row.expectedGoals?.away)}`));
         const grid=el('div',undefined,'banko-profile-grid');grid.append(profile(row.profiles?.home,row.home.name),profile(row.profiles?.away,row.away.name));details.appendChild(grid);
         const markets=el('details');markets.appendChild(el('summary',`Tüm marketleri aç (${row.markets.length}) · desteklenmeyenler yalnız analiz`));const listing=el('div');let count=80;
@@ -115,7 +116,7 @@
         const archive=$('banko-archive');archive.replaceChildren(el('option','Kayıtlı tarihler'));archive.children[0].value='';data.availableDates.forEach(d=>{const n=el('option',d);n.value=d;archive.appendChild(n);});
         const coupons=$('banko-coupons');coupons.replaceChildren();if(!s)coupons.appendChild(note('Bu tarih için kupon yok. Önce ligleri getirebilir veya doğrudan manuel oluşturabilirsiniz.'));else{if(s.status==='running')coupons.appendChild(note(data.busy&&data.job?.sessionId===s.id&&data.job?.status==='waiting-live'?'⏸ Canlı işlem bekleniyor. Toplanan analizler korundu; aynı tarama otomatik devam edecek. Tekrar oluştur düğmesine basmanız gerekmiyor.':'Tarama sürüyor; kuponlar tamamlanınca oluşturulacak.'));else if(s.status!=='complete')coupons.appendChild(note(`Tarama ${s.status}: ${s.reason||'Henüz tamamlanmadı'}. Eksik tarama kupon onayı sayılmaz.`,true));if(s.reason)coupons.appendChild(note(s.reason));s.coupons.forEach((c,i)=>coupons.appendChild(couponCard(c,i,s)));}
         const leagueBox=$('banko-leagues');if(!dirty){leagueBox.replaceChildren();(data.discovery?.leagues||[]).forEach(l=>{const n=el('label'),input=el('input');input.type='checkbox';input.dataset.bankoLeague=String(l.id);input.checked=data.settings.allowedLeagueIds.includes(l.id);input.onchange=window.markBankoDirty;n.append(input,el('span',`${l.country} · ${l.name} (${l.matches})`));leagueBox.appendChild(n);});}
-        renderCandidates();renderTracking(data);if(typeof window.renderBankoShowroom==='function')window.renderBankoShowroom(data);
+        renderCandidates();renderTracking(data);if(typeof window.renderBankoShowroom==='function')window.renderBankoShowroom(data);if(window.BankoStrengthPanel)window.BankoStrengthPanel.render(data);
     }
     async function fetchFull(){if(fetching)return;fetching=true;try{render(await apiFetch('/api/banko-coupon?date='+encodeURIComponent(day())+(sessionId?'&session='+encodeURIComponent(sessionId):'')));}catch(e){$('banko-status').textContent=e.message;}finally{fetching=false;}}
     async function poll(){try{const data=await apiFetch('/api/banko-coupon?summary=1&date='+encodeURIComponent(day()));const changed=latest?.job?.id!==data.job?.id||latest?.job?.status!==data.job?.status;controls(data);if(changed&&(!data.busy||data.job?.status==='waiting-live'||latest?.job?.status==='waiting-live'))await fetchFull();else if(latest)latest.job=data.job;}catch(_){} }

@@ -1326,6 +1326,7 @@
     <link rel="stylesheet" href="/banko_coupon.css?v=20261007banko5">
     <link rel="stylesheet" href="/banko_showroom.css?v=20261008paper1">
     <link rel="stylesheet" href="/panel_workspace.css?v=20261008workspace1">
+    <link rel="stylesheet" href="/banko_strength.css?v=20261008strength1">
 </head>
 <body>
     <div class="panel-theme-corner" role="group" aria-label="Panel teması">
@@ -2066,6 +2067,9 @@
                     <label><input type="checkbox" id="banko-setting-autoPrecheck" checked onchange="markBankoDirty()"> Otomatik Banko kuponlarının maçlarını kontrol et</label>
                     <label><input type="checkbox" id="banko-setting-women" checked onchange="markBankoDirty()"> Kadın ligleri açık</label>
                     <label><input type="checkbox" id="banko-setting-predictionContext" checked onchange="markBankoDirty()"> API tavsiyesini bağlam olarak göster</label>
+                    <label><input type="checkbox" id="banko-setting-allowFullMatchUnder" onchange="markBankoDirty()"> Maç toplamı ALT önerilerine izin ver</label>
+                    <label><input type="checkbox" id="banko-setting-allowSecondHalfUnder" onchange="markBankoDirty()"> İkinci yarı ALT önerilerine izin ver</label>
+                    <label><input type="checkbox" id="banko-setting-strengthLabEnabled" checked onchange="markBankoDirty()"> Güç LAB karşılaştırması açık (ana seçim değişmez)</label>
                     <label>Günlük Banko API tavanı<input type="number" id="banko-setting-dailyLimit" min="20" max="7500" value="2000" onchange="markBankoDirty()"></label>
                     <label>En fazla incelenecek maç<input type="number" id="banko-setting-maxCandidates" min="1" max="100" value="30" onchange="markBankoDirty()"></label>
                     <label>İstenen maksimum kupon sayısı<input type="number" id="banko-setting-maxCoupons" min="1" step="1" value="1" onchange="markBankoDirty()"></label>
@@ -2081,6 +2085,7 @@
                     <label>En eski kabul edilen oran (saat)<input type="number" id="banko-setting-maxOddsAgeHours" min="1" max="24" value="6" onchange="markBankoDirty()"></label>
                 </div>
                 <p class="muted">Yeni taramalarda her iki takım için en az 8 geçmiş lig maçı ve 3 ilgili saha maçı gerekir. Yarı marketlerinde ayrıca 10 geçerli yarı skoru gerekir. Kart ve xG eksikliği seçim engeli değildir; isteğe bağlı ayrıntıda gösterilir.</p>
+                <p class="muted">Maç toplamı ALT ve ikinci yarı ALT başlangıçta kapalıdır; yeni ana/yedek öneriye ve otomatik kupona alınmaz. İlk yarı ALT, takım golü ALT ve ÜST marketleri mevcut şartlarıyla açıktır. Kapalı marketler bütün marketler tablosunda görülebilir; yalnız manuel takip için uyarıyı kabul ederek kaydedilebilir. İkinci yarı tahmini ilk yarıya çevrilmez; ilk yarı kendi oran/verisiyle hesaplanır. Eski sürümler ve kaydettiğiniz seçimler değiştirilmez.</p>
                 <p class="muted">Kupon sayısında sabit 2 tavanı yoktur; pozitif tam sayı yazabilirsiniz. Her kupon 1–2 maçlı kalır, aynı taramanın kuponlarında maç tekrarlanmaz. Bu sayı üst sınırdır; uygun maç yetmezse kupon zorlanmaz. İncelenecek maç ve API bütçesi ayarları ayrıca korunur.</p>
                 <p class="muted">Bu sınırlar başlangıç LAB filtreleridir; kanıtlanmış başarı eşikleri değildir. Bütçe 2000 isteği harcamaya zorlamaz. Günlük sayaç TSİ gününe göre tutulur; genel API kalan ve 1500 istek canlı rezervi de korunur.</p>
                 <div class="banko-families">
@@ -2096,7 +2101,15 @@
                 <button id="banko-save" type="button" onclick="saveBankoSettings()">BANKO AYARLARINI KAYDET</button>
             </details>
             <div class="metrics"><div class="metric info"><span class="metric-label">Seçili gün</span><span id="banko-count" class="metric-value">0 kupon</span></div><div class="metric warning"><span class="metric-label">Banko API / günlük tavan</span><span id="banko-api" class="metric-value">0 / 2000</span><small id="banko-reserve"></small></div><div class="metric info"><span class="metric-label">Kupon sonuçları · ilk kayıt fiyatı</span><span id="banko-results-summary">0 K / 0 Y / 0 bekleyen</span></div></div>
-            <div class="panel-tabs" id="panel-banko-tabs" role="tablist" aria-label="Banko çalışma alanı"><button type="button" role="tab" data-panel-banko-tab="analysis" aria-selected="true" aria-controls="panel-banko-analysis">Analizler</button><button type="button" role="tab" data-panel-banko-tab="coupons" aria-selected="false" aria-controls="banko-coupons">Otomatik kuponlar</button><button type="button" role="tab" data-panel-banko-tab="manual" aria-selected="false" aria-controls="panel-banko-manual">Seçimlerim</button><button type="button" role="tab" data-panel-banko-tab="showroom" aria-selected="false" aria-controls="banko-showroom-section">Showroom</button><button type="button" role="tab" data-panel-banko-tab="settings" aria-selected="false" aria-controls="panel-banko-settings">Ayarlar</button></div>
+            <div class="panel-tabs" id="panel-banko-tabs" role="tablist" aria-label="Banko çalışma alanı"><button type="button" role="tab" data-panel-banko-tab="analysis" aria-selected="true" aria-controls="panel-banko-analysis">Analizler</button><button type="button" role="tab" data-panel-banko-tab="comparison" aria-selected="false" aria-controls="panel-banko-comparison">Model karşılaştırması</button><button type="button" role="tab" data-panel-banko-tab="coupons" aria-selected="false" aria-controls="banko-coupons">Otomatik kuponlar</button><button type="button" role="tab" data-panel-banko-tab="manual" aria-selected="false" aria-controls="panel-banko-manual">Seçimlerim</button><button type="button" role="tab" data-panel-banko-tab="showroom" aria-selected="false" aria-controls="banko-showroom-section">Showroom</button><button type="button" role="tab" data-panel-banko-tab="settings" aria-selected="false" aria-controls="panel-banko-settings">Ayarlar</button></div>
+            <section id="panel-banko-comparison" data-panel-banko-pane="comparison" hidden>
+                <h4>Mevcut model / Güç LAB · aynı maçlar ve kayıtlı oranlar</h4>
+                <p class="muted">Güç LAB yalnız manuel taramada çalışır; ana kuponu, yedeği ve Telegram'ı değiştirmez. Yeni seçime açık marketler ve eşikler iki modelde aynıdır. Sonuçları SONUÇLARI GETİR düğmesiyle manuel kontrol edin; bu karşılaştırma ilk kayıt tahminlerini değiştirmez.</p>
+                <div id="banko-strength-summary"></div>
+                <div class="banko-strength-controls"><input type="search" id="banko-strength-search" placeholder="Maç veya lig ara…" aria-label="Güç LAB maç veya lig arama"><label><input type="checkbox" id="banko-strength-different"> Yalnız farklı seçimleri göster</label></div>
+                <div class="banko-pagination"><button id="banko-strength-prev" type="button">ÖNCEKİ</button><span id="banko-strength-page">Sayfa 1/1</span><button id="banko-strength-next" type="button">SONRAKİ</button></div>
+                <div id="banko-strength-list"></div>
+            </section>
             <div id="banko-coupons" data-panel-banko-pane="coupons"></div>
             <details class="banko-settings banko-manual" id="panel-banko-manual" data-panel-banko-pane="manual" data-panel-open><summary>📌 Seçimlerim · ana / yedek / manuel analiz</summary><p id="banko-manual-summary" class="muted">Henüz kayıt yok.</p><details class="panel-help"><summary>Manuel kayıt hakkında</summary><p class="muted">Tüm sürümlerde bu gün için kaydettiğiniz seçimler korunur. Aynı etiketi verdiğiniz seçimler aşağıdaki Kuponlarım / Showroom bölümünde gruplanır; üç ve daha fazla maç da olabilir. Gerçek bahis kuponu oluşturulmaz veya Telegram'a gönderilmez. Oran boşsa yalnız sonuç takip edilir. Eski, başlamış veya şart dışı kayıtlar model onayı sayılmaz. Manuel listede otomatik kadro kontrolü yoktur; MAÇ ÖNÜ KONTROL mevcut otomatik Banko kuponlarını kontrol eder.</p></details><div id="banko-manual-list"></div></details>
             <details class="banko-settings" id="banko-showroom-section" data-panel-banko-pane="showroom" data-panel-open>
@@ -2266,10 +2279,11 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
-<script src="/banko_choices.js?v=20261007banko5"></script>
+<script src="/banko_choices.js?v=20261008under1"></script>
 <script src="/banko_showroom.js?v=20261008paper1"></script>
 <script src="/banko_showroom_panel.js?v=20261008paper1"></script>
-<script src="/banko_coupon_panel.js?v=20261008workspace1"></script>
+<script src="/banko_strength_panel.js?v=20261008strength1"></script>
+<script src="/banko_coupon_panel.js?v=20261008strength1"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
@@ -4127,6 +4141,6 @@
         setInterval(updateIstanbulClock, 1000);
         setInterval(updateNextRunCountdown, 1000);
     </script>
-    <script src="/panel_workspace.js?v=20261008workspace1"></script>
+    <script src="/panel_workspace.js?v=20261008strength1"></script>
 </body>
 </html>
