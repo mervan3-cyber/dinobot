@@ -26,6 +26,10 @@
         return !settings||(m.odd>=settings.minLegOdd&&m.odd<=settings.maxLegOdd&&m.modelProbability*100>=settings.minModelProbability&&m.edgePP>=settings.minEdgePP&&(!Array.isArray(settings.marketFamilies)||settings.marketFamilies.includes(m.spec.family)));
     }
     const rank=(a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||(Number(a.betId)||0)-(Number(b.betId)||0)||String(a.selection).localeCompare(String(b.selection));
+    function displayRows(rows,showPas=false,query=''){
+        const search=String(query).toLocaleLowerCase('tr-TR'),time=r=>Number.isFinite(Date.parse(r.kickoff))?Date.parse(r.kickoff):Infinity;
+        return (rows||[]).filter(r=>(showPas||!!r.pick)&&String(r.match+' '+r.league).toLocaleLowerCase('tr-TR').includes(search)).slice().sort((a,b)=>Number(!!b.pick)-Number(!!a.pick)||time(a)-time(b)||(Number(a.fixtureId)||0)-(Number(b.fixtureId)||0));
+    }
     function alternative(row,settings){if(!outcomeKey(row.pick))return null;return (row.markets||[]).filter(m=>m.key!==row.pick.key&&!sameOutcome(m,row.pick)&&accepted(m,settings)).sort(rank)[0]||null;}
     function priceCheck(row,m,settings,odd,now){
         const priceReasons=new Set(['Ayak oran aralığı dışında','Deneysel model/piyasa farkı sınırın altında']);
@@ -60,5 +64,5 @@
         if(s?.kind==='btts')return `${period} · KG · ${s.yes?'VAR':'YOK'}`;
         return kind?`${period} · ${kind} · ${s.kind==='doubleChance'?s.code:value}`:`${m.market||'Kuralı doğrulanmamış market'} · ${value}`;
     }
-    return {VERSION,POLICY_VERSION,policyReason,outcomeKey,sameOutcome,accepted,rank,alternative,priceCheck,marketLabel};
+    return {VERSION,POLICY_VERSION,policyReason,outcomeKey,sameOutcome,accepted,rank,displayRows,alternative,priceCheck,marketLabel};
 });

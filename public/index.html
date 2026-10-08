@@ -1323,7 +1323,7 @@
         .filterlab-negative { color:#f3a294; font-weight:600; }
         .filterlab-notice { border-left:3px solid #4db6ac; padding:10px 12px; background:#13272a; border-radius:4px; }
     </style>
-    <link rel="stylesheet" href="/banko_coupon.css?v=20261007banko5">
+    <link rel="stylesheet" href="/banko_coupon.css?v=20261008resume1">
     <link rel="stylesheet" href="/banko_showroom.css?v=20261008paper1">
     <link rel="stylesheet" href="/panel_workspace.css?v=20261008workspace1">
     <link rel="stylesheet" href="/banko_strength.css?v=20261008strength1">
@@ -2059,7 +2059,9 @@
                 <button type="button" onclick="bankoSetDay(0)">BUGÜN</button><button type="button" onclick="bankoSetDay(1)">YARIN</button>
                 <button id="banko-discover" type="button" onclick="runBankoAction('discover')">LİGLERİ GETİR</button>
                 <button id="banko-scan" type="button" class="banko-primary" onclick="runBankoAction('scan')">SEÇİLİ GÜNE KUPON OLUŞTUR</button>
+                <button id="banko-resume" type="button" class="banko-primary" onclick="runBankoAction('resume')" hidden>DEVAM ET · AYNI TARAMA</button>
             </div>
+            <p id="banko-progress" class="muted" role="status" aria-live="polite"></p>
             <div class="banko-toolbar"><label>Önceki sürümler<select id="banko-version" onchange="bankoVersionChanged()"><option>Son sürüm</option></select></label><label>Arşiv tarihi<select id="banko-archive" onchange="bankoArchiveChanged()"><option>Kayıtlı tarihler</option></select></label><button id="banko-check" type="button" onclick="runBankoAction('check')">MAÇ ÖNÜ KONTROL</button><button id="banko-results" type="button" onclick="runBankoAction('results')">SONUÇLARI GETİR · MANUEL</button></div>
             <details class="banko-settings" id="panel-banko-settings" data-panel-banko-pane="settings" data-panel-open><summary>⚙️ Banko ayarları</summary>
                 <div class="banko-settings-grid">
@@ -2071,7 +2073,7 @@
                     <label><input type="checkbox" id="banko-setting-allowSecondHalfUnder" onchange="markBankoDirty()"> İkinci yarı ALT önerilerine izin ver</label>
                     <label><input type="checkbox" id="banko-setting-strengthLabEnabled" checked onchange="markBankoDirty()"> Güç LAB karşılaştırması açık (ana seçim değişmez)</label>
                     <label>Günlük Banko API tavanı<input type="number" id="banko-setting-dailyLimit" min="20" max="7500" value="2000" onchange="markBankoDirty()"></label>
-                    <label>En fazla incelenecek maç<input type="number" id="banko-setting-maxCandidates" min="1" max="100" value="30" onchange="markBankoDirty()"></label>
+                    <label>En fazla uygun ana tahmin (PAS hariç)<input type="number" id="banko-setting-maxCandidates" min="1" max="100" value="30" onchange="markBankoDirty()"></label>
                     <label>İstenen maksimum kupon sayısı<input type="number" id="banko-setting-maxCoupons" min="1" step="1" value="1" onchange="markBankoDirty()"></label>
                     <label>Maç önü kontrol (dk)<input type="number" id="banko-setting-precheckMinutes" min="15" max="120" value="75" onchange="markBankoDirty()"></label>
                     <label>Ayak minimum oran<input type="number" id="banko-setting-minLegOdd" min="1.4" max="3" step="0.01" value="1.40" onchange="markBankoDirty()"></label>
@@ -2106,7 +2108,7 @@
                 <h4>Mevcut model / Güç LAB · aynı maçlar ve kayıtlı oranlar</h4>
                 <p class="muted">Güç LAB yalnız manuel taramada çalışır; ana kuponu, yedeği ve Telegram'ı değiştirmez. Yeni seçime açık marketler ve eşikler iki modelde aynıdır. Sonuçları SONUÇLARI GETİR düğmesiyle manuel kontrol edin; bu karşılaştırma ilk kayıt tahminlerini değiştirmez.</p>
                 <div id="banko-strength-summary"></div>
-                <div class="banko-strength-controls"><input type="search" id="banko-strength-search" placeholder="Maç veya lig ara…" aria-label="Güç LAB maç veya lig arama"><label><input type="checkbox" id="banko-strength-different"> Yalnız farklı seçimleri göster</label></div>
+                <div class="banko-strength-controls"><input type="search" id="banko-strength-search" placeholder="Maç veya lig ara…" aria-label="Güç LAB maç veya lig arama"><label><input type="checkbox" id="banko-strength-different"> Yalnız farklı seçimleri göster</label><label><input type="checkbox" id="banko-strength-show-pas"> Ana model PAS’larını göster · en sonda</label></div>
                 <div class="banko-pagination"><button id="banko-strength-prev" type="button">ÖNCEKİ</button><span id="banko-strength-page">Sayfa 1/1</span><button id="banko-strength-next" type="button">SONRAKİ</button></div>
                 <div id="banko-strength-list"></div>
             </section>
@@ -2123,7 +2125,7 @@
                 <div id="banko-showroom-preview" class="banko-showroom-preview"></div>
             </details>
             <details class="banko-settings" data-panel-banko-pane="coupons"><summary>📊 Model takibi · yalnız seçili tarama</summary><p id="banko-model-tracking" class="muted"></p><p class="muted">SONUÇLARI GETİR düğmesi kuponlarla birlikte bu taramanın tüm uygun marketlerini ve seçili günün manuel listesini kontrol eder. Tam sonucu veya yarı skoru eksik olanlar bekler. Aynı maçın farklı marketleri bağımsız doğrulama örneği değildir; manuel tercihler model performansıyla birleştirilmez.</p></details>
-            <details class="banko-settings" id="panel-banko-analysis" data-panel-banko-pane="analysis" data-panel-open><summary>🔎 İncelenen tüm maçlar · seçim nedenleri, pas nedenleri ve bütün marketler</summary><p class="muted">Her maçın yanındaki ↻ Alternatif tahmin, aynı kayıtta şartları geçen ikinci farklı seçeneği gösterir. Ek API harcamaz; ana seçim ve kayıtlı kupon değişmez. Uygun ikinci seçenek yoksa tahmin zorlanmaz.</p><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
+            <details class="banko-settings" id="panel-banko-analysis" data-panel-banko-pane="analysis" data-panel-open><summary>🔎 Maç analizleri · tahminler saat sırasıyla</summary><p class="muted">Ana tahmini olan maçlar başlangıç saatine göre önde, PAS’lar isteğe bağlı en sondadır. İstenen sayı üst sınırdır; yalnız seçili gün taranır, uygun maç azsa sayı zorlanmaz. ↻ Alternatif tahmin aynı kayıttaki uygun farklı seçeneği gösterir; API harcamaz.</p><div class="banko-analysis-filters"><input id="banko-search" placeholder="Maç veya lig ara…" oninput="bankoSearch()"><label><input type="checkbox" id="banko-show-pas" onchange="bankoSearch()"> PAS’ları göster · en sonda</label></div><div class="banko-pagination"><button id="banko-prev" type="button" onclick="bankoPage(-1)">ÖNCEKİ</button><span id="banko-page">Sayfa 1/1</span><button id="banko-next" type="button" onclick="bankoPage(1)">SONRAKİ</button></div><div id="banko-candidates"></div></details>
             <details class="panel-help"><summary>İşleyiş ve kayıt kuralları</summary>
             <p class="muted">Canlı tarama/sonuç kontrolü sırasında Banko bekler; işlem bitince aynı tarama kaldığı yerden otomatik devam eder. Beklerken API isteği gönderilmez; tekrar oluştur düğmesine basmanız gerekmez. Sunucu yeniden başlatılırsa yarım kayıt korunur ama otomatik devam etmez; yeni manuel tarama gerekir.</p>
             <p class="muted">Her manuel oluşturma yeni, ayrı sürüm kaydeder; eski kupon değiştirilmez. Yeni veya yarım tarama eski kuponları silmez. Otomatik maç önü kontrol yalnız o günün son tamamlanmış sürümündeki seçilen maçlara uygulanır; eski sürümler elle kontrol edilebilir. Sonuçları kendiniz getirirsiniz; panelin durum yenilemesi API-Football taraması değildir. Otomatik Telegram gönderimi yok.</p>
@@ -2279,11 +2281,11 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script src="/coupon_lab_panel.js?v=20261005htft"></script>
-<script src="/banko_choices.js?v=20261008under1"></script>
+<script src="/banko_choices.js?v=20261008resume1"></script>
 <script src="/banko_showroom.js?v=20261008paper1"></script>
 <script src="/banko_showroom_panel.js?v=20261008paper1"></script>
-<script src="/banko_strength_panel.js?v=20261008strength1"></script>
-<script src="/banko_coupon_panel.js?v=20261008strength1"></script>
+<script src="/banko_strength_panel.js?v=20261008resume1"></script>
+<script src="/banko_coupon_panel.js?v=20261008resume1"></script>
     <script>
         const BACKEND_URL = window.location.origin;
         let authenticated = false;
