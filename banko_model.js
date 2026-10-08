@@ -1,4 +1,5 @@
 'use strict';
+const C=require('./public/banko_choices');
 // Transparent, uncalibrated LAB baselines. Never calls a provider or a messaging client.
 const VERSION='banko-model-lab-v2-2026-10-06';
 const DATA_POLICY=Object.freeze({minimumHistoryMatches:8,minimumVenueMatches:3,minimumPhaseMatches:10});
@@ -119,12 +120,13 @@ function evaluateMarkets(odds,goals,profiles,settings,now,kickoff){
         if(p!==null&&p*100<settings.minModelProbability)reasons.push('Deneysel ham model alt sınırı altında');
         const edge=p===null?null:p*100-100/m.odd;if(edge!==null&&edge<settings.minEdgePP)reasons.push('Deneysel model/piyasa farkı sınırın altında');
         if(m.spec&&!settings.marketFamilies.includes(m.spec.family))reasons.push('Bu market ailesi ayarlardan kapalı');
+        const policy=C.policyReason(m,settings);if(policy)reasons.push(policy);
         const score=Math.round((Math.min(profiles.home.last20.games,profiles.away.last20.games)/20*.6+Math.min(profiles.home.venueSummary.games,profiles.away.venueSummary.games)/10*.4)*100);
-        return {...m,modelProbability:p,edgePP:edge,dataScore:score,eligible:!reasons.length,reasons,modelVersion:VERSION};
+        return {...m,modelProbability:p,edgePP:edge,dataScore:score,eligible:!reasons.length,reasons,modelVersion:VERSION,selectionPolicyVersion:C.POLICY_VERSION};
     });
 }
 function optimize(rows,settings,sessionId){
-    const options=rows.filter(r=>r.pick).sort((a,b)=>b.pick.modelProbability-a.pick.modelProbability||b.pick.dataScore-a.pick.dataScore||a.fixtureId-b.fixtureId),pairsFound=[];
+    const options=rows.filter(r=>r.pick&&!C.policyReason(r.pick,settings)).sort((a,b)=>b.pick.modelProbability-a.pick.modelProbability||b.pick.dataScore-a.pick.dataScore||a.fixtureId-b.fixtureId),pairsFound=[];
     for(let a=0;a<options.length;a++)for(let b=a+1;b<options.length;b++){const x=options[a],y=options[b],odd=x.pick.odd*y.pick.odd;if(odd>=settings.minCouponOdd&&odd<=settings.maxCouponOdd)pairsFound.push({rows:[x,y],odd,rank:x.pick.modelProbability*y.pick.modelProbability});}
     pairsFound.sort((a,b)=>b.rank-a.rank||a.odd-b.odd);const selected=[],used=new Set();
     for(const pair of pairsFound){if(pair.rows.some(r=>used.has(r.fixtureId)))continue;selected.push(pair.rows);pair.rows.forEach(r=>used.add(r.fixtureId));if(selected.length>=settings.maxCoupons)break;}

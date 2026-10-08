@@ -1,0 +1,158 @@
+{
+  "version": "banko-strength-lab-v1-2026-10-08",
+  "createdAt": "2026-10-08T11:20:08.111Z",
+  "requires": "Current V24 + Banko + Paper Showroom + panel; combined patch, not a full bot",
+  "replaces": "mac-yakala-banko-alt-filtre-2026-10-08.zip",
+  "files": [
+    {
+      "path": "banko_coupon.js",
+      "sha256": "cba3dad64a98bdf204ff7e76f58a980eb1233273db1a794c969ced31cc9cb06e",
+      "priorSha256": "034e5cbdee5c4a0b2fdc6a966e4f3ec77b1fa8a5bb00a8aea598f78a1de25e55"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "a63eb9385e3334708ca21bd0c393c75d3ffc696dcf48cf5cee78e1f867a31704",
+      "priorSha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d"
+    },
+    {
+      "path": "banko_strength_lab.js",
+      "sha256": "e8eb2215701474009d82b36dbc51d06ca0cc92b4ffb5dae5131e888e34ce1864",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_choices.js",
+      "sha256": "1f22f7a053f94cd96ef48fe3bb93451db0abd8f07f6841cbf9b28193858f84bd",
+      "priorSha256": "b98a6051ffdce8641212eade9d120d2f81ed95fbb76079c36ebe07399d91d9db"
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "802f05fa14de7a29a17088a9ea41e07fd3712a7bae7f4476bda8f4b24f20c01a",
+      "priorSha256": "007c345a23fe001b65aa1509bc9e484185a1e19f29bdebc41c5ec165f20771ea"
+    },
+    {
+      "path": "public/banko_strength_panel.js",
+      "sha256": "9b69aacae0b3066d398b0c812fc36b4d07d867c5fd764cbb866db47b54006738",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_strength.css",
+      "sha256": "013baabb56487374f738250a33498d39d377fc1ac96b2536c9dff82e80e4d962",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_workspace.js",
+      "sha256": "de988d6b8c3d6af68587485b280c2f29a47fbaa832ce7813e985054b1c8db049",
+      "priorSha256": "f754c8869be99afad52de7b710074c398fc4bb19f2cd2b080c7664fc5263e421"
+    },
+    {
+      "path": "index.html",
+      "sha256": "15a1f580e4ea2b77000c1104006546ff52d600cb309ce34f80ff37ced69c28a5",
+      "priorSha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "15a1f580e4ea2b77000c1104006546ff52d600cb309ce34f80ff37ced69c28a5",
+      "priorSha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511"
+    },
+    {
+      "path": "package.json",
+      "sha256": "59cdd99c4539c401d687d9f970cb606af4560292a686ccb6461d2a661c79939c",
+      "priorSha256": "18b7b5afbd751a98648400d8c46a9781ef9bef6c355ea511833696b3031f4ecb"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "018adba3f936421e90e5266dd0d80da8ca5d1509ef6ddea9a6b323b903d9b54a",
+      "priorSha256": "4d257515957b6b093f6ab9bc5af546cabc7071198c6a67e9a3bf18d9add09632"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "c2c73ace6bc31767efc94aeda13eb830d2e7958fcbae99964fc2dc02853860ba",
+      "priorSha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3"
+    },
+    {
+      "path": "banko_under_policy.test.js",
+      "sha256": "99527325879b1048296a2fcbcd895b09841d91690d162552374763842de5a409",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_lab.test.js",
+      "sha256": "df95495825d08c20da558c4f9b2d1ef6cff088f8ca090454b68caaabeca4fcb1",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_panel.test.js",
+      "sha256": "a41ccf33d4153990198f78303bfee50ea7f04d6b59a4b6baf94a330b9fcf28df",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_scan.test.js",
+      "sha256": "1b0c3086d916740de58110147a60164c91c930ce409bf12fd229cf33f9433a92",
+      "priorSha256": null
+    },
+    {
+      "path": "README_BANKO_STRENGTH_LAB_2026_10_08.md",
+      "sha256": "07bb8ef96f9cbf8c471eaf5d812b0fa58ce37cec83f5163e423635def3d5f1ae",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_theme.js",
+      "sha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0",
+      "priorSha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0"
+    },
+    {
+      "path": "public/panel_workspace.css",
+      "sha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a",
+      "priorSha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a"
+    },
+    {
+      "path": "panel_workspace.test.js",
+      "sha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e",
+      "priorSha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e"
+    }
+  ],
+  "changedFiles": [
+    "README_BANKO_STRENGTH_LAB_2026_10_08.md",
+    "banko_coupon.js",
+    "banko_model.js",
+    "banko_panel.test.js",
+    "banko_pause_resume.test.js",
+    "banko_strength_lab.js",
+    "banko_strength_lab.test.js",
+    "banko_strength_panel.test.js",
+    "banko_strength_scan.test.js",
+    "banko_under_policy.test.js",
+    "index.html",
+    "package.json",
+    "public/banko_choices.js",
+    "public/banko_coupon_panel.js",
+    "public/banko_strength.css",
+    "public/banko_strength_panel.js",
+    "public/index.html",
+    "public/panel_workspace.js"
+  ],
+  "tests": {
+    "scripts": 58,
+    "passed": 58,
+    "failed": 0
+  },
+  "testReport": "C:\\Users\\enes_\\Documents\\Codex\\2026-08-23\\referenced-chatgpt-conversation-this-is-an\\outputs\\v24-delivery-sync-tests-2026-10-07-banko-strength-source-v2.json",
+  "browserReport": "C:\\Users\\enes_\\Documents\\Codex\\2026-08-23\\referenced-chatgpt-conversation-this-is-an\\outputs\\panel-workspace-browser-2026-10-08-banko-strength-v1.json",
+  "defaults": {
+    "allowFullMatchUnder": false,
+    "allowSecondHalfUnder": false,
+    "strengthLabEnabled": true
+  },
+  "primaryGoalModelUnchanged": true,
+  "apiDirectionGateImplemented": false,
+  "strengthModelImplemented": true,
+  "strengthReadOnly": true,
+  "archivesAndManualRecordsPreserved": true,
+  "newDependencies": false,
+  "additionalScanProviderRequests": 0,
+  "resultRequests": "Fixture-ID union shared by both models; LAB-only fixtures can increase batch count",
+  "telegramChanged": false,
+  "serverChanged": false,
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false
+}
