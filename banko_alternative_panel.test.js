@@ -29,14 +29,15 @@ async function run(){
     const click=b=>{let prevented=0,stopped=0;b.onclick({preventDefault(){prevented++;},stopPropagation(){stopped++;}});assert.equal(prevented,1);assert.equal(stopped,1);};
     const snapshot=JSON.stringify(session);
     await context.window.fetchBankoCoupon();assert.equal(rows().length,10);assert.equal(all(node('banko-candidates')).filter(n=>n.className==='banko-alternative-button').length,10,'Every displayed analysis, not only coupon legs, gets the button');
+    assert(!text(node('banko-candidates')).includes('Bu maç PAS'),'PAS hidden by default');node('banko-show-pas').checked=true;context.window.bankoSearch();
     assert(box(rows()[0]).hidden);assert.equal(button(rows()[0]).attributes['aria-expanded'],'false');
     const before=requests.length;click(button(rows()[0]));assert.equal(requests.length,before,'Showing an alternative spends no HTTP/provider request');assert.equal(state.api.used,17);assert(rows()[0].open);assert(!box(rows()[0]).hidden);assert.equal(button(rows()[0]).attributes['aria-expanded'],'true');
     assert.match(text(box(rows()[0])),/MAÇ · KG · VAR/,'Highest eligible distinct option, not higher-scoring alias or rejected market');assert.match(text(box(rows()[0])),/1\.60.*78\.0.*75\/100.*15\.5/);assert.match(text(box(rows()[0])),/aynı veri\/oran\/model şartlarını/);assert.match(text(box(rows()[0])),/Canlı yenileme veya yeni maç önü kontrolü yapılmadı/);assert(!/sigortasıdır/.test(text(box(rows()[0]))));
     assert.equal(JSON.stringify(session),snapshot,'Deep-frozen markets, original picks, coupons and results untouched');
     click(button(rows()[0]));assert(box(rows()[0]).hidden);click(button(rows()[0]));assert.match(text(box(rows()[0])),/MAÇ · KG · VAR/,'Repeated clicks toggle the same backup, not random predictions');
-    click(button(rows()[1]));assert.match(text(box(rows()[1])),/Uygun alternatif yok.*eşikler düşürülmedi/);click(button(rows()[2]));assert.match(text(box(rows()[2])),/Uygun alternatif yok.*Bu maç PAS/);
-    click(button(rows()[3]));assert.match(text(box(rows()[3])),/MAÇ · KG · VAR/,'Verified spec controls the label, not untrusted provider selection text');assert(!source.includes('innerHTML'));
-    context.window.bankoPage(1);assert.equal(rows().length,1);assert(button(rows()[0]));click(button(rows()[0]));assert.match(text(box(rows()[0])),/MAÇ · KG · VAR/,'Non-coupon fixture on page two has an alternative');
+    click(button(rows()[1]));assert.match(text(box(rows()[1])),/Uygun alternatif yok.*eşikler düşürülmedi/);
+    click(button(rows()[2]));assert.match(text(box(rows()[2])),/MAÇ · KG · VAR/,'Verified spec controls the label, not untrusted provider selection text');assert(!source.includes('innerHTML'));
+    context.window.bankoPage(1);assert.equal(rows().length,1);assert(button(rows()[0]));click(button(rows()[0]));assert.match(text(box(rows()[0])),/Uygun alternatif yok.*Bu maç PAS/,'PAS is still inspectable, after all selected analyses');
     context.window.bankoPage(-1);assert(!box(rows()[0]).hidden,'Open backup survives pagination');await context.window.fetchBankoCoupon();assert(!box(rows()[0]).hidden,'Open backup survives status refresh');
     node('banko-search').value='Maç 2';context.window.bankoSearch();assert.equal(rows().length,1);assert.match(text(box(rows()[0])),/Uygun alternatif yok/);node('banko-search').value='';context.window.bankoSearch();
     state={...state,session:{...session,id:'session-2'}};await context.window.fetchBankoCoupon();assert(box(rows()[0]).hidden,'Another scan must not inherit open choice state');

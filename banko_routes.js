@@ -7,7 +7,7 @@ function registerBankoRoutes(app,{banko,apiReady=()=>true}={}){
         try{const value=banko[method](req.body||{});return res.json({success:true,...(method==='previewSelection'?{priceCheck:value}:method==='addSelection'?value:{selection:value})});}
         catch(e){return res.status(banko.busy?409:400).json({success:false,error:e.message});}
     });
-    for(const kind of ['scan','discover','check','results'])app.post('/api/banko-coupon/'+kind,(req,res)=>{
+    for(const kind of ['scan','resume','discover','check','results'])app.post('/api/banko-coupon/'+kind,(req,res)=>{
         if(!apiReady())return res.status(503).json({success:false,error:'API_FOOTBALL_KEY bulunamadı.'});
         try{const status=banko.start(kind,req.body?.date,req.body?.sessionId||null);return res.status(202).json({success:true,message:kind==='results'?'Manuel sonuç kontrolü başladı.':'Banko işlemi başladı.',...status});}
         catch(e){return res.status(409).json({success:false,error:e.message});}

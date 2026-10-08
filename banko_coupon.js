@@ -3,9 +3,10 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto'),M=require('
 const C=require('./public/banko_choices');
 const S=require('./public/banko_showroom');
 const L=require('./banko_strength_lab');
+const P=require('./banko_scan_progress');
 // Storage schema stays v1 so existing sessions, frozen picks and API usage remain readable.
 const VERSION='banko-coupon-lab-v1-2026-10-05';
-const RUNTIME_VERSION='banko-strength-lab-v1-2026-10-08';
+const RUNTIME_VERSION='banko-scan-resume-v1-2026-10-08';
 class LiveDispatchDeferred extends Error {constructor(){super('Banko isteği canlı işlem için gönderilmeden ertelendi.');}}
 const DEFAULTS=Object.freeze({enabled:true,dailyLimit:2000,maxCandidates:30,maxCoupons:1,minLegOdd:1.40,maxLegOdd:2.20,
     minCouponOdd:1.95,maxCouponOdd:2.40,minSingleOdd:1.80,maxSingleOdd:2.20,minModelProbability:65,minEdgePP:0,
@@ -31,7 +32,7 @@ class BankoCoupon {
     constructor({directory,apiGet,canRun=()=>true,getQuotaRemaining=()=>null,reserve=1500,now=()=>new Date(),logger=()=>{},priorityLeagues=[],waitForLiveTick=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
         this.directory=directory;this.apiGet=apiGet;this.canRun=canRun;this.getQuotaRemaining=getQuotaRemaining;this.reserve=reserve;this.now=now;this.logger=logger;this.priority=new Set(priorityLeagues.map(M.normalize));
         this.files=directory?{data:path.join(directory,'dino_banko_coupon_v1.json'),usage:path.join(directory,'dino_banko_api_usage.json'),cache:path.join(directory,'dino_banko_cache_v1.json')}:{};this.requestCount=0;
-        this.data={version:VERSION,settings:JSON.parse(JSON.stringify(DEFAULTS)),sessions:[],manualSelections:[],discoveries:{},latestJob:null};this.usage={};this.cache={};this.busy=false;this.storageError=null;this.task=Promise.resolve();this.waitForLiveTick=waitForLiveTick;
+        this.data={version:VERSION,settings:JSON.parse(JSON.stringify(DEFAULTS)),sessions:[],manualSelections:[],discoveries:{},latestJob:null};this.usage={};this.cache={};this.busy=false;this.storageError=null;this.task=Promise.resolve();this.waitForLiveTick=waitForLiveTick;this.scanContext=null;
     }
     load(){try{
         for(const key of ['data','usage','cache'])if(this.files[key]&&fs.existsSync(this.files[key])){
@@ -41,7 +42,8 @@ class BankoCoupon {
             else this.cache=item;
         }
         if(['running','waiting-live'].includes(this.data.latestJob?.status)){this.data.latestJob.status='interrupted';this.data.latestJob.message='Sunucu yeniden başladı. Kayıtlar korunuyor; manuel yeniden oluşturun.';}
-        for(const s of this.data.sessions)if(s.status==='running'){s.status='interrupted';s.reason='Yeniden başlatma sırasında yarım kaldı; kupon oluşturulmadı.';}
+        for(const s of this.data.sessions){if(s.scanProgress&&!P.valid(s.scanProgress,s.date))throw Error('checkpoint schema');if(s.status==='running'){s.status='interrupted';s.reason=P.resumable(s)?'Yeniden başladı; aynı taramayı Devam et ile sürdürebilirsiniz.':'Yeniden başlatma sırasında yarım kaldı; kupon oluşturulmadı.';}if(s.scanProgress?.inFlight)s.reason='Gönderilmiş API yanıtı doğrulanamadı; otomatik tekrar yapılmaz. Yeni manuel tarama gerekir.';}
+        if(P.resumable(this.data.sessions.find(s=>s.id===this.data.latestJob?.sessionId))&&this.data.latestJob.status==='interrupted')this.data.latestJob.message='İlerleme kaydedildi. Özgün taramayı Devam et ile sürdürebilirsiniz.';
     }catch(_){this.storageError='Banko dosyası okunamadı; geçmiş korunuyor. Dosyayı silmeden yedeği inceleyin.';}return this.status();}
     save(){if(this.storageError)throw Error(this.storageError);try{if(this.files.data)atomic(this.files.data,this.data);}catch(_){this.storageError='Banko geçmişi yazılamadı; güvenli şekilde durduruldu.';throw Error(this.storageError);}}
     saveUsage(){try{if(this.files.usage)atomic(this.files.usage,this.usage);}catch(_){this.storageError='Banko API bütçesi yazılamadı; yeni istek durduruldu.';throw Error(this.storageError);}}
@@ -84,7 +86,7 @@ class BankoCoupon {
         if(['won','lost'].includes(entry.result.status))entry.result.profitUnits=playedOdd===null?null:entry.result.status==='won'?playedOdd-1:-1;
         try{this.save();}catch(e){Object.keys(entry).forEach(k=>delete entry[k]);Object.assign(entry,old);throw e;}return JSON.parse(JSON.stringify(entry));
     }
-    guard({allowLiveBusy=false,api=true}={}){if(this.storageError)throw Error(this.storageError);if(!this.data.settings.enabled)throw Error('Banko Kupon kapalı.');if(api){const day=dayKey(this.now()),used=this.usage[day]||0,remaining=M.finite(this.getQuotaRemaining());if(used>=this.data.settings.dailyLimit)throw Error('Banko günlük API bütçesi doldu.');if(remaining!==null&&remaining<=this.reserve)throw Error('Canlı sistem için genel API rezervi korundu.');}if(!allowLiveBusy&&!this.canRun())throw new LiveDispatchDeferred();}
+    guard({allowLiveBusy=false,api=true}={}){if(this.storageError)throw Error(this.storageError);if(!this.data.settings.enabled)throw Error('Banko Kupon kapalı.');if(api){const day=dayKey(this.now()),used=this.usage[day]||0,remaining=M.finite(this.getQuotaRemaining());if(used>=this.data.settings.dailyLimit)throw new P.BudgetPaused('daily');if(remaining!==null&&remaining<=this.reserve)throw new P.BudgetPaused('reserve');}if(!allowLiveBusy&&!this.canRun())throw new LiveDispatchDeferred();}
     async waitForLive({api=false}={}){
         this.guard({allowLiveBusy:true,api});if(this.canRun())return;
         const job=this.data.latestJob,resumeMessage=job?.message||'Banko işlemi sürüyor';
@@ -100,7 +102,7 @@ class BankoCoupon {
     async call(endpoint,params={}){
         const url=endpoint+'?'+new URLSearchParams(params);
         for(;;){await this.waitForLive({api:true});let counted=false,response;
-            try{response=await this.apiGet(url,{dinoMaxAttempts:1,dinoBeforeAttempt:()=>{if(counted)throw Error('Banko otomatik tekrar isteği engellendi.');this.consume();counted=true;}});}catch(error){
+            try{response=await this.apiGet(url,{dinoMaxAttempts:1,dinoBeforeAttempt:()=>{if(counted)throw Error('Banko otomatik tekrar isteği engellendi.');this.consume();counted=true;if(this.scanContext){this.scanContext.apiUsed=(this.scanContext.apiUsed||0)+1;this.scanContext.inFlight={endpoint,params,at:this.now().toISOString()};this.save();}}});}catch(error){
                 if(this.storageError)throw Error(this.storageError);
                 // Retry ONLY a local live guard before dispatch, never a sent/ambiguous/API error.
                 if(!counted&&error instanceof LiveDispatchDeferred)continue;
@@ -109,41 +111,40 @@ class BankoCoupon {
             }
             if(!counted)throw Error('API bütçe sayacı bağlanmamış; Banko güvenli şekilde durduruldu.');
             if(!response?.data||Object.keys(response.data.errors||{}).length)throw Error('API eksik/hatalı yanıt verdi; kayıt tamamlandı sayılmadı.');
+            if(this.scanContext)this.scanContext.inFlight=null;
             return response.data;
         }
     }
-    async cached(key,ttl,loader){const old=this.cache[key];if(old&&old.expires>this.now().getTime())return JSON.parse(JSON.stringify(old.value));const value=await loader();this.cache[key]={expires:this.now().getTime()+ttl,value};return value;}
+    async cached(key,ttl,loader){const old=this.cache[key];if(old&&old.expires>this.now().getTime())return JSON.parse(JSON.stringify(old.value));const value=await loader();this.cache[key]={expires:this.now().getTime()+ttl,value};if(this.scanContext){this.saveCache();this.save();}return value;}
     validateScanDate(date){validDay(date);const today=dayKey(this.now());if(date<today)throw Error('Geçmiş güne yeni maç önü kuponu oluşturulmaz. Arşivden görüntüleyin; kör replay ayrı analizdir.');if(date>dayAdd(today,7))throw Error('En fazla 7 gün ileri tarih seçilebilir; marketler açılmamış olabilir.');}
-    start(kind,date,sessionId){validDay(date);if(this.busy)throw Error('Banko işlemi zaten sürüyor.');this.guard({allowLiveBusy:true});if(['scan','discover'].includes(kind))this.validateScanDate(date);
+    start(kind,date,sessionId){validDay(date);if(this.busy)throw Error('Banko işlemi zaten sürüyor.');this.guard({allowLiveBusy:true,api:kind!=='resume'});if(['scan','discover'].includes(kind))this.validateScanDate(date);
         const session=sessionId?this.data.sessions.find(s=>s.id===sessionId&&s.date===date):[...this.data.sessions].reverse().find(s=>s.date===date&&s.status==='complete');
         if(['check','results'].includes(kind)&&!session)throw Error('Bu tarih için tamamlanmış kupon kaydı bulunamadı.');
+        if(kind==='resume'&&(!sessionId||!P.resumable(session)))throw Error('Bu sürümde devam edilebilir tarama yok. Özgün tarih ve sürümü seçin.');
         this.busy=true;const job={id:crypto.randomUUID(),kind,date,sessionId:session?.id||null,status:'running',startedAt:this.now().toISOString(),message:'Başlatılıyor',processed:0,total:0};this.data.latestJob=job;
         try{this.save();}catch(e){this.busy=false;throw e;}
         const requestStart=this.requestCount;
-        this.task=Promise.resolve().then(async()=>{try{if(kind==='scan')await this.scan(date,job);else if(kind==='discover')await this.discover(date,job);else if(kind==='check')await this.checkSession(session,job);else if(kind==='results')await this.results(session,job);else throw Error('Bilinmeyen Banko işlemi.');job.status='complete';job.message=kind==='scan'?'Tarama tamamlandı':kind==='results'?'Sonuç kontrolü tamamlandı':'Kontrol tamamlandı';}
-            catch(e){job.status='error';job.message=this.storageError||e.message;this.logger('> ⚠️ Banko: '+job.message);}
+        this.task=Promise.resolve().then(async()=>{try{if(kind==='scan'||kind==='resume')await this.scan(date,job,kind==='resume'?session:null);else if(kind==='discover')await this.discover(date,job);else if(kind==='check')await this.checkSession(session,job);else if(kind==='results')await this.results(session,job);else throw Error('Bilinmeyen Banko işlemi.');job.status='complete';job.message=['scan','resume'].includes(kind)?'Tarama tamamlandı · '+job.accepted+'/'+job.target+' uygun seçim':kind==='results'?'Sonuç kontrolü tamamlandı':'Kontrol tamamlandı';}
+            catch(e){job.status=e instanceof P.BudgetPaused&&['scan','resume'].includes(kind)?'waiting-budget':'error';job.message=this.storageError||e.message;this.logger('> ⚠️ Banko: '+job.message);}
             finally{this.busy=false;job.completedAt=this.now().toISOString();job.apiUsed=this.requestCount-requestStart;try{this.save();this.saveCache();}catch(_){}}});return this.status(date);
     }
     async schedule(date){return this.cached('schedule:'+date,20*60000,async()=>{const r=await this.call('/fixtures',{date,timezone:'Europe/Istanbul'});return (r.response||[]).map(f=>({fixtureId:f.fixture?.id,kickoff:f.fixture?.date,status:f.fixture?.status?.short,leagueId:f.league?.id,league:f.league?.name,country:f.league?.country,season:f.league?.season,home:{id:f.teams?.home?.id,name:f.teams?.home?.name},away:{id:f.teams?.away?.id,name:f.teams?.away?.name}}));});}
     async discover(date,job){const fixtures=await this.schedule(date);const leagues=new Map();for(const f of fixtures){const old=leagues.get(f.leagueId)||{id:f.leagueId,name:f.league,country:f.country,matches:0};old.matches++;leagues.set(f.leagueId,old);}this.data.discoveries[date]={capturedAt:this.now().toISOString(),fixtures:fixtures.length,leagues:[...leagues.values()].sort((a,b)=>a.country.localeCompare(b.country)||a.name.localeCompare(b.name))};job.total=fixtures.length;job.processed=fixtures.length;this.save();return fixtures;}
     async leagueHistory(f,season,cutoffDay){const cutoff=Date.parse(dayAdd(cutoffDay,1)+'T00:00:00+03:00');return this.cached(`history:${f.leagueId}:${season}:${cutoffDay}`,12*3600000,async()=>{const r=await this.call('/fixtures',{league:f.leagueId,season,from:'2024-01-01',to:cutoffDay,timezone:'Europe/Istanbul'});return (r.response||[]).map(row=>M.pastFixture(row,cutoff)).filter(Boolean);});}
-    async richHistory(ids){const missing=[...new Set(ids)].filter(id=>!this.cache['stats:'+id]||this.cache['stats:'+id].expires<=this.now().getTime());for(let i=0;i<missing.length;i+=5){const batch=missing.slice(i,i+5),r=await this.call('/fixtures',{ids:batch.join('-'),timezone:'Europe/Istanbul'});for(const f of r.response||[])if(batch.includes(f.fixture?.id))this.cache['stats:'+f.fixture.id]={expires:this.now().getTime()+3*86400000,value:M.slimRich(f)};}
+    async richHistory(ids){const pending=this.scanContext?.pending,queried=pending?.richDoneIds||[];const missing=[...new Set(ids)].filter(id=>(!this.cache['stats:'+id]||this.cache['stats:'+id].expires<=this.now().getTime())&&!queried.includes(id));for(let i=0;i<missing.length;i+=5){const batch=missing.slice(i,i+5),r=await this.call('/fixtures',{ids:batch.join('-'),timezone:'Europe/Istanbul'});for(const f of r.response||[])if(batch.includes(f.fixture?.id))this.cache['stats:'+f.fixture.id]={expires:this.now().getTime()+3*86400000,value:M.slimRich(f)};if(pending){pending.richDoneIds=[...new Set([...(pending.richDoneIds||[]),...batch])];this.saveCache();this.save();}}
         return Object.fromEntries(ids.map(id=>[id,this.cache['stats:'+id]?.value||{id,statistics:[],players:[]}]));}
     async coverage(f){return this.cached(`coverage:${f.leagueId}:${f.season}`,86400000,async()=>{const r=await this.call('/leagues',{id:f.leagueId,season:f.season});return r.response?.[0]?.seasons?.find(s=>s.year===f.season)?.coverage||null;});}
-    async odds(fixtureId){let page=1,total=1,rows=[];do{const r=await this.call('/odds',{fixture:fixtureId,bookmaker:8,page});rows.push(...(r.response||[]));total=Number(r.paging?.total)||1;if(total>20)throw Error('Oran yanıtı 20 sayfayı aşıyor; yarım market onaylanmadı.');page++;}while(page<=total);return M.parseMarkets(rows,fixtureId,8);}
-    async scan(date,job){
-        const settings=JSON.parse(JSON.stringify(this.data.settings)),cutoffDay=dayAdd(dayKey(this.now()),-1),id='banko-'+crypto.randomUUID();
-        // Fit reuse lives only for this manual scan. Never retain a growing model/RAM cache or fetch extra history.
-        const strengthFits=new Map();
-        const session={id,date,createdAt:this.now().toISOString(),version:VERSION,choicesVersion:C.VERSION,strengthLabVersion:settings.strengthLabEnabled?L.VERSION:null,settings,inputCutoffDay:cutoffDay,status:'running',candidates:[],coupons:[],reason:null,apiStart:this.requestCount};job.sessionId=id;this.data.sessions.push(session);
-        this.save();
-        try{const fixtures=await this.discover(date,job);
-        const wanted=fixtures.filter(f=>['NS','TBD'].includes(f.status)&&Date.parse(f.kickoff)>this.now().getTime()+30*60000&&(!settings.allowedLeagueIds.length||settings.allowedLeagueIds.includes(f.leagueId))&&(settings.women||!(/women|femen|feminin|\bw\b/i.test(f.league+' '+f.home.name+' '+f.away.name)))).sort((a,b)=>Number(this.priority.has(M.normalize(b.league)))-Number(this.priority.has(M.normalize(a.league)))||Date.parse(a.kickoff)-Date.parse(b.kickoff)||a.fixtureId-b.fixtureId).slice(0,settings.maxCandidates);
-        job.total=wanted.length;job.processed=0;this.save();
-        for(const f of wanted){await this.waitForLive();job.message=f.home.name+' - '+f.away.name;
-            if(Date.parse(f.kickoff)<=this.now().getTime()+30*60000){job.processed++;this.save();continue;}
-            const odds=await this.odds(f.fixtureId);
-            const row={...f,id:id+':'+f.fixtureId,match:f.home.name+' - '+f.away.name,capturedAt:this.now().toISOString(),oddsUpdatedAt:odds.update,bookmaker:odds.bookmaker,markets:[],pick:null,reasons:[],risks:[],profiles:null,coverage:null};
+    async odds(fixtureId){const pending=this.scanContext?.pending;
+        if(pending?.odds)return pending.odds;
+        const progress=pending?(pending.oddsPages||{page:1,total:1,rows:[]}):{page:1,total:1,rows:[]};
+        while(progress.page<=progress.total){const r=await this.call('/odds',{fixture:fixtureId,bookmaker:8,page:progress.page});const total=Number(r.paging?.total)||1;if(total>20)throw Error('Oran yanıtı 20 sayfayı aşıyor; yarım market onaylanmadı.');progress.rows.push(...(r.response||[]));progress.total=total;progress.page++;if(pending){pending.oddsPages=progress;this.save();}}
+        const odds=M.parseMarkets(progress.rows,fixtureId,8);if(pending){pending.odds=odds;delete pending.oddsPages;this.save();}return odds;
+    }
+    async buildCandidate(f,session,strengthFits){
+        const {settings,inputCutoffDay:cutoffDay,id}=session,pending=session.scanProgress.pending;
+        let row=pending.row;
+        if(!row){const odds=await this.odds(f.fixtureId);
+            row={...f,id:id+':'+f.fixtureId,match:f.home.name+' - '+f.away.name,capturedAt:pending.capturedAt,oddsUpdatedAt:odds.update,bookmaker:odds.bookmaker,markets:[],pick:null,reasons:[],risks:[],profiles:null,coverage:null};
             if(!odds.markets.length)row.reasons.push('Seçili Bet365 marketi açılmamış/yok');
             else{
                 let history=await this.leagueHistory(f,f.season,cutoffDay);const teamCount=team=>history.filter(r=>r.homeId===team||r.awayId===team).length;
@@ -162,16 +163,40 @@ class BankoCoupon {
                 row.risks.push('Ham model kalibre edilmedi; yüzde gerçek başarı garantisi değildir','Geçmiş yalnız bu ligdeki maçları kapsar; diğer kupalar/ligler form ve dinlenme hesabına dahil değildir');
                 if(row.coverage?.injuries!==true)row.risks.push('Sakatlık veri kapsamı yok/bilinmiyor; eksik oyuncu yok anlamına gelmez');
                 row.risks.push('Maç önü kadro/sakatlık kontrolü henüz yapılmadı');
-                if(settings.predictionContext&&row.coverage?.predictions===true){const r=await this.call('/predictions',{fixture:f.fixtureId});const p=r.response?.[0]?.predictions;row.apiPrediction={advice:p?.advice||null,percent:p?.percent||null,contextOnly:true,capturedAt:this.now().toISOString()};}
             }
-            session.candidates.push(row);job.processed++;this.save();this.saveCache();
+            pending.row=row;this.save();
         }
-        // Recheck time/quote freshness after live pauses, without additional API requests.
-        for(const row of session.candidates){await this.waitForLive();this.evaluateCandidate(row,settings);}
+        if(settings.predictionContext&&row.coverage?.predictions===true&&!row.apiPrediction){const r=await this.call('/predictions',{fixture:f.fixtureId});const p=r.response?.[0]?.predictions;row.apiPrediction={advice:p?.advice||null,percent:p?.percent||null,contextOnly:true,capturedAt:this.now().toISOString()};this.save();}
+        this.evaluateCandidate(row,settings);return row;
+    }
+    async scan(date,job,resumeSession=null){
+        const session=resumeSession||{id:'banko-'+crypto.randomUUID(),date,createdAt:this.now().toISOString(),version:VERSION,choicesVersion:C.VERSION,strengthLabVersion:this.data.settings.strengthLabEnabled?L.VERSION:null,settings:JSON.parse(JSON.stringify(this.data.settings)),inputCutoffDay:dayAdd(dayKey(this.now()),-1),status:'running',candidates:[],coupons:[],reason:null,apiStart:this.requestCount,apiUsed:0};
+        const {settings,id}=session;
+        // Fit reuse lives only for this manual scan. Never retain a growing model/RAM cache or fetch extra history.
+        const strengthFits=new Map();
+        if(!resumeSession){session.scanProgress={version:P.VERSION,date,target:settings.maxCandidates,fixtures:null,cursor:0,skipped:0,pending:null,inFlight:null,apiUsed:0};this.data.sessions.push(session);}
+        const progress=session.scanProgress;if(!Number.isInteger(progress.apiUsed))progress.apiUsed=session.apiUsed||0;this.scanContext=progress;job.sessionId=id;session.status='running';session.reason=null;
+        const update=()=>{job.total=progress.fixtures?.length||0;job.processed=progress.cursor;job.accepted=session.candidates.filter(P.selected).length;job.target=progress.target;progress.updatedAt=this.now().toISOString();};update();this.save();
+        try{
+        if(progress.fixtures===null){const fixtures=date<dayKey(this.now())?[]:await this.discover(date,job);progress.fixtures=P.plan(fixtures,date,settings,this.now(),this.priority,M.normalize);update();this.save();}
+        let recheckedAt=-Infinity,recheckedPause=-1;
+        for(;;){
+            // Draft-only safety recheck: never fetch completed analyses again or remodel completed archives.
+            if(this.now().getTime()-recheckedAt>=60000||recheckedPause!==(job.pauseCount||0)||job.accepted>=progress.target||progress.cursor>=progress.fixtures.length){for(const row of session.candidates){await this.waitForLive();this.evaluateCandidate(row,settings);}recheckedAt=this.now().getTime();recheckedPause=job.pauseCount||0;}update();
+            if(job.accepted>=progress.target||progress.cursor>=progress.fixtures.length)break;
+            const f=progress.fixtures[progress.cursor];await this.waitForLive();job.message=f.home.name+' - '+f.away.name;
+            if(Date.parse(f.kickoff)<=this.now().getTime()+30*60000){progress.cursor++;progress.skipped++;progress.pending=null;update();this.save();continue;}
+            if(!progress.pending)progress.pending={fixtureId:f.fixtureId,capturedAt:this.now().toISOString(),richDoneIds:[]};
+            if(progress.pending.fixtureId!==f.fixtureId)throw Error('Tarama kayıt noktası ile maç sırası uyuşmuyor; yeni istek durduruldu.');this.save();
+            const row=await this.buildCandidate(f,session,strengthFits);
+            if(!session.candidates.some(r=>r.fixtureId===f.fixtureId))session.candidates.push(row);
+            progress.cursor++;progress.pending=null;update();this.save();this.saveCache();
+        }
         session.coupons=M.optimize(session.candidates,settings,id);session.status='complete';if(!session.coupons.length)session.reason='İstenen güven/veri/oran şartlarında 1–2 ayaklı kupon bulunamadı. Ayak ekleyerek oran zorlanmadı.';session.completedAt=this.now().toISOString();
+        session.scanSummary={date,target:progress.target,accepted:job.accepted,examined:progress.cursor,skipped:progress.skipped,available:progress.fixtures.length,stopReason:job.accepted>=progress.target?'target':'day-exhausted'};session.scanProgress=null;
         session.predictionsSha256=crypto.createHash('sha256').update(JSON.stringify(session.coupons.map(c=>c.legs.map(l=>({fixtureId:l.fixtureId,pick:l.pick}))))).digest('hex');
         this.logger(`> 🎫 Banko LAB: ${date} · ${session.candidates.length} analiz · ${session.coupons.length} kupon · Telegram YOK.`);
-        }catch(e){session.status='partial';session.reason=e.message;throw e;}finally{session.apiUsed=this.requestCount-session.apiStart;this.save();}
+        }catch(e){session.status=e instanceof P.BudgetPaused?'waiting-budget':'partial';session.reason=e.message;update();throw e;}finally{this.scanContext=null;session.apiUsed=progress.apiUsed;this.save();}
     }
     evaluateCandidate(row,settings){
         if(!row.profiles)return;
@@ -241,14 +266,17 @@ class BankoCoupon {
         try{this.save();await this.checkSession(due.s,job,{automatic:true,onlyIds:due.ids});job.status='complete';}catch(e){job.status='error';job.message=e.message;}finally{this.busy=false;job.completedAt=this.now().toISOString();try{this.save();}catch(_){}}
     }
     status(date=dayKey(this.now()),sessionId=null){validDay(date);const sessions=this.data.sessions.filter(s=>s.date===date),session=sessionId?sessions.find(s=>s.id===sessionId):sessions.at(-1)||null,coupons=session?.coupons||[];
+        const sessionView=session?JSON.parse(JSON.stringify(session)):null,selected=session?.candidates.filter(P.selected).length||0;
+        if(sessionView?.scanProgress){const p=session.scanProgress;sessionView.apiUsed=p.apiUsed??session.apiUsed;sessionView.scanProgress={version:p.version,date:p.date,target:p.target,cursor:p.cursor,total:p.fixtures?.length||0,skipped:p.skipped,updatedAt:p.updatedAt};}
         const manual=(this.data.manualSelections||[]).filter(l=>l.date===date);
         // Old manual records resolve ONLY their original revision; no API call, model rerun or store mutation.
         const sessionsById=new Map(this.data.sessions.map(s=>[s.id,s]));
         const showroomManual=manual.map(l=>({...JSON.parse(JSON.stringify(l)),showroomContext:S.normalizeContext(l.showroomSnapshot||S.snapshotFor(sessionsById.get(l.sessionId)?.candidates?.find(r=>r.fixtureId===l.fixtureId)))}));
         return {success:true,version:VERSION,runtimeVersion:RUNTIME_VERSION,date,day:dayKey(this.now()),busy:this.busy,storageError:this.storageError,settings:JSON.parse(JSON.stringify(this.data.settings)),api:{used:this.usage[dayKey(this.now())]||0,limit:this.data.settings.dailyLimit,reserve:this.reserve,remaining:M.finite(this.getQuotaRemaining())},job:this.data.latestJob,
             manualSelections:showroomManual,trackingSummary:this.trackingSummary(session,manual),strengthComparison:L.summary(session),
-            availableDates:[...new Set(this.data.sessions.map(s=>s.date))].sort().reverse(),sessions:sessions.map(s=>({id:s.id,createdAt:s.createdAt,status:s.status,couponCount:s.coupons.length})),session:session?JSON.parse(JSON.stringify(session)):null,discovery:this.data.discoveries[date]||null,
-            summary:{candidates:session?.candidates.length||0,coupons:coupons.length,won:coupons.filter(c=>c.result.status==='won').length,lost:coupons.filter(c=>c.result.status==='lost').length,pending:coupons.filter(c=>c.result.status==='pending').length,profitUnits:coupons.filter(c=>c.result.status!=='pending').reduce((sum,c)=>sum+(c.result.profitUnits||0),0)},
+            availableDates:[...new Set(this.data.sessions.map(s=>s.date))].sort().reverse(),sessions:sessions.map(s=>({id:s.id,createdAt:s.createdAt,status:s.status,couponCount:s.coupons.length})),session:sessionView,discovery:this.data.discoveries[date]||null,
+            scan:{canResume:P.resumable(session),target:session?.scanProgress?.target||session?.scanSummary?.target||null,accepted:selected,examined:session?.scanProgress?.cursor??session?.scanSummary?.examined??session?.candidates.length??0,total:session?.scanProgress?.fixtures?.length??session?.scanSummary?.available??null,stopReason:session?.scanSummary?.stopReason||null},
+            summary:{candidates:session?.candidates.length||0,selected,pas:(session?.candidates.length||0)-selected,coupons:coupons.length,won:coupons.filter(c=>c.result.status==='won').length,lost:coupons.filter(c=>c.result.status==='lost').length,pending:coupons.filter(c=>c.result.status==='pending').length,profitUnits:coupons.filter(c=>c.result.status!=='pending').reduce((sum,c)=>sum+(c.result.profitUnits||0),0)},
             disclaimer:'Banko bir mod adıdır, garanti değildir. Ham model yüzdeleri kalibrasyonsuz LAB tahminidir. Tarama ve sonuçlar manuel; yalnız seçilen maçların kontrolü isteğe bağlı otomatiktir. Telegram gönderimi yok.'};
     }
 }

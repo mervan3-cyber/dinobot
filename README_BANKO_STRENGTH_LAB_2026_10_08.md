@@ -1,6 +1,20 @@
-# Banko ALT filtreleri + Güç LAB — birleşik güncelleme
+# Banko PAS görünümü + uygun seçim sınırı + bütçede devam + Güç LAB
 
-Bu tek paket, önceki `mac-yakala-banko-alt-filtre-2026-10-08.zip` paketinin yerine geçer; ikisini peş peşe kurmanız gerekmez. Mevcut V24 + Banko + kağıt showroom + yenilenmiş panel kurulumuna yamadır, tam bot değildir.
+Bu tek paket, önceki `mac-yakala-banko-alt-filtre-2026-10-08.zip` ve `mac-yakala-banko-alt-ve-guc-lab-2026-10-08.zip` paketlerinin yerine geçer; onları ayrıca kurmanız gerekmez. Mevcut V24 + Banko + kağıt showroom + yenilenmiş panel kurulumuna yamadır, tam bot değildir.
+
+## PAS görünümü, sayı ve aynı güne bağlı tarama
+
+Analizler ve Model karşılaştırması listelerinde ana tahmini olan maçlar öndedir; kendi içlerinde başlangıç saatine göre erkenden geçe sıralanırlar. PAS kayıtları varsayılan gizlidir. PAS’ları göster kutusu açılırsa seçilenlerin ardından, kendi saat sıralarında görünürler. Arama ve sayfalama bu görünümü kullanır, ek API istemez. PAS kayıtları silinmez; sonuç özetleri görünüm filtresinden etkilenmez.
+
+“En fazla uygun ana tahmin (PAS hariç)” alanına 100 yazmak, 100 incelenen maç değil en fazla 100 uygun ana seçim demektir. PAS ve yalnız LAB seçimi olan maçlar sayılmaz. Mevcut veri/oran/model eşikleri gevşetilmez. Seçili günün (TSİ) maçları tükenince örneğin 37/100 ile tamamlanır; ertesi güne veya başka tarihe geçilmez. Her taramanın özgün tarih, lig/market ayarları, üst sınırı ve geçmiş kesimi kaydedilir.
+
+## API bütçesi dolduğunda Devam et
+
+Günlük Banko bütçesi dolunca veya canlı API rezervine gelince tarama hata olarak iptal edilmez; “waiting-budget” durumuyla diske kaydedilir. Aynı sürümde DEVAM ET · AYNI TARAMA düğmesi görünür. Bütçe artırılıp kaydedildiğinde, günlük bütçe yenilendiğinde veya genel rezerv serbest kaldığında düğmeye manuel basın. Limitler atlanmaz; otomatik bekleyip API çağırma döngüsü yoktur.
+
+Özgün tarama listesi/sırası, biten analizler, o maçta alınmış oran sayfaları ve eksik işlem noktası korunur. Biten analizler tekrar çekilmez; genel tarih/istatistik önbelleği de diske yazılır. Devam edilen sürüm model ayarlarının özgün fotoğrafını kullanır; değişen günlük bütçe ise güncel genel ayardan okunur. Başlamış maçlar atlanır, eskimiş oranlar yeni seçim sayılmaz. Ertesi gün Devam et dahi yalnız eski seçili günü bitirir; yeni güne maç eklemez. Güncel tahmin isteniyorsa ayrı yeni manuel tarama oluşturulmalıdır.
+
+Yeni kayıt noktalı tarama sunucu yeniden başlasa da manuel devam edebilir. Ancak gönderildiği halde yanıtı doğrulanamayan API isteği varsa güvenlik için yeniden deneme/Devam et kapalıdır; yeni manuel tarama gerekir. Eski paketlerin kayıt noktası olmayan yarım taramalarına sonradan ilerleme uydurulmaz. Tarama tamamlanmadan otomatik kupon onayı verilmez. API sayacı yeniden başlatma ve devamda sıfırlanmaz.
 
 ## Nerede görünür?
 
@@ -37,7 +51,7 @@ V24, canlı sinyaller, Telegram teslimi, sunucu rotaları ve ana kupon oluşturm
 
 1. Çalışan manuel Banko taramasının bitmesini bekleyin. Paketteki mevcut dosyaların yedeğini alın.
 2. ZIP içeriğini bot kök klasörüne `public/` yapısını koruyarak kopyalayın. Eski JSON kayıtlarını, önbelleği veya `.env` dosyasını silmeyin.
-3. Botu kendi mevcut çalıştırma yöntemiyle yeniden başlatın. Yeniden başlatmada kesilen tarama güvenlik nedeniyle otomatik devam etmez; canlı sırasında bekleme ise aynı çalışan süreçte kaldığı yerden devam eder.
+3. Botu kendi mevcut çalıştırma yöntemiyle yeniden başlatın. Hiçbir tarama otomatik yeniden başlamaz. Bu paketin güvenli kayıt noktalı taramaları Devam et ile manuel sürdürülebilir; eski yarım sürümler için yeni manuel tarama gerekir. Canlı sırasında bekleme aynı çalışan süreçte kaldığı yerden otomatik devam eder.
 4. Panelde Ctrl+F5 yapın. Banko ayarlarında iki ALT izin kutusu boş, Güç LAB işaretli olsun; kaydedin. Yeni manuel tarama oluşturun ve Model karşılaştırması sekmesini açın.
 5. Maçlar bittikten sonra seçili sürümde “Sonuçları getir · manuel”e basın. Ana ve LAB sonuçları ayrı izlenir.
 

@@ -1,0 +1,198 @@
+{
+  "version": "banko-scan-resume-v1-2026-10-08",
+  "createdAt": "2026-10-08T20:17:12.736Z",
+  "requires": "Current V24 + Banko + Paper Showroom + panel; combined patch, not a full bot",
+  "replaces": [
+    "mac-yakala-banko-alt-filtre-2026-10-08.zip",
+    "mac-yakala-banko-alt-ve-guc-lab-2026-10-08.zip"
+  ],
+  "files": [
+    {
+      "path": "banko_coupon.js",
+      "sha256": "099e5a4f51ab3cdfbf9fd28b12a5f0a8d512a6cd6697b53f7da749df7f13ce82",
+      "priorSha256": "034e5cbdee5c4a0b2fdc6a966e4f3ec77b1fa8a5bb00a8aea598f78a1de25e55"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "a63eb9385e3334708ca21bd0c393c75d3ffc696dcf48cf5cee78e1f867a31704",
+      "priorSha256": "7f85321f441cc213ebb02cae7695716b5b1a1d518e68b753493394fcb4f5588d"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "d66363507f3bf3285f4251757f3d0168a02fe05ca9ee92cee9a56173d4f2fe4e",
+      "priorSha256": "c3b657e22f0893372063e4412ee77d6e81cc4a30162b3006ec7aeadf48cb5b00"
+    },
+    {
+      "path": "banko_strength_lab.js",
+      "sha256": "e8eb2215701474009d82b36dbc51d06ca0cc92b4ffb5dae5131e888e34ce1864",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_scan_progress.js",
+      "sha256": "e7dfd33f2962703da4a42743b85751af7a3b3a3e04a872a910fe0f8d71e72b3b",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_choices.js",
+      "sha256": "f9dacee8471b9235c08a21c2416016468c6e8d382f4eaf17a060b5d3656cf79e",
+      "priorSha256": "b98a6051ffdce8641212eade9d120d2f81ed95fbb76079c36ebe07399d91d9db"
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "87a35954e10535f1de9b9abc8cbd9510ca4e9af1479d039640b9db73d95d5df2",
+      "priorSha256": "007c345a23fe001b65aa1509bc9e484185a1e19f29bdebc41c5ec165f20771ea"
+    },
+    {
+      "path": "public/banko_coupon.css",
+      "sha256": "eb844a8d02a76e1dbe1b585c37b844c841f844ba32c17ca1d686af9a99b420cf",
+      "priorSha256": "39601060dc2116254e843a56fa52520624d05bebc4a1fe65dd3f9672dee418ed"
+    },
+    {
+      "path": "public/banko_strength_panel.js",
+      "sha256": "93d35816b2f4afae6e2ce6d6e91ba2706d0574b27f6c9fd22bf661c4ccbe49e0",
+      "priorSha256": null
+    },
+    {
+      "path": "public/banko_strength.css",
+      "sha256": "013baabb56487374f738250a33498d39d377fc1ac96b2536c9dff82e80e4d962",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_workspace.js",
+      "sha256": "de988d6b8c3d6af68587485b280c2f29a47fbaa832ce7813e985054b1c8db049",
+      "priorSha256": "f754c8869be99afad52de7b710074c398fc4bb19f2cd2b080c7664fc5263e421"
+    },
+    {
+      "path": "index.html",
+      "sha256": "c13c49a0714b0d813fd5611579be12f82f294201d8058e9f348c7f8b22c07973",
+      "priorSha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "c13c49a0714b0d813fd5611579be12f82f294201d8058e9f348c7f8b22c07973",
+      "priorSha256": "580ece8cee23c39d5a1b3e7cb3670eb23079a5ad7b27bc8af72f18f17fda5511"
+    },
+    {
+      "path": "package.json",
+      "sha256": "fac6c6c16940e5379f36fb6fd4eee210165e0376bd9d88392782ba3aa735013c",
+      "priorSha256": "18b7b5afbd751a98648400d8c46a9781ef9bef6c355ea511833696b3031f4ecb"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "42f50fc6933549df6e92ea9af243d35069873ee80251ebda3cdee6c8fa63c73d",
+      "priorSha256": "4d257515957b6b093f6ab9bc5af546cabc7071198c6a67e9a3bf18d9add09632"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "f742202ce4ed1faa053f01414082fdbe5feab7ead93800d3477c7be57ad65d62",
+      "priorSha256": "e7d1823eecb3e5f68bda3a636324a12b8c9bdb11c0646140fb342162e65829b3"
+    },
+    {
+      "path": "banko_alternative_panel.test.js",
+      "sha256": "4c28d9d289bbd0a23c1c932af7e13387191e7e3a2fb2d8629e3eac659b2548dc",
+      "priorSha256": "1f76547aad11bab15e224d92e44f26d5a8a67f1e6916b6732242923bb25dd1f8"
+    },
+    {
+      "path": "banko_under_policy.test.js",
+      "sha256": "99527325879b1048296a2fcbcd895b09841d91690d162552374763842de5a409",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_lab.test.js",
+      "sha256": "df95495825d08c20da558c4f9b2d1ef6cff088f8ca090454b68caaabeca4fcb1",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_panel.test.js",
+      "sha256": "a41ccf33d4153990198f78303bfee50ea7f04d6b59a4b6baf94a330b9fcf28df",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_strength_scan.test.js",
+      "sha256": "1b0c3086d916740de58110147a60164c91c930ce409bf12fd229cf33f9433a92",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_scan_resume.test.js",
+      "sha256": "987118a1281dda6544bf83351bac1945b4838c973a98e0193faa31c85e8e3bb4",
+      "priorSha256": null
+    },
+    {
+      "path": "banko_scan_panel.test.js",
+      "sha256": "72965f67be3fdbbdd9b03c1ed04de8590ab82ef87c98a8d17bfcbceb52bf0c5a",
+      "priorSha256": null
+    },
+    {
+      "path": "README_BANKO_STRENGTH_LAB_2026_10_08.md",
+      "sha256": "425f571113e541fa3e309cb8991cdb077c222551f5ad5f40fbf010a65497af16",
+      "priorSha256": null
+    },
+    {
+      "path": "public/panel_theme.js",
+      "sha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0",
+      "priorSha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0"
+    },
+    {
+      "path": "public/panel_workspace.css",
+      "sha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a",
+      "priorSha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a"
+    },
+    {
+      "path": "panel_workspace.test.js",
+      "sha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e",
+      "priorSha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e"
+    }
+  ],
+  "changedFiles": [
+    "README_BANKO_STRENGTH_LAB_2026_10_08.md",
+    "banko_alternative_panel.test.js",
+    "banko_coupon.js",
+    "banko_model.js",
+    "banko_panel.test.js",
+    "banko_pause_resume.test.js",
+    "banko_routes.js",
+    "banko_scan_panel.test.js",
+    "banko_scan_progress.js",
+    "banko_scan_resume.test.js",
+    "banko_strength_lab.js",
+    "banko_strength_lab.test.js",
+    "banko_strength_panel.test.js",
+    "banko_strength_scan.test.js",
+    "banko_under_policy.test.js",
+    "index.html",
+    "package.json",
+    "public/banko_choices.js",
+    "public/banko_coupon.css",
+    "public/banko_coupon_panel.js",
+    "public/banko_strength.css",
+    "public/banko_strength_panel.js",
+    "public/index.html",
+    "public/panel_workspace.js"
+  ],
+  "tests": {
+    "scripts": 60,
+    "passed": 60,
+    "failed": 0
+  },
+  "testReport": "C:\\Users\\enes_\\Documents\\Codex\\2026-08-23\\referenced-chatgpt-conversation-this-is-an\\outputs\\v24-delivery-sync-tests-2026-10-07-banko-resume-source-v3.json",
+  "browserReport": "C:\\Users\\enes_\\Documents\\Codex\\2026-08-23\\referenced-chatgpt-conversation-this-is-an\\outputs\\panel-workspace-browser-2026-10-08-banko-resume-v2.json",
+  "defaults": {
+    "allowFullMatchUnder": false,
+    "allowSecondHalfUnder": false,
+    "strengthLabEnabled": true,
+    "showPas": false
+  },
+  "candidateLimit": "Upper cap on eligible main predictions only; selected TSİ date never changes; no forced picks",
+  "budgetResume": "Durable original-session cursor and pending odds pages, manual resume, current global daily cap/reserve, no sent/ambiguous retry",
+  "primaryGoalModelUnchanged": true,
+  "apiDirectionGateImplemented": false,
+  "strengthReadOnly": true,
+  "archivesAndManualRecordsPreserved": true,
+  "newDependencies": false,
+  "additionalLabScanProviderRequests": 0,
+  "telegramChanged": false,
+  "serverChanged": false,
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false
+}
