@@ -1,0 +1,15 @@
+.banko-market-card{margin:14px 0;padding:14px;border:1px solid var(--ui-line,#dedfd7);border-left:4px solid var(--ui-accent,#306552);border-radius:12px;background:var(--ui-raised,#f8f7f3);color:var(--ui-ink,#283632)}
+.banko-market-card summary{font-weight:650;cursor:pointer;overflow-wrap:anywhere}
+.banko-market-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:12px;margin:12px 0}
+.banko-market-choice{min-width:0;padding:14px;border:1px solid var(--ui-line,#dedfd7);border-radius:10px;background:var(--ui-surface,#fffefa);overflow-wrap:anywhere}
+.banko-market-choice h4{margin:9px 0;font-size:1.05rem;color:var(--ui-ink,#283632)}
+.banko-market-quote{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+.banko-market-quote strong{font-size:1.15rem;color:var(--ui-accent,#306552)}
+.banko-market-card p{white-space:normal;margin:9px 0;line-height:1.5}
+.banko-market-card small,.banko-market-muted{color:var(--ui-muted,#5d6862);line-height:1.5}
+.banko-market-stats{margin-top:14px;padding-top:12px;border-top:1px solid var(--ui-line,#dedfd7)}
+.banko-market-experimental{border-left:3px solid var(--ui-amber,#815c16)}
+.banko-market-result[data-result=won]{color:var(--ui-green,#276342)}
+.banko-market-result[data-result=lost]{color:var(--ui-red,#993d39)}
+.banko-settings-grid input[type=time],.banko-settings-grid select{box-sizing:border-box;min-width:0;max-width:100%;width:100%;padding:10px;border:1px solid var(--ui-line,#dedfd7);border-radius:8px;background:var(--ui-surface,#fffefa);color:var(--ui-ink,#283632)}
+.banko-settings-grid input[type=time]:disabled{opacity:.5}
