@@ -1,4 +1,5 @@
 'use strict';
+const W=require('./banko_scan_window');
 const VERSION='banko-scan-progress-v1-2026-10-08';
 class BudgetPaused extends Error{constructor(reason){super(reason==='reserve'?'Canlı API rezervi bekleniyor; tarama ilerlemesi korundu.':'Banko günlük API bütçesi doldu; tarama ilerlemesi korundu.');this.reason=reason;}}
 const selected=r=>!!r.pick;
@@ -7,7 +8,7 @@ function plan(fixtures,date,settings,now,priority,normalize){
     const seen=new Set();return fixtures.filter(f=>{
         const time=Date.parse(f.kickoff);if(!Number.isInteger(f.fixtureId)||seen.has(f.fixtureId)||!Number.isFinite(time)||!f.home?.id||!f.away?.id)return false;
         const day=dateOf(time);
-        if(day!==date||!['NS','TBD'].includes(f.status)||time<=now.getTime()+30*60000||settings.allowedLeagueIds.length&&!settings.allowedLeagueIds.includes(f.leagueId)||!settings.women&&/women|femen|feminin|\bw\b/i.test(f.league+' '+f.home.name+' '+f.away.name))return false;
+        if(day!==date||!W.contains(f.kickoff,date,settings)||!['NS','TBD'].includes(f.status)||time<=now.getTime()+30*60000||settings.allowedLeagueIds.length&&!settings.allowedLeagueIds.includes(f.leagueId)||!settings.women&&/women|femen|feminin|\bw\b/i.test(f.league+' '+f.home.name+' '+f.away.name))return false;
         seen.add(f.fixtureId);return true;
     }).sort((a,b)=>Number(priority.has(normalize(b.league)))-Number(priority.has(normalize(a.league)))||Date.parse(a.kickoff)-Date.parse(b.kickoff)||a.fixtureId-b.fixtureId);
 }

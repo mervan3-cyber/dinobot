@@ -4,22 +4,25 @@ const C=require('./public/banko_choices');
 const S=require('./public/banko_showroom');
 const L=require('./banko_strength_lab');
 const P=require('./banko_scan_progress');
+const W=require('./banko_scan_window'),ML=require('./banko_market_lab');
 // Storage schema stays v1 so existing sessions, frozen picks and API usage remain readable.
 const VERSION='banko-coupon-lab-v1-2026-10-05';
-const RUNTIME_VERSION='banko-scan-resume-v1-2026-10-08';
+const RUNTIME_VERSION='banko-market-window-v1-2026-10-10';
 class LiveDispatchDeferred extends Error {constructor(){super('Banko isteği canlı işlem için gönderilmeden ertelendi.');}}
 const DEFAULTS=Object.freeze({enabled:true,dailyLimit:2000,maxCandidates:30,maxCoupons:1,minLegOdd:1.40,maxLegOdd:2.20,
     minCouponOdd:1.95,maxCouponOdd:2.40,minSingleOdd:1.80,maxSingleOdd:2.20,minModelProbability:65,minEdgePP:0,
     maxOddsAgeHours:6,precheckMinutes:75,autoPrecheck:true,allowedLeagueIds:[],women:true,
     marketFamilies:['goals','result','halves','btts','teamGoals','corners'],predictionContext:true,
-    allowFullMatchUnder:false,allowSecondHalfUnder:false,strengthLabEnabled:true});
+    allowFullMatchUnder:false,allowSecondHalfUnder:false,strengthLabEnabled:true,marketLabEnabled:true,
+    scanWindowMode:'all-day',scanFrom:'00:00',scanTo:'23:59'});
 function dayKey(now=new Date()){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);}
 function dayAdd(day,n){return new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);}
 function validDay(day){if(typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day+'T12:00:00Z'))||new Date(day+'T12:00:00Z').toISOString().slice(0,10)!==day)throw new Error('Geçerli bir tarih seçin (YYYY-AA-GG).');return day;}
 function atomic(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.tmp-'+process.pid;fs.writeFileSync(tmp,JSON.stringify(value));fs.renameSync(tmp,file);}
 function schemaSettings(input,previous=DEFAULTS){
     if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Ayar nesnesi gerekli.');const next=JSON.parse(JSON.stringify(previous));
-    for(const key of ['enabled','autoPrecheck','women','predictionContext','allowFullMatchUnder','allowSecondHalfUnder','strengthLabEnabled'])if(input[key]!==undefined){if(typeof input[key]!=='boolean')throw new Error(key+' true/false olmalı.');next[key]=input[key];}
+    for(const key of ['enabled','autoPrecheck','women','predictionContext','allowFullMatchUnder','allowSecondHalfUnder','strengthLabEnabled','marketLabEnabled'])if(input[key]!==undefined){if(typeof input[key]!=='boolean')throw new Error(key+' true/false olmalı.');next[key]=input[key];}
+    for(const key of ['scanWindowMode','scanFrom','scanTo'])if(input[key]!==undefined)next[key]=input[key];Object.assign(next,W.normalize(next));
     const ranges={dailyLimit:[20,7500,true],maxCandidates:[1,100,true],minLegOdd:[1.4,3,false],maxLegOdd:[1.4,5,false],minCouponOdd:[1.8,4,false],maxCouponOdd:[1.8,5,false],minSingleOdd:[1.4,3,false],maxSingleOdd:[1.4,4,false],minModelProbability:[55,90,false],minEdgePP:[-10,20,false],maxOddsAgeHours:[1,24,true],precheckMinutes:[15,120,true]};
     for(const [key,[lo,hi,int]] of Object.entries(ranges))if(input[key]!==undefined){const n=M.finite(input[key]);if(n===null||n<lo||n>hi||int&&!Number.isInteger(n))throw new Error(key+` ${lo}–${hi} arasında ${int?'tam ':''}sayı olmalı.`);next[key]=n;}
     if(input.maxCoupons!==undefined){const n=M.finite(input.maxCoupons);if(!Number.isSafeInteger(n)||n<1)throw new Error('Kupon sayısı pozitif, güvenli bir tam sayı olmalı.');next.maxCoupons=n;}
@@ -129,7 +132,7 @@ class BankoCoupon {
             finally{this.busy=false;job.completedAt=this.now().toISOString();job.apiUsed=this.requestCount-requestStart;try{this.save();this.saveCache();}catch(_){}}});return this.status(date);
     }
     async schedule(date){return this.cached('schedule:'+date,20*60000,async()=>{const r=await this.call('/fixtures',{date,timezone:'Europe/Istanbul'});return (r.response||[]).map(f=>({fixtureId:f.fixture?.id,kickoff:f.fixture?.date,status:f.fixture?.status?.short,leagueId:f.league?.id,league:f.league?.name,country:f.league?.country,season:f.league?.season,home:{id:f.teams?.home?.id,name:f.teams?.home?.name},away:{id:f.teams?.away?.id,name:f.teams?.away?.name}}));});}
-    async discover(date,job){const fixtures=await this.schedule(date);const leagues=new Map();for(const f of fixtures){const old=leagues.get(f.leagueId)||{id:f.leagueId,name:f.league,country:f.country,matches:0};old.matches++;leagues.set(f.leagueId,old);}this.data.discoveries[date]={capturedAt:this.now().toISOString(),fixtures:fixtures.length,leagues:[...leagues.values()].sort((a,b)=>a.country.localeCompare(b.country)||a.name.localeCompare(b.name))};job.total=fixtures.length;job.processed=fixtures.length;this.save();return fixtures;}
+    async discover(date,job,settings=this.data.settings){const fixtures=(await this.schedule(date)).filter(f=>W.contains(f.kickoff,date,settings));const leagues=new Map();for(const f of fixtures){const old=leagues.get(f.leagueId)||{id:f.leagueId,name:f.league,country:f.country,matches:0};old.matches++;leagues.set(f.leagueId,old);}this.data.discoveries[date]={capturedAt:this.now().toISOString(),window:W.label(settings),fixtures:fixtures.length,leagues:[...leagues.values()].sort((a,b)=>a.country.localeCompare(b.country)||a.name.localeCompare(b.name))};job.total=fixtures.length;job.processed=fixtures.length;this.save();return fixtures;}
     async leagueHistory(f,season,cutoffDay){const cutoff=Date.parse(dayAdd(cutoffDay,1)+'T00:00:00+03:00');return this.cached(`history:${f.leagueId}:${season}:${cutoffDay}`,12*3600000,async()=>{const r=await this.call('/fixtures',{league:f.leagueId,season,from:'2024-01-01',to:cutoffDay,timezone:'Europe/Istanbul'});return (r.response||[]).map(row=>M.pastFixture(row,cutoff)).filter(Boolean);});}
     async richHistory(ids){const pending=this.scanContext?.pending,queried=pending?.richDoneIds||[];const missing=[...new Set(ids)].filter(id=>(!this.cache['stats:'+id]||this.cache['stats:'+id].expires<=this.now().getTime())&&!queried.includes(id));for(let i=0;i<missing.length;i+=5){const batch=missing.slice(i,i+5),r=await this.call('/fixtures',{ids:batch.join('-'),timezone:'Europe/Istanbul'});for(const f of r.response||[])if(batch.includes(f.fixture?.id))this.cache['stats:'+f.fixture.id]={expires:this.now().getTime()+3*86400000,value:M.slimRich(f)};if(pending){pending.richDoneIds=[...new Set([...(pending.richDoneIds||[]),...batch])];this.saveCache();this.save();}}
         return Object.fromEntries(ids.map(id=>[id,this.cache['stats:'+id]?.value||{id,statistics:[],players:[]}]));}
@@ -170,7 +173,7 @@ class BankoCoupon {
         this.evaluateCandidate(row,settings);return row;
     }
     async scan(date,job,resumeSession=null){
-        const session=resumeSession||{id:'banko-'+crypto.randomUUID(),date,createdAt:this.now().toISOString(),version:VERSION,choicesVersion:C.VERSION,strengthLabVersion:this.data.settings.strengthLabEnabled?L.VERSION:null,settings:JSON.parse(JSON.stringify(this.data.settings)),inputCutoffDay:dayAdd(dayKey(this.now()),-1),status:'running',candidates:[],coupons:[],reason:null,apiStart:this.requestCount,apiUsed:0};
+        const session=resumeSession||{id:'banko-'+crypto.randomUUID(),date,createdAt:this.now().toISOString(),version:VERSION,choicesVersion:C.VERSION,strengthLabVersion:this.data.settings.strengthLabEnabled?L.VERSION:null,marketLabVersion:this.data.settings.marketLabEnabled?ML.VERSION:null,settings:JSON.parse(JSON.stringify(this.data.settings)),inputCutoffDay:dayAdd(dayKey(this.now()),-1),status:'running',candidates:[],coupons:[],reason:null,apiStart:this.requestCount,apiUsed:0};
         const {settings,id}=session;
         // Fit reuse lives only for this manual scan. Never retain a growing model/RAM cache or fetch extra history.
         const strengthFits=new Map();
@@ -178,7 +181,7 @@ class BankoCoupon {
         const progress=session.scanProgress;if(!Number.isInteger(progress.apiUsed))progress.apiUsed=session.apiUsed||0;this.scanContext=progress;job.sessionId=id;session.status='running';session.reason=null;
         const update=()=>{job.total=progress.fixtures?.length||0;job.processed=progress.cursor;job.accepted=session.candidates.filter(P.selected).length;job.target=progress.target;progress.updatedAt=this.now().toISOString();};update();this.save();
         try{
-        if(progress.fixtures===null){const fixtures=date<dayKey(this.now())?[]:await this.discover(date,job);progress.fixtures=P.plan(fixtures,date,settings,this.now(),this.priority,M.normalize);update();this.save();}
+        if(progress.fixtures===null){const fixtures=date<dayKey(this.now())?[]:await this.discover(date,job,settings);progress.fixtures=P.plan(fixtures,date,settings,this.now(),this.priority,M.normalize);update();this.save();}
         let recheckedAt=-Infinity,recheckedPause=-1;
         for(;;){
             // Draft-only safety recheck: never fetch completed analyses again or remodel completed archives.
@@ -199,13 +202,14 @@ class BankoCoupon {
         }catch(e){session.status=e instanceof P.BudgetPaused?'waiting-budget':'partial';session.reason=e.message;update();throw e;}finally{this.scanContext=null;session.apiUsed=progress.apiUsed;this.save();}
     }
     evaluateCandidate(row,settings){
-        if(!row.profiles)return;
+        if(!row.profiles){if(settings.marketLabEnabled===true)row.marketLab=ML.analyse(row,settings,this.now());return;}
         row.markets=M.evaluateMarkets({update:row.oddsUpdatedAt,markets:row.markets},row.expectedGoals,row.profiles,settings,this.now(),row.kickoff);
         if(Date.parse(row.kickoff)<=this.now().getTime()+30*60000)for(const m of row.markets){m.eligible=false;m.reasons.push('Maç başlamış veya başlangıca 30 dakikadan az kalmış; yeni kupona alınmadı');}
         const eligible=row.markets.filter(m=>m.eligible).sort((a,b)=>b.modelProbability-a.modelProbability||b.dataScore-a.dataScore||a.betId-b.betId||a.selection.localeCompare(b.selection));row.pick=eligible[0]||null;
         const noPick='Sabit veri/oran/model şartlarını geçen market yok; seçim zorlanmadı';row.reasons=row.reasons.filter(r=>r!==noPick);if(!row.pick)row.reasons.push(noPick);
         // Draft-only recheck after live pauses; completed historical sessions are never re-modelled.
         if(row.strengthLab)L.evaluate(row,settings,this.now());
+        if(settings.marketLabEnabled===true)row.marketLab=ML.analyse(row,settings,this.now());
     }
     async checkSession(session,job,{automatic=false,onlyIds=null}={}){
         const ids=[...new Set(session.coupons.flatMap(c=>c.legs.filter(l=>l.result.status==='pending').map(l=>l.fixtureId)))].filter(id=>!onlyIds||onlyIds.includes(id));
@@ -237,12 +241,15 @@ class BankoCoupon {
         const ids=[...new Set([...session.coupons.flatMap(c=>c.legs.filter(l=>l.result.status==='pending'&&Date.parse(l.kickoff)<now).map(l=>l.fixtureId)),
             ...manual.filter(l=>l.result.status==='pending'&&Date.parse(l.kickoff)<now).map(l=>l.fixtureId),
             ...session.candidates.filter(row=>Date.parse(row.kickoff)<now&&L.selections(row).some(([kind])=>!['won','lost'].includes(row.strengthLab.results?.[kind]?.status))).map(row=>row.fixtureId),
+            ...session.candidates.filter(row=>Date.parse(row.kickoff)<now&&ML.selections(row).some(m=>!['won','lost'].includes(row.marketLab.results?.[m.key]?.status))).map(row=>row.fixtureId),
             ...session.candidates.filter(row=>Date.parse(row.kickoff)<now&&this.trackedMarkets(row,session.settings).some(m=>!['won','lost'].includes(row.marketResults?.[m.key]?.status))).map(row=>row.fixtureId)])];job.total=ids.length;
         for(let i=0;i<ids.length;i+=10){const batch=ids.slice(i,i+10),r=await this.call('/fixtures',{ids:batch.join('-'),timezone:'Europe/Istanbul'});for(const coupon of session.coupons)for(const leg of coupon.legs){if(!batch.includes(leg.fixtureId)||leg.result.status!=='pending')continue;const f=r.response?.find(f=>f.fixture?.id===leg.fixtureId);if(f)leg.result=M.settle(leg.pick,f);}
             for(const row of session.candidates){if(!batch.includes(row.fixtureId))continue;const f=r.response?.find(f=>f.fixture?.id===row.fixtureId);if(!f)continue;row.marketResults=row.marketResults||{};
                 for(const m of this.trackedMarkets(row,session.settings))if(!['won','lost'].includes(row.marketResults[m.key]?.status))row.marketResults[m.key]={...M.settle(m,f),checkedAt:this.now().toISOString()};}
             for(const row of session.candidates){if(!batch.includes(row.fixtureId))continue;const f=r.response?.find(f=>f.fixture?.id===row.fixtureId);if(!f)continue;
                 for(const [kind,m] of L.selections(row))if(!['won','lost'].includes(row.strengthLab.results?.[kind]?.status)){row.strengthLab.results=row.strengthLab.results||{};row.strengthLab.results[kind]={...M.settle(m,f),checkedAt:this.now().toISOString()};}}
+            for(const row of session.candidates){if(!batch.includes(row.fixtureId)||!row.marketLab)continue;const f=r.response?.find(f=>f.fixture?.id===row.fixtureId);if(!f)continue;row.marketLab.results=row.marketLab.results||{};
+                row.marketLab.actual={...ML.actual(f),checkedAt:this.now().toISOString()};for(const m of ML.selections(row))if(!['won','lost'].includes(row.marketLab.results[m.key]?.status))row.marketLab.results[m.key]={...ML.settle(m,f),checkedAt:this.now().toISOString()};}
             for(const leg of manual){if(!batch.includes(leg.fixtureId)||leg.result.status!=='pending')continue;const f=r.response?.find(f=>f.fixture?.id===leg.fixtureId);if(f){const result=M.settle(leg.pick,f);leg.result={...result,profitUnits:['won','lost'].includes(result.status)&&leg.playedOdd!==null?(result.status==='won'?leg.playedOdd-1:-1):null,checkedAt:this.now().toISOString()};}}
             job.processed+=batch.length;this.refreshCouponStates(session);this.save();}
     }
@@ -273,9 +280,9 @@ class BankoCoupon {
         const sessionsById=new Map(this.data.sessions.map(s=>[s.id,s]));
         const showroomManual=manual.map(l=>({...JSON.parse(JSON.stringify(l)),showroomContext:S.normalizeContext(l.showroomSnapshot||S.snapshotFor(sessionsById.get(l.sessionId)?.candidates?.find(r=>r.fixtureId===l.fixtureId)))}));
         return {success:true,version:VERSION,runtimeVersion:RUNTIME_VERSION,date,day:dayKey(this.now()),busy:this.busy,storageError:this.storageError,settings:JSON.parse(JSON.stringify(this.data.settings)),api:{used:this.usage[dayKey(this.now())]||0,limit:this.data.settings.dailyLimit,reserve:this.reserve,remaining:M.finite(this.getQuotaRemaining())},job:this.data.latestJob,
-            manualSelections:showroomManual,trackingSummary:this.trackingSummary(session,manual),strengthComparison:L.summary(session),
+            manualSelections:showroomManual,trackingSummary:this.trackingSummary(session,manual),strengthComparison:L.summary(session),marketComparison:ML.summary(session),
             availableDates:[...new Set(this.data.sessions.map(s=>s.date))].sort().reverse(),sessions:sessions.map(s=>({id:s.id,createdAt:s.createdAt,status:s.status,couponCount:s.coupons.length})),session:sessionView,discovery:this.data.discoveries[date]||null,
-            scan:{canResume:P.resumable(session),target:session?.scanProgress?.target||session?.scanSummary?.target||null,accepted:selected,examined:session?.scanProgress?.cursor??session?.scanSummary?.examined??session?.candidates.length??0,total:session?.scanProgress?.fixtures?.length??session?.scanSummary?.available??null,stopReason:session?.scanSummary?.stopReason||null},
+            scan:{canResume:P.resumable(session),window:W.label(session?.settings||this.data.settings),target:session?.scanProgress?.target||session?.scanSummary?.target||null,accepted:selected,examined:session?.scanProgress?.cursor??session?.scanSummary?.examined??session?.candidates.length??0,total:session?.scanProgress?.fixtures?.length??session?.scanSummary?.available??null,stopReason:session?.scanSummary?.stopReason||null},
             summary:{candidates:session?.candidates.length||0,selected,pas:(session?.candidates.length||0)-selected,coupons:coupons.length,won:coupons.filter(c=>c.result.status==='won').length,lost:coupons.filter(c=>c.result.status==='lost').length,pending:coupons.filter(c=>c.result.status==='pending').length,profitUnits:coupons.filter(c=>c.result.status!=='pending').reduce((sum,c)=>sum+(c.result.profitUnits||0),0)},
             disclaimer:'Banko bir mod adıdır, garanti değildir. Ham model yüzdeleri kalibrasyonsuz LAB tahminidir. Tarama ve sonuçlar manuel; yalnız seçilen maçların kontrolü isteğe bağlı otomatiktir. Telegram gönderimi yok.'};
     }

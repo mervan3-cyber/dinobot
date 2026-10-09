@@ -1,0 +1,194 @@
+{
+  "version": "banko-market-window-v1-2026-10-10",
+  "requires": "Existing V24 + Banko + Paper Showroom + renewed panel; combined update, not full bot",
+  "includesPrior": "Banko 2026-10-08 combined PAS/eligible target/resume/Strength LAB patch",
+  "files": [
+    {
+      "path": "banko_coupon.js",
+      "sha256": "15539afb26992acf3f5a4ce6f7d96ac69e289d444775ff708d5907ec7baf2307"
+    },
+    {
+      "path": "banko_model.js",
+      "sha256": "a63eb9385e3334708ca21bd0c393c75d3ffc696dcf48cf5cee78e1f867a31704"
+    },
+    {
+      "path": "banko_routes.js",
+      "sha256": "d66363507f3bf3285f4251757f3d0168a02fe05ca9ee92cee9a56173d4f2fe4e"
+    },
+    {
+      "path": "banko_strength_lab.js",
+      "sha256": "e8eb2215701474009d82b36dbc51d06ca0cc92b4ffb5dae5131e888e34ce1864"
+    },
+    {
+      "path": "banko_scan_progress.js",
+      "sha256": "3473fc5ab04e84937f851e8651aee04a36f3c20ad111bebecc835ce0542868cc"
+    },
+    {
+      "path": "public/banko_choices.js",
+      "sha256": "f9dacee8471b9235c08a21c2416016468c6e8d382f4eaf17a060b5d3656cf79e"
+    },
+    {
+      "path": "public/banko_coupon_panel.js",
+      "sha256": "c772f9a63b17c133e9e07e66d3371e1d27f2e2dad2276e20d0cf152e8bf16ac2"
+    },
+    {
+      "path": "public/banko_coupon.css",
+      "sha256": "eb844a8d02a76e1dbe1b585c37b844c841f844ba32c17ca1d686af9a99b420cf"
+    },
+    {
+      "path": "public/banko_strength_panel.js",
+      "sha256": "93d35816b2f4afae6e2ce6d6e91ba2706d0574b27f6c9fd22bf661c4ccbe49e0"
+    },
+    {
+      "path": "public/banko_strength.css",
+      "sha256": "013baabb56487374f738250a33498d39d377fc1ac96b2536c9dff82e80e4d962"
+    },
+    {
+      "path": "public/panel_workspace.js",
+      "sha256": "de988d6b8c3d6af68587485b280c2f29a47fbaa832ce7813e985054b1c8db049"
+    },
+    {
+      "path": "index.html",
+      "sha256": "f8233d83aa5e1f1e579adc3e580972a64c8453b86a6ebf44601186115a658ef0"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "f8233d83aa5e1f1e579adc3e580972a64c8453b86a6ebf44601186115a658ef0"
+    },
+    {
+      "path": "package.json",
+      "sha256": "774f5529cd46de81c914bc8f4ce691b24170ed906af8d3d779579c5e6a3b89be"
+    },
+    {
+      "path": "banko_panel.test.js",
+      "sha256": "1111954cb3087ec4048e594a4c354344821d93513a28370f1b4f92d1cd0d40a9"
+    },
+    {
+      "path": "banko_pause_resume.test.js",
+      "sha256": "f742202ce4ed1faa053f01414082fdbe5feab7ead93800d3477c7be57ad65d62"
+    },
+    {
+      "path": "banko_alternative_panel.test.js",
+      "sha256": "4c28d9d289bbd0a23c1c932af7e13387191e7e3a2fb2d8629e3eac659b2548dc"
+    },
+    {
+      "path": "banko_under_policy.test.js",
+      "sha256": "99527325879b1048296a2fcbcd895b09841d91690d162552374763842de5a409"
+    },
+    {
+      "path": "banko_strength_lab.test.js",
+      "sha256": "df95495825d08c20da558c4f9b2d1ef6cff088f8ca090454b68caaabeca4fcb1"
+    },
+    {
+      "path": "banko_strength_panel.test.js",
+      "sha256": "a41ccf33d4153990198f78303bfee50ea7f04d6b59a4b6baf94a330b9fcf28df"
+    },
+    {
+      "path": "banko_strength_scan.test.js",
+      "sha256": "1b0c3086d916740de58110147a60164c91c930ce409bf12fd229cf33f9433a92"
+    },
+    {
+      "path": "banko_scan_resume.test.js",
+      "sha256": "987118a1281dda6544bf83351bac1945b4838c973a98e0193faa31c85e8e3bb4"
+    },
+    {
+      "path": "banko_scan_panel.test.js",
+      "sha256": "72965f67be3fdbbdd9b03c1ed04de8590ab82ef87c98a8d17bfcbceb52bf0c5a"
+    },
+    {
+      "path": "README_BANKO_STRENGTH_LAB_2026_10_08.md",
+      "sha256": "425f571113e541fa3e309cb8991cdb077c222551f5ad5f40fbf010a65497af16"
+    },
+    {
+      "path": "public/panel_theme.js",
+      "sha256": "591f3642db73e4fe4730e47928c976ae2a73922f71fb9aad6644c9db8237a9a0"
+    },
+    {
+      "path": "public/panel_workspace.css",
+      "sha256": "78135c31e5e5ce0746b53700b0d64e6a99dee3172441a7a9d3a39ed60e67402a"
+    },
+    {
+      "path": "panel_workspace.test.js",
+      "sha256": "ee9b8d826958ac7594196a464fab6a64aa79a4959321bc6c9e3f36a02faa325e"
+    },
+    {
+      "path": "banko_market_lab.js",
+      "sha256": "0826a0590180fe4cee64e25b0742dcc0b99f161b6100a319bd18500ff4c0f63a"
+    },
+    {
+      "path": "banko_scan_window.js",
+      "sha256": "7cd676c42519864f94fad2d7768701dc85d453f768f273eef78c293c5189fb2f"
+    },
+    {
+      "path": "public/banko_market_panel.js",
+      "sha256": "0bb2c97815d7408153c89adbfd53661719ab4867951b2be9bdef0eee6040b73f"
+    },
+    {
+      "path": "public/banko_market.css",
+      "sha256": "6839456c4b170ebfa6ff9f24369fdef614811cc6485e3df52b25a06d3cecb068"
+    },
+    {
+      "path": "banko_market_lab.test.js",
+      "sha256": "ffa6126554b1c9de15cfadcc3d5c4dc4fbf41495ddfdca1548a5c429a98d5f9b"
+    },
+    {
+      "path": "banko_scan_window.test.js",
+      "sha256": "848c4472ed9469e65a52aacff28861e7e910cb00a6cc224fcb11d3508dafc3e6"
+    },
+    {
+      "path": "banko_market_panel.test.js",
+      "sha256": "4369095d46cec5c90220cc970b788cb9f2e8f53de97739144b70ac30c9c2b0c4"
+    },
+    {
+      "path": "README_BANKO_MARKET_LAB_2026_10_10.md",
+      "sha256": "1e58f9b91fdfbd70bfa3ff0826f706f5082315690e2d33fdec4ab003ec596e9c"
+    }
+  ],
+  "newChangedFiles": [
+    "README_BANKO_MARKET_LAB_2026_10_10.md",
+    "banko_coupon.js",
+    "banko_market_lab.js",
+    "banko_market_lab.test.js",
+    "banko_market_panel.test.js",
+    "banko_panel.test.js",
+    "banko_scan_progress.js",
+    "banko_scan_window.js",
+    "banko_scan_window.test.js",
+    "index.html",
+    "package.json",
+    "public/banko_coupon_panel.js",
+    "public/banko_market.css",
+    "public/banko_market_panel.js",
+    "public/index.html"
+  ],
+  "tests": {
+    "scripts": 58,
+    "passed": 58,
+    "failed": 0
+  },
+  "testReport": "C:\\Users\\enes_\\Documents\\Codex\\2026-08-23\\referenced-chatgpt-conversation-this-is-an\\outputs\\banko-tests-patch-applied-2026-10-05-market-source-v3.json",
+  "defaults": {
+    "marketLabEnabled": true,
+    "scanWindowMode": "all-day",
+    "scanFrom": "00:00",
+    "scanTo": "23:59"
+  },
+  "marketLab": "Read-only, same saved goal rates; full-result/DC, supported OVER/BTTS; exact MS1+OVER joint grid; near OVER within 3pp; count diagnostics separate",
+  "countScope": "Verified ID+name and half-lines only; 8+ records; 276 team/player shots NOT inferred",
+  "window": "Istanbul selected date only; inclusive start/end minutes; original session snapshot on resume",
+  "primaryAndStrengthModelUnchanged": true,
+  "liveAndTelegramSourceUnchanged": true,
+  "mainCouponAndEligibleTargetUnchanged": true,
+  "additionalScanProviderRequests": 0,
+  "manualResults": "Unique IDs in shared batches; count statistics remain pending if absent; no extra stats calls",
+  "newDependencies": false,
+  "archivesAndManualSelectionsPreserved": true,
+  "runtimeStoresIncluded": false,
+  "envIncluded": false,
+  "deployed": false,
+  "visualQA": {
+    "skill": "computer-use",
+    "status": "not-completed",
+    "reason": "Browser could not access loopback preview; offline DOM/theme contract tests passed"
+  }
+}
